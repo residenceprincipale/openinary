@@ -6,6 +6,7 @@ import {
   ListObjectsV2Command,
   DeleteObjectCommand,
   DeleteObjectsCommand,
+  CopyObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import https from "https";
@@ -279,6 +280,19 @@ export class S3ClientWrapper {
     }
 
     return totalDeleted;
+  }
+
+  /**
+   * Copies an object within the bucket
+   */
+  async copyObject(sourceKey: string, targetKey: string): Promise<void> {
+    await this.s3Client.send(
+      new CopyObjectCommand({
+        Bucket: this.config.bucketName,
+        CopySource: `/${this.config.bucketName}/${sourceKey}`,
+        Key: targetKey,
+      }),
+    );
   }
 
   /**

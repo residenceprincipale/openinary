@@ -315,6 +315,69 @@ storageRoute.get("/*", async (c) => {
 });
 
 /**
+ * Move/rename a file or folder
+ * PUT /storage/move
+ */
+storageRoute.put("/move", async (c) => {
+  try {
+    const { sourcePath, targetPath } = await c.req.json();
+
+    if (!sourcePath || !targetPath) {
+      return c.json({ error: "sourcePath and targetPath are required" }, 400);
+    }
+
+    let decodedSource = sourcePath.replace(/^\/+/, "").replace(/\/+$/, "");
+    let decodedTarget = targetPath.replace(/^\/+/, "").replace(/\/+$/, "");
+
+    try {
+      decodedSource = decodeURIComponent(decodedSource);
+    } catch {}
+    try {
+      decodedTarget = decodeURIComponent(decodedTarget);
+    } catch {}
+
+    if (decodedSource === decodedTarget) {
+      return c.json({ error: "source and target are the same" }, 400);
+    }
+
+    if (storageClient) {
+      await storageClient.move(decodedSource, decodedTarget);
+      storageClient.invalidateAllCacheEntries(decodedSource);
+    } else {
+      const sourceAbsolute = path.join(".", "public", decodedSource);
+      const targetAbsolute = path.join(".", "public", decodedTarget);
+
+      if (!fs.existsSync(sourceAbsolute)) {
+        return c.json({ error: "Source not found" }, 404);
+      }
+
+      // Ensure parent directory exists
+      const targetDir = path.dirname(targetAbsolute);
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+
+      fs.renameSync(sourceAbsolute, targetAbsolute);
+    }
+
+    logger.info({ source: decodedSource, target: decodedTarget }, "Moved/renamed asset");
+    return c.json({ success: true });
+  } catch (error) {
+    logger.error(
+      { error: serializeError(error) },
+      "Failed to move asset",
+    );
+    return c.json(
+      {
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      },
+      500,
+    );
+  }
+});
+
+/**
  * Delete a file from storage
  * DELETE /storage/*
  * This now performs a complete deletion including cache and jobs

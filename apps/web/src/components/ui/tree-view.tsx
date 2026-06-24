@@ -48,6 +48,7 @@ type TreeProps = React.HTMLAttributes<HTMLDivElement> & {
     defaultLeafIcon?: any
     onDocumentDrag?: (sourceItem: TreeDataItem, targetItem: TreeDataItem) => void
     onMediaSelect?: (media: MediaFile) => void
+    onContextMenu?: (item: TreeDataItem, e: React.MouseEvent) => void
 }
 
 // Helper function to find the path of an item in the tree
@@ -90,6 +91,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
             className,
             onDocumentDrag,
             onMediaSelect,
+            onContextMenu,
             ...props
         },
         ref
@@ -165,6 +167,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
                     handleDrop={handleDrop}
                     draggedItem={draggedItem}
                     onMediaSelect={onMediaSelect}
+                    onContextMenu={onContextMenu}
                     treeData={data}
                     {...props}
                 />
@@ -258,6 +261,7 @@ const TreeNode = ({
     handleDrop,
     draggedItem,
     onMediaSelect,
+    onContextMenu,
     treeData,
 }: {
     item: TreeDataItem
@@ -270,6 +274,7 @@ const TreeNode = ({
     handleDrop?: (item: TreeDataItem) => void
     draggedItem: TreeDataItem | null
     onMediaSelect?: (media: MediaFile) => void
+    onContextMenu?: (item: TreeDataItem, e: React.MouseEvent) => void
     treeData?: TreeDataItem[] | TreeDataItem
 }) => {
     const [value, setValue] = React.useState(
@@ -320,6 +325,7 @@ const TreeNode = ({
                         handleSelectChange(item)
                         item.onClick?.()
                     }}
+                    onContextMenu={(e) => onContextMenu?.(item, e)}
                     draggable={!!item.draggable}
                     onDragStart={onDragStart}
                     onDragOver={onDragOver}
@@ -353,6 +359,7 @@ const TreeNode = ({
                         handleDrop={handleDrop}
                         draggedItem={draggedItem}
                         onMediaSelect={onMediaSelect}
+                        onContextMenu={onContextMenu}
                         treeData={treeData}
                     />
                 </AccordionContent>
@@ -372,6 +379,7 @@ const TreeLeaf = React.forwardRef<
         handleDrop?: (item: TreeDataItem) => void
         draggedItem: TreeDataItem | null
         onMediaSelect?: (media: MediaFile) => void
+        onContextMenu?: (item: TreeDataItem, e: React.MouseEvent) => void
         treeData?: TreeDataItem[] | TreeDataItem
     }
 >(
@@ -386,6 +394,7 @@ const TreeLeaf = React.forwardRef<
             handleDrop,
             draggedItem,
             onMediaSelect,
+            onContextMenu,
             treeData,
             ...props
         },
@@ -453,6 +462,7 @@ const TreeLeaf = React.forwardRef<
                     item.disabled && 'opacity-50 cursor-not-allowed pointer-events-none'
                 )}
                 onClick={handleClick}
+                onContextMenu={(e) => onContextMenu?.(item, e)}
                 draggable={!!item.draggable && !item.disabled}
                 onDragStart={onDragStart}
                 onDragOver={onDragOver}

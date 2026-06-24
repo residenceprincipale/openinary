@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { FileImage, FileVideo, ArrowUpRight, Folder } from "lucide-react";
 import { useQueryState } from "nuqs";
 import { useStorageTree } from "@/hooks/use-storage-tree";
@@ -19,6 +20,15 @@ import { preloadMedia } from "@/hooks/use-preload-media";
 import { VideoThumbnail } from "@/components/video-thumbnail";
 import type { TreeDataItem } from "@/components/ui/tree-view";
 import UploadButtonWithDialog from "./upload-button-with-dialog";
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu";
+import { RenameDialog } from "@/components/rename-dialog";
+import { MoveDialog } from "@/components/move-dialog";
 
 type MediaFile = {
   id: string;
@@ -150,8 +160,26 @@ export function MediaGrid({
   sidebarOpen = false,
 }: MediaGridProps) {
   const { data: treeData, isLoading, error } = useStorageTree();
+  const queryClient = useQueryClient();
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [folderPath, setFolderPath] = useQueryState("folder");
+  const [renameItem, setRenameItem] = useState<{
+    id: string
+    name: string
+    path: string
+    isFolder: boolean
+  } | null>(null);
+  const [moveItem, setMoveItem] = useState<{
+    id: string
+    name: string
+    path: string
+  } | null>(null);
+
+  const getItemPath = (name: string): string => {
+    return pathSegments.length > 0
+      ? `${pathSegments.join("/")}/${name}`
+      : name
+  }
 
   // Parse folder path from URL - must be called before any conditional returns
   const pathSegments = useMemo(() => {
@@ -279,13 +307,14 @@ export function MediaGrid({
           ? getFolderImages(treeData, [...pathSegments, folder.name])
           : [];
         return (
-          <div
-            key={folder.id}
-            className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted/50 cursor-pointer transition-all hover:border-primary/30 hover:shadow-md"
-            onClick={() => handleFolderClick(folder.path)}
-            onMouseEnter={() => setHoveredId(folder.id)}
-            onMouseLeave={() => setHoveredId(null)}
-          >
+          <ContextMenu key={folder.id}>
+            <ContextMenuTrigger asChild>
+              <div
+                className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted/50 cursor-pointer transition-all hover:border-primary/30 hover:shadow-md"
+                onClick={() => handleFolderClick(folder.path)}
+                onMouseEnter={() => setHoveredId(folder.id)}
+                onMouseLeave={() => setHoveredId(null)}
+              >
             <div className="relative w-full h-full">
               {folderImages.length === 4 ? (
                 <div className="grid grid-cols-2 gap-0.5 w-full h-full">
@@ -363,13 +392,51 @@ export function MediaGrid({
               </p>
             </div>
           </div>
-        );
-      })}
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem
+              onClick={() => {
+                document.body.style.pointerEvents = ""
+                setRenameItem({
+                  id: folder.id,
+                  name: folder.name,
+                  path: folder.path,
+                  isFolder: true,
+                })
+              }}
+            >
+              Rename
+            </ContextMenuItem>
+            <ContextMenuItem
+              onClick={() => {
+                document.body.style.pointerEvents = ""
+                setMoveItem({ id: folder.id, name: folder.name, path: folder.path })
+              }}
+            >
+              Move to...
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              variant="destructive"
+              onClick={() => {
+                const p = folder.path;
+                if (confirm(`Delete folder "${folder.name}" and all contents?`)) {
+                  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+                  const encoded = p.split("/").map(encodeURIComponent).join("/");
+                  fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" })
+                    .then(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] }));
+                }
+              }}
+            >
+              Delete
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+      );
+    })}
 
-      {/* Render media files */}
+    {/* Render media files */}
       {files.map((media) => {
-        // For images: resize and optimize
-        // For videos: extract thumbnail at 1 second as jpg image with crop mode to avoid stretching
         const thumbnailUrl =
           media.type === "image"
             ? `${transformBaseUrl}/t/w_500,h_500,q_80/${media.path}`
@@ -377,16 +444,17 @@ export function MediaGrid({
         const isHovered = hoveredId === media.id;
 
         return (
-          <div
-            key={media.id}
-            className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted/50 cursor-pointer transition-all hover:border-primary/30 hover:shadow-md"
-            onClick={() => onMediaSelect(media)}
-            onMouseEnter={() => {
-              setHoveredId(media.id);
-              handleMediaHover(media);
-            }}
-            onMouseLeave={() => setHoveredId(null)}
-          >
+          <ContextMenu key={media.id}>
+            <ContextMenuTrigger asChild>
+              <div
+                className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted/50 cursor-pointer transition-all hover:border-primary/30 hover:shadow-md"
+                onClick={() => onMediaSelect(media)}
+                onMouseEnter={() => {
+                  setHoveredId(media.id);
+                  handleMediaHover(media);
+                }}
+                onMouseLeave={() => setHoveredId(null)}
+              >
             {media.type === "image" ? (
               <img
                 src={thumbnailUrl}
@@ -413,8 +481,61 @@ export function MediaGrid({
               </p>
             </div>
           </div>
-        );
-      })}
+          </ContextMenuTrigger>
+          <ContextMenuContent>
+            <ContextMenuItem
+              onClick={() => {
+                document.body.style.pointerEvents = ""
+                setRenameItem({
+                  id: media.id,
+                  name: media.name,
+                  path: getItemPath(media.name),
+                  isFolder: false,
+                })
+              }}
+            >
+              Rename
+            </ContextMenuItem>
+            <ContextMenuItem
+              onClick={() => {
+                document.body.style.pointerEvents = ""
+                setMoveItem({ id: media.id, name: media.name, path: getItemPath(media.name) })
+              }}
+            >
+              Move to...
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              variant="destructive"
+              onClick={() => {
+                const path = getItemPath(media.name);
+                if (confirm(`Delete "${media.name}"?`)) {
+                  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+                  const encoded = path.split("/").map(encodeURIComponent).join("/");
+                  fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" })
+                    .then(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] }));
+                }
+              }}
+            >
+              Delete
+            </ContextMenuItem>
+          </ContextMenuContent>
+        </ContextMenu>
+      );
+    })}
+
+    <RenameDialog
+        isOpen={!!renameItem}
+        item={renameItem ? { id: renameItem.id, name: renameItem.name, path: renameItem.path } : null}
+        isFolder={renameItem?.isFolder ?? false}
+        onClose={() => setRenameItem(null)}
+      />
+      <MoveDialog
+        isOpen={!!moveItem}
+        item={moveItem ? { id: moveItem.id, name: moveItem.name, path: moveItem.path } : null}
+        treeData={treeData}
+        onClose={() => setMoveItem(null)}
+      />
     </div>
   );
 }

@@ -298,6 +298,41 @@ export class CloudStorage {
   }
 
   /**
+   * Moves/renames a file or folder
+   * For folders, recursively copies all children then deletes originals
+   */
+  async move(sourcePath: string, targetPath: string): Promise<void> {
+    const sourcePrefix = `public/${sourcePath}`;
+    const targetPrefix = `public/${targetPath}`;
+
+    const objects = await this.s3Client.listObjects(sourcePrefix);
+
+    if (objects.length === 0) {
+      // single file or empty prefix
+      await this.s3Client.copyObject(sourcePrefix, targetPrefix);
+      await this.s3Client.deleteObject(sourcePrefix);
+      this.cache.delete(`original:${sourcePath}`);
+      return;
+    }
+
+    // folder: copy all then bulk delete
+    const sourcePrefixSlash = sourcePrefix.endsWith("/") ? sourcePrefix : `${sourcePrefix}/`;
+    const targetPrefixSlash = targetPrefix.endsWith("/") ? targetPrefix : `${targetPrefix}/`;
+
+    for (const obj of objects) {
+      const relativePath = obj.key.startsWith(sourcePrefixSlash)
+        ? obj.key.slice(sourcePrefixSlash.length)
+        : obj.key.slice(sourcePrefix.length);
+      const newKey = relativePath ? `${targetPrefixSlash}${relativePath}` : targetPrefixSlash;
+      await this.s3Client.copyObject(obj.key, newKey);
+    }
+
+    const keys = objects.map((obj) => obj.key);
+    await this.s3Client.deleteObjects(keys);
+    this.cache.delete(`original:${sourcePath}`);
+  }
+
+  /**
    * Invalidates the cache for a specific file
    */
   invalidateCache(originalPath: string, params?: any): void {
