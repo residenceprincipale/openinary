@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { FileImage, FileVideo, ArrowUpRight } from "lucide-react";
+import { FileImage, FileVideo, ArrowUpRight, Folder } from "lucide-react";
 import { useQueryState } from "nuqs";
 import { useStorageTree } from "@/hooks/use-storage-tree";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -348,6 +348,9 @@ export function MediaGrid({
                   </span>
                 </div>
               )}
+            </div>
+            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+              <Folder className="w-16 h-16 text-white opacity-80" />
             </div>
             <div
               className={cn(
