@@ -65,7 +65,7 @@ function getFolderImages(
         ".psd",
       ].some((ext) => lower.endsWith(ext));
       if (isImage) {
-        images.push([...folderPath, item.name].join("/"));
+        images.push(item.id);
       }
     }
   }
@@ -122,14 +122,10 @@ function findItemsInPath(
         lowerName.endsWith(".webm");
 
       if (isImage || isVideo) {
-        const filePath =
-          targetPath.length > 0
-            ? `${targetPath.join("/")}/${item.name}`
-            : item.name;
         files.push({
           id: item.id,
           name: item.name,
-          path: filePath,
+          path: item.id,
           type: isImage ? "image" : "video",
         });
       }

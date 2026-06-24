@@ -1,5 +1,6 @@
 import { Context, Hono } from "hono";
 import { createStorageClient } from "../utils/storage/index";
+import type { AuthVariables } from "../middleware/auth";
 import fs from "fs";
 import path from "path";
 import logger, { serializeError } from "../utils/logger";
@@ -14,7 +15,7 @@ import {
 import { TransformService } from "../services/transform.service";
 import heicConvert from 'heic-convert';
 
-const upload = new Hono();
+const upload = new Hono<AuthVariables>();
 const storage = createStorageClient();
 const transformService = new TransformService();
 
@@ -462,16 +463,22 @@ upload.post("/", async (c) => {
           fileName: normalizedFileName
         } = await normalizeUploadFormat(buffer, mimeType, rawSanitizedPath)
 
+        // Prefix path with user ID for per-user asset isolation (non-admin only)
+        const user = c.get("user");
+        const isAdmin = user?.role === "admin";
+        const userPrefix = !isAdmin ? (user?.id || "unknown") : undefined;
+        const userPrefixedPath = userPrefix ? `${userPrefix}/${normalizedPath}` : normalizedPath;
+
         // Compute a unique file path to avoid overwriting existing files
-        let finalPath = normalizedPath;
+        let finalPath = userPrefixedPath;
 
         if (storage) {
-          finalPath = await getUniqueFilePath(normalizedPath, async (p) =>
+          finalPath = await getUniqueFilePath(userPrefixedPath, async (p) =>
             storage.existsOriginalPath(p),
           );
         } else {
           finalPath = await getUniqueFilePath(
-            normalizedPath,
+            userPrefixedPath,
             localFileExists,
           );
         }
@@ -706,11 +713,18 @@ upload.post("/createfolder", async (c) => {
       );
     }
 
+    const user = c.get("user");
+    const isAdmin = user?.role === "admin";
+    const userPrefix = !isAdmin ? (user?.id || "unknown") : undefined;
+    const prefixedPath = userPrefix
+      ? `${userPrefix}/${rawSanitizedPath}`
+      : rawSanitizedPath;
+
     if (storage) {
-      const alreadyExists = await storage.folderExists(rawSanitizedPath);
+      const alreadyExists = await storage.folderExists(prefixedPath);
 
       if (alreadyExists) {
-        logger.warn({ folder: rawSanitizedPath }, "Folder already exists");
+        logger.warn({ folder: prefixedPath }, "Folder already exists");
         return c.json(
           {
             success: false,
@@ -721,8 +735,8 @@ upload.post("/createfolder", async (c) => {
         );
       }
 
-      await storage.createFolder(rawSanitizedPath);
-      logger.info({ folder: rawSanitizedPath }, "Folder marker created");
+      await storage.createFolder(prefixedPath);
+      logger.info({ folder: prefixedPath }, "Folder marker created");
 
       return c.json(
         {
@@ -735,7 +749,7 @@ upload.post("/createfolder", async (c) => {
     }
 
     const localBasePath = path.join(".", "public");
-    const localPath = path.join(".", "public", rawSanitizedPath);
+    const localPath = path.join(".", "public", prefixedPath);
 
     if (!fs.existsSync(localBasePath)) {
       logger.error({ folder }, "Local storage path does not exist");

@@ -9,6 +9,7 @@ export type AuthVariables = {
       id: string;
       email: string;
       name: string;
+      role: string;
     } | null;
     apiKey: {
       id: string;
@@ -59,10 +60,17 @@ export async function apiKeyAuth(c: Context<AuthVariables>, next: Next) {
           });
 
           c.set("user", {
-            id: result.key.referenceId, // userId associated with the API key
+            id: result.key.referenceId,
             email: "",
             name: "",
+            role: '',
           });
+          // Fetch role from DB for API key auth
+          try {
+            const { db } = await import("shared/auth");
+            const user = db.prepare("SELECT role FROM user WHERE id = ?").get(result.key.referenceId) as { role: string } | undefined;
+            if (user) c.set("user", { ...c.get("user")!, role: user.role });
+          } catch {}
 
           // Audit log: successful API key authentication
           auditLog("auth.api_key.success", {
@@ -132,6 +140,7 @@ export async function apiKeyAuth(c: Context<AuthVariables>, next: Next) {
             id: sessionResult.user.id,
             email: sessionResult.user.email,
             name: sessionResult.user.name,
+            role: (sessionResult.user as any).role || 'user',
           });
 
           c.set("apiKey", null); // No API key, using session

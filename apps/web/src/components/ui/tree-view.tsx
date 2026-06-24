@@ -51,29 +51,6 @@ type TreeProps = React.HTMLAttributes<HTMLDivElement> & {
 }
 
 // Helper function to find the path of an item in the tree
-function findItemPath(
-    items: TreeDataItem[] | TreeDataItem,
-    targetId: string,
-    currentPath: string[] = []
-): string[] | null {
-    const itemsArray = Array.isArray(items) ? items : [items]
-    
-    for (const item of itemsArray) {
-        const newPath = [...currentPath, item.name]
-        
-        if (item.id === targetId) {
-            return newPath
-        }
-        
-        if (item.children && item.children.length > 0) {
-            const found = findItemPath(item.children, targetId, newPath)
-            if (found) return found
-        }
-    }
-    
-    return null
-}
-
 // Helper function to check if an item is a media file
 function isMediaFile(item: TreeDataItem): { isMedia: boolean; type?: "image" | "video" } {
     const lowerName = item.name.toLowerCase()
@@ -448,18 +425,15 @@ const TreeLeaf = React.forwardRef<
             
             // Check if it's a media file
             const mediaCheck = isMediaFile(item)
-            if (mediaCheck.isMedia && onMediaSelect && treeData) {
-                const pathSegments = findItemPath(treeData, item.id)
-                if (pathSegments && pathSegments.length > 0) {
-                    const media: MediaFile = {
-                        id: item.id,
-                        name: item.name,
-                        path: pathSegments.join("/"),
-                        type: mediaCheck.type!,
-                    }
-                    onMediaSelect(media)
-                    return
+            if (mediaCheck.isMedia && onMediaSelect) {
+                const media: MediaFile = {
+                    id: item.id,
+                    name: item.name,
+                    path: item.id,
+                    type: mediaCheck.type!,
                 }
+                onMediaSelect(media)
+                return
             }
             
             // Default behavior for non-media files

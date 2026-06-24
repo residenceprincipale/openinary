@@ -83,35 +83,23 @@ export default function SetupPage() {
     },
   });
 
-  // Check if user is already authenticated or if setup is already complete
   useEffect(() => {
-    const checkAuthAndSetup = async () => {
+    const checkAuth = async () => {
       try {
-        // First, validate authentication configuration
         const configValidation = await validateAuthConfig();
-        
         if (!configValidation.isValid) {
-          // Show configuration error and block access
           setConfigError(configValidation.error || "Configuration error");
           setCheckingSetup(false);
           return;
         }
-
-        // Next, check if user is already authenticated
         const session = await authClient.getSession();
-        
         if (session?.data?.session) {
-          // User is already signed in, redirect to home
-          router.push("/");
+          setCheckingSetup(false);
           return;
         }
-
-        // If not authenticated, check if setup is already complete
         const response = await fetch("/api/check-setup");
         const data = await response.json();
-        
         if (data.setupComplete) {
-          // Users already exist, redirect to login
           router.push("/login");
         } else {
           setCheckingSetup(false);
@@ -121,8 +109,7 @@ export default function SetupPage() {
         setCheckingSetup(false);
       }
     };
-
-    checkAuthAndSetup();
+    checkAuth();
   }, [router]);
 
   // ANIMATIONS COMMENTED OUT - Form displays immediately
@@ -343,10 +330,10 @@ export default function SetupPage() {
         </div>
         <div className="text-center">
           <h1 className="text-3xl font-bold tracking-tight">
-            Initial Setup
+            Create User
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Create the first administrator account
+            Create a new user account
           </p>
         </div>
 
@@ -451,7 +438,7 @@ export default function SetupPage() {
             >
               {form.formState.isSubmitting
                 ? "Creating account..."
-                : "Create administrator account"}
+                : "Create account"}
             </Button>
           </form>
         </Form>

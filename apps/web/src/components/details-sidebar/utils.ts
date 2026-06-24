@@ -4,10 +4,8 @@ import type { MediaFile } from "./types"
 export function findAssetInTree(
   items: TreeDataItem[],
   assetId: string,
-  basePath: string = ""
 ): MediaFile | null {
   for (const item of items) {
-    const currentPath = basePath ? `${basePath}/${item.name}` : item.name
     const lowerName = item.name.toLowerCase()
 
     const isImage =
@@ -28,13 +26,13 @@ export function findAssetInTree(
       return {
         id: item.id,
         name: item.name,
-        path: currentPath,
+        path: item.id,
         type: isImage ? "image" : "video",
       }
     }
 
     if (item.children && item.children.length > 0) {
-      const found = findAssetInTree(item.children, assetId, currentPath)
+      const found = findAssetInTree(item.children, assetId)
       if (found) return found
     }
   }

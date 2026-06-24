@@ -1,32 +1,8 @@
 import { NextResponse } from "next/server";
-import Database from "better-sqlite3";
-import path from "path";
 import logger from "@/lib/logger";
-import { auth } from "@/lib/auth";
+import { auth, db } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
-
-// Helper function to check if any admin account exists
-function hasAdminAccount(): boolean {
-  try {
-    // Use the same database path as the API server / Better Auth
-    // In Docker, the database lives at /app/data/auth.db (controlled by DB_PATH)
-    // In development, fall back to the previous relative path behaviour
-    const isDocker = process.env.DOCKER_CONTAINER === "true";
-    const defaultDbPath = isDocker
-      ? "/app/data/auth.db"
-      : path.join(process.cwd(), "../../data/auth.db");
-    const dbPath = process.env.DB_PATH || defaultDbPath;
-    const db = new Database(dbPath, { readonly: true });
-    const result = db.prepare("SELECT COUNT(*) as count FROM user").get() as {
-      count: number;
-    };
-    db.close();
-    return result.count > 0;
-  } catch (error) {
-    return false;
-  }
-}
 
 export async function POST(request: Request) {
   const betterAuthUrl =
@@ -37,14 +13,6 @@ export async function POST(request: Request) {
     })();
 
   try {
-    // Security check: Prevent account creation if an admin already exists
-    if (hasAdminAccount()) {
-      return NextResponse.json(
-        { error: "Setup already completed. Account creation is disabled." },
-        { status: 403 },
-      );
-    }
-
     // Parse request body
     const body = await request.json();
     const { email, password, name } = body;
@@ -86,13 +54,19 @@ export async function POST(request: Request) {
     // Call Better Auth directly (server-side) to avoid HTTP round-trips through
     // the public reverse proxy (e.g. Coolify/nginx), which would return HTML
     // instead of JSON and cause "Unexpected token '<'" parse errors.
-    logger.info("[Setup] Creating admin account", { email, betterAuthUrl });
+    logger.info("[Setup] Creating account", { email, betterAuthUrl });
 
     const authResponse = await auth.api.signUpEmail({
       body: { email, password, name },
     });
 
-    logger.info("[Setup] Admin account created successfully", { email });
+    // First user gets admin role
+    const count = db.prepare("SELECT COUNT(*) as count FROM user").get() as { count: number };
+    if (count.count === 1) {
+      db.prepare("UPDATE user SET role = 'admin' WHERE id = ?").run(authResponse.user.id);
+    }
+
+    logger.info("[Setup] Account created successfully", { email });
     return NextResponse.json(authResponse, { status: 201 });
   } catch (error: any) {
     logger.error("[Setup] Error creating admin account", {

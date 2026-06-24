@@ -62,7 +62,8 @@ export function initializeDatabase(db: Database.Database) {
         createdAt INTEGER NOT NULL,
         updatedAt INTEGER NOT NULL,
         image TEXT,
-        twoFactorEnabled INTEGER DEFAULT 0
+        twoFactorEnabled INTEGER DEFAULT 0,
+        role TEXT NOT NULL DEFAULT 'user'
       );
     `);
   }

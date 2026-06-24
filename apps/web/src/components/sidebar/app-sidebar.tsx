@@ -7,8 +7,10 @@ import {
   GalleryVerticalEnd,
   Image as ImageIcon,
   Package,
+  Users,
   Video,
 } from "lucide-react"
+import { useSession } from "@/lib/auth-client";
 
 import { NavMain } from "@/components/sidebar/nav-main"
 import { NavProjects } from "@/components/sidebar/nav-projects"
@@ -35,28 +37,15 @@ import {
 } from "@/components/ui/sidebar"
 import Link from "next/link"
 
-// This is sample data.
-const data = {
-  navMain: [
-    {
-      title: "Assets",
-      url: "/",
-      icon: Package,
-      isActive: true,
-    },
-    {
-      title: "Image",
-      url: "/",
-      icon: ImageIcon,
-      disabled: true,
-    },
-    {
-      title: "Video",
-      url: "/",
-      icon: Video,
-      disabled: true,
-    },
-  ],
+function useNavItems() {
+  const { data: session } = useSession();
+  const isAdmin = (session?.user as any)?.role === "admin";
+  return [
+    { title: "Assets", url: "/", icon: Package, isActive: true },
+    ...(isAdmin ? [{ title: "Users", url: "/users", icon: Users }] : []),
+    { title: "Image", url: "/", icon: ImageIcon, disabled: true },
+    { title: "Video", url: "/", icon: Video, disabled: true },
+  ];
 }
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
@@ -66,6 +55,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 export function AppSidebar({ onMediaSelect, ...props }: AppSidebarProps) {
   const { state } = useSidebar()
   const isCollapsed = state === "collapsed"
+  const navItems = useNavItems()
   
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -81,7 +71,7 @@ export function AppSidebar({ onMediaSelect, ...props }: AppSidebarProps) {
         </Link>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navItems} />
         <NavProjects onMediaSelect={onMediaSelect} />
       </SidebarContent>
       <SidebarFooter>

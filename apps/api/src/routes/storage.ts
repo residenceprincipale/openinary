@@ -1,9 +1,11 @@
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { createStorageClient } from "../utils/storage";
 import fs from "fs";
 import path from "path";
 import logger, { serializeError } from "../utils/logger";
 import { deleteAssetCompletely } from "../utils/asset-deletion";
+import type { AuthVariables } from "../middleware/auth";
 
 type StorageNode = {
   name: string;
@@ -21,7 +23,7 @@ type TreeDataItem = {
   disabled?: boolean;
 };
 
-const storageRoute = new Hono();
+const storageRoute = new Hono<AuthVariables>();
 const storageClient = createStorageClient();
 
 function buildLocalTree(rootDir: string): StorageNode {
@@ -149,40 +151,64 @@ function storageTreeToTreeData(root: StorageNode): TreeDataItem[] {
 
 storageRoute.get("/", async (c) => {
   try {
+    const user = c.get("user");
+    const userPrefix = user?.id ? `${user.id}/` : "";
+    const isAdmin = user?.role === "admin";
+
     let root: StorageNode;
 
     if (storageClient) {
-      // List only objects in the public/ folder
       const objects = await storageClient.list("public/");
-
-      // Remove the public/ prefix from all keys
       const publicObjects = objects
         .filter((obj) => obj.key.startsWith("public/"))
         .map((obj) => ({
           ...obj,
-          key: obj.key.substring(7), // Remove "public/" prefix (7 characters)
+          key: obj.key.substring(7),
         }));
 
-      root = buildTreeFromKeys(publicObjects);
+      // Per-user isolation: filter by user prefix, admin sees all
+      const filtered = isAdmin
+        ? publicObjects
+        : publicObjects.filter((obj) => obj.key.startsWith(userPrefix));
+
+      root = buildTreeFromKeys(filtered);
+
+      // For non-admin, extract the user's subtree (skip the UUID folder level)
+      // Paths keep the user prefix so transform URLs resolve correctly
+      if (!isAdmin && userPrefix) {
+        const prefixName = userPrefix.replace(/\/$/, "");
+        const userNode = root.children?.find((c) => c.name === prefixName);
+        root = {
+          ...root,
+          children: userNode?.children ?? [],
+        };
+      }
     } else {
       const publicDir = path.join(".", "public");
-      root = buildLocalTree(publicDir);
+      if (!isAdmin && userPrefix) {
+        const userDir = path.join(publicDir, userPrefix);
+        if (fs.existsSync(userDir)) {
+          const userTree = buildLocalTree(userDir);
+          const prefix = userPrefix.replace(/\/$/, "");
+          const prependPrefix = (node: StorageNode): StorageNode => ({
+            ...node,
+            path: node.path ? `${prefix}/${node.path}` : prefix,
+            children: node.children?.map(prependPrefix),
+          });
+          root = prependPrefix(userTree);
+        } else {
+          root = { name: "storage", path: "", type: "directory", children: [] };
+        }
+      } else {
+        root = buildLocalTree(publicDir);
+      }
     }
 
     const treeData = storageTreeToTreeData(root);
-
     return c.json(treeData);
   } catch (error) {
-    logger.error(
-      { error: serializeError(error) },
-      "Failed to list storage contents",
-    );
-    return c.json(
-      {
-        error: "Failed to list storage contents",
-      },
-      500,
-    );
+    logger.error({ error: serializeError(error) }, "Failed to list storage contents");
+    return c.json({ error: "Failed to list storage contents" }, 500);
   }
 });
 

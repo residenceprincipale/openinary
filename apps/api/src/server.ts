@@ -79,7 +79,11 @@ async function initializeAuth() {
       
       if (signUpResult) {
         const userId = signUpResult.user.id;
-        
+
+        // Set the system user as admin
+        const db = auth.options.database;
+        db.prepare("UPDATE user SET role = 'admin' WHERE id = ?").run(userId);
+
         // Create an API key for this user
         const apiKeyResult = await auth.api.createApiKey({
           body: {

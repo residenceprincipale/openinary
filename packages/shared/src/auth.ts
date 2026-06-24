@@ -78,6 +78,15 @@ function initializeTables() {
   const missingTables = requiredTables.filter((table) => !tableExists(table));
 
   if (missingTables.length === 0) {
+    try { db.exec("DROP TRIGGER IF EXISTS prevent_multiple_users"); } catch {}
+    // Migration: add role column if missing
+    try {
+      const hasRole = db.prepare("SELECT COUNT(*) as count FROM pragma_table_info('user') WHERE name='role'").get() as { count: number };
+      if (!hasRole.count) {
+        db.exec("ALTER TABLE user ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
+        db.exec("UPDATE user SET role = 'admin' WHERE id = (SELECT id FROM user ORDER BY createdAt ASC LIMIT 1)");
+      }
+    } catch {}
     // check if the apiKey has the correct schema
     const hasReferenceId = db.prepare("SELECT COUNT(*) as count FROM pragma_table_info('apiKey') WHERE name='referenceId'").get() as { count: number };
     
@@ -132,7 +141,7 @@ function initializeTables() {
       })();
     }
 
-    return; // Tables already exist
+    return;
   }
 
   console.log(`Initializing database tables: ${missingTables.join(", ")}...`);
@@ -148,35 +157,13 @@ function initializeTables() {
         createdAt INTEGER NOT NULL,
         updatedAt INTEGER NOT NULL,
         image TEXT,
-        twoFactorEnabled INTEGER DEFAULT 0
+        twoFactorEnabled INTEGER DEFAULT 0,
+        role TEXT NOT NULL DEFAULT 'user'
       );
     `);
   }
 
-  // SECURITY: Enforce a hard limit of a single user/admin at the database level.
-  // This closes any race-condition window where two sign-ups could occur concurrently.
-  // We implement this via a BEFORE INSERT trigger that aborts when at least one row exists.
-  try {
-    const triggerExists = db
-      .prepare(
-        "SELECT name FROM sqlite_master WHERE type='trigger' AND name='prevent_multiple_users'"
-      )
-      .get();
-
-    if (!triggerExists) {
-      db.exec(`
-        CREATE TRIGGER prevent_multiple_users
-        BEFORE INSERT ON user
-        WHEN (SELECT COUNT(*) FROM user) >= 1
-        BEGIN
-          SELECT RAISE(ABORT, 'Only one user account is allowed in this deployment');
-        END;
-      `);
-    }
-  } catch {
-    // If we cannot create the trigger (older SQLite, read-only, etc.),
-    // we still rely on higher-level guards to prevent additional admins.
-  }
+  // ponytail: trigger removed — multi-user support
 
   // Session table
   if (!tableExists("session")) {
@@ -326,6 +313,16 @@ if (isProduction && !isBuildTime) {
 
 export const auth = betterAuth({
   database: db,
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        required: true,
+        defaultValue: "user",
+        input: false,
+      },
+    },
+  },
   emailAndPassword: {
     enabled: true,
     disableSignUp: false, // Allow signup (will be checked manually in the setup page)
@@ -379,16 +376,6 @@ export const auth = betterAuth({
     }),
   ],
 });
-
-// Helper function to check if any admin account exists
-export function hasAdminAccount(): boolean {
-  try {
-    const result = db.prepare("SELECT COUNT(*) as count FROM user").get() as { count: number };
-    return result.count > 0;
-  } catch (error) {
-    return false;
-  }
-}
 
 export type AuthSession = typeof auth.$Infer.Session.session;
 export type AuthUser = typeof auth.$Infer.Session.user;
