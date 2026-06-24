@@ -44,6 +44,10 @@ function UsersPageContent() {
   const [newRole, setNewRole] = useState<"user" | "admin">("user");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editRole, setEditRole] = useState<"user" | "admin">("user");
 
   const isAdmin =
     !isPending && (session?.user as any)?.role === "admin";
@@ -109,6 +113,26 @@ function UsersPageContent() {
     } finally {
       setCreating(false);
     }
+  };
+
+  const startEdit = (u: User) => {
+    setEditingId(u.id);
+    setEditName(u.name);
+    setEditEmail(u.email);
+    setEditRole(u.role as "user" | "admin");
+  };
+
+  const handleEdit = async () => {
+    if (!editingId) return;
+    try {
+      const res = await fetch(`${apiBaseUrl}/users/${editingId}`, {
+        method: "PATCH", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editName, email: editEmail, role: editRole }),
+      });
+      if (res.ok) { setEditingId(null); fetchUsers(); }
+      else setError("Failed to update user");
+    } catch { setError("Failed to update user"); }
   };
 
   const handleDelete = async (id: string) => {
@@ -212,6 +236,7 @@ function UsersPageContent() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b text-sm text-muted-foreground">
+                    <th className="text-left p-4 font-medium">User ID</th>
                     <th className="text-left p-4 font-medium">Name</th>
                     <th className="text-left p-4 font-medium">Email</th>
                     <th className="text-left p-4 font-medium">Role</th>
@@ -222,27 +247,44 @@ function UsersPageContent() {
                 <tbody>
                   {users.map((u) => (
                     <tr key={u.id} className="border-b last:border-0">
-                      <td className="p-4">{u.name}</td>
-                      <td className="p-4 text-muted-foreground">{u.email}</td>
-                      <td className="p-4">
-                        <Badge variant={u.role === "admin" ? "default" : "secondary"}>
-                          {u.role}
-                        </Badge>
-                      </td>
-                      <td className="p-4 text-muted-foreground text-sm">
-                        {new Date(u.createdAt * 1000).toLocaleDateString()}
-                      </td>
-                      <td className="p-4 text-right">
-                        {u.id !== session?.user?.id && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDelete(u.id)}
-                          >
-                            Delete
-                          </Button>
-                        )}
-                      </td>
+                      {editingId === u.id ? (
+                        <>
+                          <td className="p-4 text-muted-foreground font-mono text-xs">{u.id}</td>
+                          <td className="p-4">
+                            <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-8 text-sm" />
+                          </td>
+                          <td className="p-4">
+                            <Input value={editEmail} onChange={(e) => setEditEmail(e.target.value)} className="h-8 text-sm" />
+                          </td>
+                          <td className="p-4">
+                            <select className="flex h-8 w-full rounded-md border border-input bg-background px-2 text-sm" value={editRole} onChange={(e) => setEditRole(e.target.value as "user" | "admin")}>
+                              <option value="user">User</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          </td>
+                          <td className="p-4 text-muted-foreground text-sm">{new Date(u.createdAt).toLocaleDateString()}</td>
+                          <td className="p-4 text-right space-x-2">
+                            <Button variant="default" size="sm" onClick={handleEdit}>Save</Button>
+                            <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="p-4 text-muted-foreground font-mono text-xs">{u.id}</td>
+                          <td className="p-4">{u.name}</td>
+                          <td className="p-4 text-muted-foreground">{u.email}</td>
+                          <td className="p-4">
+                            <Badge variant={u.role === "admin" ? "default" : "secondary"}>{u.role}</Badge>
+                          </td>
+                          <td className="p-4 text-muted-foreground text-sm">{new Date(u.createdAt).toLocaleDateString()}</td>
+                          <td className="p-4 text-right">
+                            <Button variant="outline" size="sm" className="mr-2" onClick={() => startEdit(u)}>Edit</Button>
+                            {u.id !== session?.user?.id && (
+                              <Button variant="destructive" size="sm" onClick={() => handleDelete(u.id)}>Delete</Button>
+                            )}
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>

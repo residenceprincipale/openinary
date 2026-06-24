@@ -44,6 +44,31 @@ usersRoute.post("/", requireAdmin, async (c) => {
   }
 });
 
+usersRoute.patch("/:id", requireAdmin, async (c) => {
+  try {
+    const { id } = c.req.param();
+    const { name, email, role } = await c.req.json();
+    const existing = db.prepare("SELECT id FROM user WHERE id = ?").get(id) as { id: string } | undefined;
+    if (!existing) return c.json({ error: "User not found" }, 404);
+    const updates: string[] = [];
+    const params: any[] = [];
+    if (name !== undefined) { updates.push("name = ?"); params.push(name); }
+    if (email !== undefined) { updates.push("email = ?"); params.push(email); }
+    if (role !== undefined) {
+      if (!["admin", "user"].includes(role)) return c.json({ error: "Invalid role" }, 400);
+      updates.push("role = ?"); params.push(role);
+    }
+    if (updates.length === 0) return c.json({ error: "No fields to update" }, 400);
+    params.push(id);
+    db.prepare(`UPDATE user SET ${updates.join(", ")} WHERE id = ?`).run(...params);
+    // ponytail: password update skipped — needs bcrypt dep or better-auth API
+    return c.json({ success: true });
+  } catch (error) {
+    logger.error({ error: serializeError(error) }, "Failed to update user");
+    return c.json({ error: "Failed to update user" }, 500);
+  }
+});
+
 usersRoute.delete("/:id", requireAdmin, async (c) => {
   try {
     const { id } = c.req.param();
