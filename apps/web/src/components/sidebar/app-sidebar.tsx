@@ -7,6 +7,7 @@ import {
   GalleryVerticalEnd,
   Image as ImageIcon,
   Package,
+  Settings,
   Users,
   Video,
 } from "lucide-react"
@@ -43,8 +44,9 @@ function useNavItems() {
   return [
     { title: "Assets", url: "/", icon: Package, isActive: true },
     ...(isAdmin ? [{ title: "Users", url: "/users", icon: Users }] : []),
-    { title: "Image", url: "/", icon: ImageIcon, disabled: true },
-    { title: "Video", url: "/", icon: Video, disabled: true },
+    { title: "Config", url: "/config", icon: Settings },
+    // { title: "Image", url: "/", icon: ImageIcon, disabled: true },
+    // { title: "Video", url: "/", icon: Video, disabled: true },
   ];
 }
 

@@ -13,6 +13,7 @@ import queueEvents from "./routes/queue-events";
 import queue from "./routes/queue";
 import invalidateRoute from "./routes/invalidate";
 import usersRoute from "./routes/users";
+import configRoute from "./routes/config";
 import { apiKeyAuth } from "./middleware/auth";
 import { publicRateLimit } from "./middleware/rate-limit";
 import { validateApiSecret } from "./utils/signature";
@@ -115,5 +116,9 @@ app.route("/api-keys", apiKeys);
 // User management routes (protected + admin check inside)
 app.use("/users/*", apiKeyAuth);
 app.route("/users", usersRoute);
+
+// Config routes (protected)
+app.use("/config/*", apiKeyAuth);
+app.route("/config", configRoute);
 
 export default app;

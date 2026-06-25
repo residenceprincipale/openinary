@@ -1,29 +1,17 @@
 import type { TransformFunction } from './types';
+import { getDefaults } from '../transform-defaults';
 
-/**
- * Apply quality settings to a video using CRF (Constant Rate Factor)
- * CRF range: 0 (lossless) to 51 (lowest quality)
- * 
- * Quality mapping:
- * - quality 100 → CRF 18 (very high quality)
- * - quality 50 → CRF 28 (medium quality)
- * - quality 10 → CRF 45 (low quality)
- */
 export const applyQuality: TransformFunction = (
   command,
   context
 ) => {
-  // Skip quality settings for thumbnail extraction
   if (context.isThumbnail) {
     return command;
   }
 
   const { quality } = context.params;
-
-  // Default quality if not specified: 60 (CRF 31 - faster encoding for 8K)
-  // This prevents ffmpeg from re-encoding without compression
-  // Lower quality = faster encoding, especially important for 8K videos
-  const defaultQuality = 60;
+  const cfg = (getDefaults().video || {}) as { quality?: number };
+  const defaultQuality = cfg.quality ?? 60;
   const qualityValue = quality !== undefined
     ? (typeof quality === 'string' ? parseInt(quality, 10) : quality)
     : defaultQuality;

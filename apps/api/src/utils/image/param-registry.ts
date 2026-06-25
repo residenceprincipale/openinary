@@ -5,6 +5,7 @@ import { applyRotation } from './rotation';
 import { applyQuality } from './quality';
 import { applyResize } from './resize';
 import { applyRoundCorners } from './round-corners';
+import { getDefaults } from '../transform-defaults';
 
 /**
  * Parameter processor function type
@@ -195,12 +196,14 @@ export const applyResizeComposite: ParamProcessor = (image, _value, allParams) =
   if (!allParams.width && !allParams.height && !allParams.resize) {
     return image;
   }
-  
+
+  const cfg = (getDefaults().image || {}) as { crop?: string; gravity?: string };
+
   return applyResize(
     image,
     allParams.resize,
-    (allParams.crop || 'fill') as CropMode,
-    (allParams.gravity || 'center') as GravityMode,
+    (allParams.crop || cfg.crop || 'fill') as CropMode,
+    (allParams.gravity || cfg.gravity || 'center') as GravityMode,
     allParams.background,
     allParams.width,
     allParams.height

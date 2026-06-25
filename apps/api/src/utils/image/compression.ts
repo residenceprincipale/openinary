@@ -1,6 +1,7 @@
 import sharp from 'sharp';
 import { TransformParams, ImageFormat, ImageAnalysis, OptimizationResult } from './types';
 import logger, { serializeError } from '../logger';
+import { getDefaults } from '../transform-defaults';
 
 export class Compression {
   private static readonly FORMAT_PRIORITIES = {
@@ -321,21 +322,21 @@ export class Compression {
       return userQuality;
     }
 
-    let baseQuality = 85;
+    const cfg = getDefaults().image || {};
+    let baseQuality = cfg.quality ?? 85;
     
-    // Simplified format-specific adjustments
     switch (format) {
       case 'avif':
-        baseQuality = 80; // AVIF can handle slightly lower quality
+        baseQuality = cfg.quality ?? 80;
         break;
       case 'webp':
-        baseQuality = 85;
+        baseQuality = cfg.quality ?? 85;
         break;
       case 'jpeg':
-        baseQuality = 90; // Higher quality for JPEG
+        baseQuality = cfg.quality ?? 90;
         break;
       case 'png':
-        return 100; // PNG is lossless, no quality adjustment needed
+        return 100;
     }
     
     // Simplified size-based adjustment (less aggressive)
