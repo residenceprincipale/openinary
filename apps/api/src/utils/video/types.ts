@@ -11,6 +11,7 @@ export interface VideoContext {
   params: VideoTransformParams;
   isImageOutput: boolean;
   isThumbnail: boolean;
+  duration?: number;
 }
 
 /**

@@ -65,7 +65,8 @@ async function convertWithSharp(
  * - 5-minute timeout protection (accommodates 8K videos)
  *
  * Thumbnail pipeline detail:
- *   1. ffmpeg seeks to tt_N and extracts one JPEG frame (universal support).
+ *   1. ffmpeg probes duration, then seeks to min(tt_N, duration-0.5) and
+ *      extracts one JPEG frame (universal support).
  *   2. If the requested format needs sharp (webp, avif, png, gif), the JPEG
  *      buffer is post-processed by sharp — this avoids relying on optional
  *      ffmpeg build flags such as libwebp.
@@ -98,6 +99,18 @@ export const transformVideo = async (
   // Generate output path using the ffmpeg-friendly format
   const outputPath = join(tmpDir, `${randomUUID()}.${ffmpegFormat}`);
 
+  // Probe duration so thumbnail extraction can clamp to a valid position
+  let duration: number | undefined;
+  if (isThumbnail) {
+    try {
+      const { getVideoInfo } = await import('./video-info');
+      const info = await getVideoInfo(inputPath);
+      duration = info.duration;
+    } catch {
+      // probe failure is non-fatal — thumbnail will fall back to seeking 0
+    }
+  }
+
   // Build context object
   const context: VideoContext = {
     inputPath,
@@ -106,6 +119,7 @@ export const transformVideo = async (
     params,
     isImageOutput,
     isThumbnail,
+    duration,
   };
 
   // Apply transformations pipeline and execute
