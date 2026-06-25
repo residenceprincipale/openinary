@@ -11,7 +11,8 @@ import type { TreeDataItem } from "./ui/tree-view"
 
 type MoveDialogProps = {
   isOpen: boolean
-  item: { id: string; name: string; path: string } | null
+  item?: { id: string; name: string; path: string } | null
+  items?: { id: string; name: string; path: string }[]
   treeData: TreeDataItem[] | undefined
   onClose: () => void
 }
@@ -28,23 +29,28 @@ function flattenFolders(items: TreeDataItem[], prefix = ""): { name: string; pat
   return result
 }
 
-export function MoveDialog({ isOpen, item, treeData, onClose }: MoveDialogProps) {
+export function MoveDialog({ isOpen, item, items, treeData, onClose }: MoveDialogProps) {
   const queryClient = useQueryClient()
   const [targetFolder, setTargetFolder] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
 
+  const movingItems = items || (item ? [item] : [])
+  const isBatch = movingItems.length > 1
+
   const folders = useMemo(() => {
     if (!treeData) return []
-    return flattenFolders(treeData).filter((f) => f.path !== item?.path)
-  }, [treeData, item?.path])
+    const movingPaths = new Set(movingItems.map(i => i.path))
+    return flattenFolders(treeData).filter((f) => !movingPaths.has(f.path))
+  }, [treeData, movingItems])
 
   useEffect(() => {
-    if (item) {
+    if (movingItems.length > 0) {
       setTargetFolder("")
       setError("")
     }
-  }, [item])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
 
   useEffect(() => {
     if (!isOpen) document.body.style.pointerEvents = ""
@@ -56,25 +62,22 @@ export function MoveDialog({ isOpen, item, treeData, onClose }: MoveDialogProps)
   }
 
   const handleSubmit = async () => {
-    if (!item) return
+    if (movingItems.length === 0) return
     setError("")
     setIsSubmitting(true)
     try {
       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
-      const targetPath = targetFolder ? `${targetFolder}/${item.name}` : item.name
-
-      const res = await fetch(`${apiBaseUrl}/storage/move`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourcePath: item.path, targetPath }),
-        credentials: "include",
-      })
-
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || data.message || "Failed to move")
-      }
-
+      await Promise.allSettled(
+        movingItems.map((movingItem) => {
+          const targetPath = targetFolder ? `${targetFolder}/${movingItem.name}` : movingItem.name
+          return fetch(`${apiBaseUrl}/storage/move`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ sourcePath: movingItem.path, targetPath }),
+            credentials: "include",
+          })
+        }),
+      )
       await queryClient.invalidateQueries({ queryKey: ["storage-tree"] })
       close()
     } catch (err) {
@@ -85,15 +88,15 @@ export function MoveDialog({ isOpen, item, treeData, onClose }: MoveDialogProps)
   }
 
   return (
-    <Dialog open={isOpen && !!item} onOpenChange={(open) => { if (!open) close() }}>
+    <Dialog open={isOpen && movingItems.length > 0} onOpenChange={(open) => { if (!open) close() }}>
       <DialogContent className="flex flex-col gap-0 p-0 max-w-2xl [&>button:last-child]:top-3.5">
         <DialogHeader className="contents space-y-0 text-left">
           <DialogTitle className="border-b px-6 py-4 text-base">Move to...</DialogTitle>
         </DialogHeader>
         <div className="px-6 py-4 space-y-4">
-          {item && (
+          {movingItems.length > 0 && (
             <p className="text-xs text-muted-foreground">
-              Moving: <code>{item.name}</code>
+              Moving {isBatch ? `${movingItems.length} items` : <><code>{movingItems[0].name}</code></>}
             </p>
           )}
           <div className="space-y-2">
@@ -129,9 +132,14 @@ export function MoveDialog({ isOpen, item, treeData, onClose }: MoveDialogProps)
                 ))}
               </div>
             )}
-            {targetFolder && (
+            {targetFolder && !isBatch && movingItems.length === 1 && (
               <p className="text-xs text-muted-foreground">
-                Will move to: <code>{targetFolder}/{item?.name}</code>
+                Will move to: <code>{targetFolder}/{movingItems[0].name}</code>
+              </p>
+            )}
+            {targetFolder && isBatch && (
+              <p className="text-xs text-muted-foreground">
+                Will move {movingItems.length} items to <code>{targetFolder}</code>
               </p>
             )}
           </div>

@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { FileImage, FileVideo, ArrowUpRight, Folder } from "lucide-react";
+import {
+  FileImage, FileVideo, ArrowUpRight, Folder,
+  CheckCircle, Circle, Trash2, Pencil,
+} from "lucide-react";
 import { useQueryState } from "nuqs";
 import { useStorageTree } from "@/hooks/use-storage-tree";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,6 +32,7 @@ import {
 } from "@/components/ui/context-menu";
 import { RenameDialog } from "@/components/rename-dialog";
 import { MoveDialog } from "@/components/move-dialog";
+import { BatchRenameDialog } from "@/components/batch-rename-dialog";
 
 type MediaFile = {
   id: string;
@@ -176,6 +180,42 @@ export function MediaGrid({
     name: string
     path: string
   } | null>(null);
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+  const [batchMoveItems, setBatchMoveItems] = useState<{id: string; name: string; path: string}[] | null>(null);
+  const [batchRenameItems, setBatchRenameItems] = useState<{name: string; path: string}[] | null>(null);
+  const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
+  const [selectionBox, setSelectionBox] = useState<{left: number; top: number; width: number; height: number} | null>(null);
+
+  const toggleSelection = useCallback((path: string) => {
+    setSelectedPaths(prev => {
+      const next = new Set(prev)
+      if (next.has(path)) next.delete(path)
+      else next.add(path)
+      return next
+    })
+  }, [])
+
+  const clearSelection = useCallback(() => setSelectedPaths(new Set()), [])
+
+  const selectedCount = selectedPaths.size
+
+  const doBatchDelete = useCallback(async () => {
+    const count = selectedPaths.size
+    if (!count) return
+    const msg = count === 1 ? "Delete this file?" : `Delete ${count} files?`
+    if (!confirm(msg)) return
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
+    await Promise.allSettled(
+      [...selectedPaths].map((path) => {
+        const encoded = path.split("/").map(encodeURIComponent).join("/")
+        return fetch(`${apiBaseUrl}/storage/${encoded}`, {
+          method: "DELETE", credentials: "include",
+        })
+      }),
+    )
+    await queryClient.invalidateQueries({ queryKey: ["storage-tree"] })
+    clearSelection()
+  }, [selectedPaths, queryClient, clearSelection])
 
   const doMove = async (sourcePath: string, targetFolder: string) => {
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
@@ -211,6 +251,50 @@ export function MediaGrid({
     if (!treeData) return { folders: [], files: [] };
     return findItemsInPath(treeData, pathSegments);
   }, [treeData, pathSegments]);
+
+  const allItems = useMemo(() => [
+    ...folders.map(f => ({ path: f.path, name: f.name })),
+    ...files.map(f => ({ path: getItemPath(f.name), name: f.name })),
+  ], [folders, files])
+
+  // ponytail: shift-click range, no ctrl+click toggle-on-main-click needed yet
+  const selectRange = useCallback((fromIdx: number, toIdx: number) => {
+    setSelectedPaths(prev => {
+      const next = new Set(prev)
+      const start = Math.min(fromIdx, toIdx)
+      const end = Math.max(fromIdx, toIdx)
+      for (let i = start; i <= end; i++) next.add(allItems[i].path)
+      return next
+    })
+  }, [allItems])
+
+  const handleItemClick = useCallback((item: { path: string; name: string }, index: number, e: React.MouseEvent) => {
+    if (e.shiftKey && lastClickedIndex !== null) {
+      e.preventDefault()
+      selectRange(lastClickedIndex, index)
+    } else if (e.metaKey || e.ctrlKey) {
+      e.preventDefault()
+      toggleSelection(item.path)
+    } else {
+      setSelectedPaths(new Set())
+    }
+    setLastClickedIndex(index)
+  }, [lastClickedIndex, selectRange, toggleSelection])
+
+  // ponytail: clears selection on folder nav — keeps UX simple
+  useEffect(() => { clearSelection() }, [folderPath, clearSelection])
+
+  // ponytail: Cmd+A selects all visible items, skips if input focused
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'a' && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+        e.preventDefault()
+        setSelectedPaths(new Set(allItems.map(i => i.path)))
+      }
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [allItems])
 
   // Adjust grid columns based on sidebar state
   const gridColsClass = sidebarOpen
@@ -327,20 +411,74 @@ export function MediaGrid({
     },
   }
 
+  // ponytail: rectangle drag-select, O(n) intersection on mouseup
+  const gridMouseHandlers = {
+    onMouseDown: (e: React.MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('[data-item-path], button, a, [role="button"]')) {
+        e.preventDefault()
+        const container = e.currentTarget as HTMLElement
+        const startX = e.clientX
+        const startY = e.clientY
+
+        const onMove = (e: MouseEvent) => {
+          const rect = container.getBoundingClientRect()
+          setSelectionBox({
+            left: Math.min(startX, e.clientX) - rect.left,
+            top: Math.min(startY, e.clientY) - rect.top,
+            width: Math.abs(e.clientX - startX),
+            height: Math.abs(e.clientY - startY),
+          })
+        }
+
+        const onUp = (e: MouseEvent) => {
+          document.removeEventListener('mousemove', onMove)
+          document.removeEventListener('mouseup', onUp)
+          setSelectionBox(null)
+
+          if (Math.abs(e.clientX - startX) < 5 && Math.abs(e.clientY - startY) < 5) {
+            clearSelection()
+            return
+          }
+
+          const selLeft = Math.min(startX, e.clientX)
+          const selTop = Math.min(startY, e.clientY)
+          const selRight = Math.max(startX, e.clientX)
+          const selBottom = Math.max(startY, e.clientY)
+
+          const selected: string[] = []
+          container.querySelectorAll('[data-item-path]').forEach((el) => {
+            const r = el.getBoundingClientRect()
+            if (selLeft < r.right && selRight > r.left && selTop < r.bottom && selBottom > r.top)
+              selected.push(el.getAttribute('data-item-path')!)
+          })
+
+          setSelectedPaths(new Set(selected))
+        }
+
+        document.addEventListener('mousemove', onMove)
+        document.addEventListener('mouseup', onUp)
+      }
+    },
+  }
+
   if (folders.length === 0 && files.length === 0) {
     return (
-      <div className={cn("flex flex-col items-center justify-center h-64 rounded-lg border-2 border-dashed transition-colors text-muted-foreground space-y-4", gridDragOver && "border-primary bg-accent/30 outline-dashed outline-2 outline-primary outline-offset-2")} {...gridHandlers}>
+      <div className="relative" {...gridMouseHandlers}>
+      <div className={cn("flex flex-col items-center justify-center h-64 rounded-lg border-2 border-dashed transition-colors text-muted-foreground space-y-4 select-none", gridDragOver && "border-primary bg-accent/30 outline-dashed outline-2 outline-primary outline-offset-2")} {...gridHandlers}>
         <FileImage className="h-12 w-12 opacity-50" />
         <p>This folder is empty.</p>
+      </div>
       </div>
     );
   }
 
   return (
-    <div className={cn(`grid ${gridColsClass} gap-4`, gridDragOver && "outline-dashed outline-2 outline-primary outline-offset-2 rounded-lg")} {...gridHandlers}>
+    <div className="relative h-full" {...gridMouseHandlers}>
+    <div className={cn(`grid ${gridColsClass} gap-4 select-none`, gridDragOver && "outline-dashed outline-2 outline-primary outline-offset-2 rounded-lg")} {...gridHandlers}>
       {/* Render folders */}
-      {folders.map((folder) => {
+      {folders.map((folder, i) => {
         const isHovered = hoveredId === folder.id;
+        const isSelected = selectedPaths.has(folder.path)
         const folderImages = treeData
           ? getFolderImages(treeData, [...pathSegments, folder.name])
           : [];
@@ -348,11 +486,19 @@ export function MediaGrid({
           <ContextMenu key={folder.id}>
             <ContextMenuTrigger asChild>
               <div
+                data-item-path={folder.path}
                 className={cn(
                   "group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted/50 cursor-pointer transition-all hover:border-primary/30 hover:shadow-md",
-                   dragOverId === folder.id && "outline-dashed outline-2 outline-primary outline-offset-2"
+                   dragOverId === folder.id && "outline-dashed outline-2 outline-primary outline-offset-2",
+                   isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
                 )}
-                onClick={() => handleFolderClick(folder.path)}
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey) {
+                    handleItemClick({ path: folder.path, name: folder.name }, i, e)
+                  } else {
+                    handleFolderClick(folder.path)
+                  }
+                }}
                 onMouseEnter={() => setHoveredId(folder.id)}
                 onMouseLeave={() => setHoveredId(null)}
                 draggable
@@ -378,6 +524,20 @@ export function MediaGrid({
                   if (src) doMove(src, folder.path)
                 }}
               >
+            {/* Folder selection checkbox */}
+            <div
+              className={cn(
+                "absolute top-2 left-2 z-10 transition-opacity",
+                isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              )}
+              onClick={(e) => { e.stopPropagation(); toggleSelection(folder.path) }}
+            >
+              {isSelected ? (
+                <CheckCircle className="size-5 text-primary" />
+              ) : (
+                <Circle className="size-5 text-white/80 drop-shadow-md" />
+              )}
+            </div>
             <div className="relative w-full h-full">
               {folderImages.length === 4 ? (
                 <div className="grid grid-cols-2 gap-0.5 w-full h-full">
@@ -499,19 +659,30 @@ export function MediaGrid({
     })}
 
     {/* Render media files */}
-      {files.map((media) => {
+      {files.map((media, i) => {
         const thumbnailUrl =
           media.type === "image"
             ? `${transformBaseUrl}/t/w_500,h_500,q_80/${media.path}`
             : `${transformBaseUrl}/t/t_true,tt_5,f_webp,w_500,h_500,c_fill,q_80/${media.path}`;
         const isHovered = hoveredId === media.id;
-
+        const filePath = getItemPath(media.name)
+        const isSelected = selectedPaths.has(filePath)
         return (
           <ContextMenu key={media.id}>
             <ContextMenuTrigger asChild>
               <div
-                className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted/50 cursor-pointer transition-all hover:border-primary/30 hover:shadow-md"
-                onClick={() => onMediaSelect(media)}
+                data-item-path={filePath}
+                className={cn(
+                  "group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted/50 cursor-pointer transition-all hover:border-primary/30 hover:shadow-md",
+                  isSelected && "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                )}
+                onClick={(e) => {
+                  if (e.metaKey || e.ctrlKey || e.shiftKey) {
+                    handleItemClick({ path: filePath, name: media.name }, folders.length + i, e)
+                  } else {
+                    onMediaSelect(media)
+                  }
+                }}
                 onMouseEnter={() => {
                   setHoveredId(media.id);
                   handleMediaHover(media);
@@ -519,10 +690,24 @@ export function MediaGrid({
                 onMouseLeave={() => setHoveredId(null)}
                 draggable
                 onDragStart={(e) => {
-                  e.dataTransfer.setData("application/x-openinary-move", getItemPath(media.name))
+                  e.dataTransfer.setData("application/x-openinary-move", filePath)
                   e.dataTransfer.effectAllowed = "move"
                 }}
               >
+                {/* Selection checkbox */}
+                <div
+                  className={cn(
+                    "absolute top-2 left-2 z-10 transition-opacity",
+                    isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                  )}
+                  onClick={(e) => { e.stopPropagation(); toggleSelection(filePath) }}
+                >
+                  {isSelected ? (
+                    <CheckCircle className="size-5 text-primary" />
+                  ) : (
+                    <Circle className="size-5 text-white/80 drop-shadow-md" />
+                  )}
+                </div>
             {media.type === "image" ? (
               <img
                 src={thumbnailUrl}
@@ -592,6 +777,47 @@ export function MediaGrid({
       );
     })}
 
+      {/* Batch action bar */}
+      {selectedCount > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-popover border rounded-full shadow-lg px-5 py-3 text-sm">
+          <span className="text-muted-foreground whitespace-nowrap">{selectedCount} selected</span>
+          <div className="w-px h-5 bg-border" />
+          <button
+            onClick={() => {
+              setBatchRenameItems(
+                [...selectedPaths].map((p) => ({ name: p.split("/").pop()!, path: p }))
+              )
+            }}
+            className="flex items-center gap-1.5 hover:text-foreground text-muted-foreground transition-colors"
+          >
+            <Pencil className="size-4" /> Rename
+          </button>
+          <button
+            onClick={() => {
+              setBatchMoveItems(
+                [...selectedPaths].map((p) => {
+                  const name = p.split("/").pop()!
+                  return { id: name, name, path: p }
+                })
+              )
+            }}
+            className="flex items-center gap-1.5 hover:text-foreground text-muted-foreground transition-colors"
+          >
+            <Folder className="size-4" /> Move
+          </button>
+          <button
+            onClick={doBatchDelete}
+            className="flex items-center gap-1.5 text-destructive hover:text-destructive/80 transition-colors"
+          >
+            <Trash2 className="size-4" /> Delete
+          </button>
+          <div className="w-px h-5 bg-border" />
+          <button onClick={clearSelection} className="hover:text-foreground text-muted-foreground transition-colors">
+            Clear
+          </button>
+        </div>
+      )}
+
     <RenameDialog
         isOpen={!!renameItem}
         item={renameItem ? { id: renameItem.id, name: renameItem.name, path: renameItem.path } : null}
@@ -599,11 +825,29 @@ export function MediaGrid({
         onClose={() => setRenameItem(null)}
       />
       <MoveDialog
-        isOpen={!!moveItem}
+        isOpen={!!moveItem || !!batchMoveItems}
         item={moveItem ? { id: moveItem.id, name: moveItem.name, path: moveItem.path } : null}
         treeData={treeData}
-        onClose={() => setMoveItem(null)}
+        onClose={() => { setMoveItem(null); setBatchMoveItems(null) }}
       />
+      <BatchRenameDialog
+        isOpen={!!batchRenameItems}
+        items={batchRenameItems}
+        onClose={() => setBatchRenameItems(null)}
+      />
+
+      {selectionBox && (
+        <div
+          className="absolute pointer-events-none z-10 border-2 border-primary bg-primary/10 rounded-sm"
+          style={{
+            left: selectionBox.left,
+            top: selectionBox.top,
+            width: selectionBox.width,
+            height: selectionBox.height,
+          }}
+        />
+      )}
+    </div>
     </div>
   );
 }
