@@ -181,11 +181,7 @@ function CachePageContent() {
                         <p className="text-xs text-muted-foreground">of {formatBytes(local.maxSize)}</p>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-4">
-                      <Button variant="destructive" onClick={clearAll} disabled={local.totalFiles === 0 && (!cloud?.enabled || (cloud.totalFiles ?? 0) === 0)}>
-                        <Trash2 className="size-4" />
-                        Clear All Cache
-                      </Button>
+                    <div className="flex flex-wrap gap-4 items-end">
                       <div className="flex items-end gap-2">
                         <div className="space-y-1">
                           <Label htmlFor="clearDays">Clear local older than (days)</Label>
@@ -193,6 +189,10 @@ function CachePageContent() {
                         </div>
                         <Button variant="outline" onClick={clearOld} disabled={local.totalFiles === 0}>Clear Old</Button>
                       </div>
+                      <Button variant="destructive" onClick={clearAll} disabled={local.totalFiles === 0 && (!cloud?.enabled || (cloud.totalFiles ?? 0) === 0)}>
+                        <Trash2 className="size-4" />
+                        Clear All Cache
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
