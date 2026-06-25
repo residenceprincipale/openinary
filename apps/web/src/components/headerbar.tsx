@@ -1,4 +1,7 @@
+import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useQueryState } from "nuqs";
+import { cn } from "@/lib/utils";
 import CreateFolderButtonWithDialog from "./create-folder-button-with-dialog";
 import DeleteFolderButton from "./delete-folder-button";
 import {
@@ -12,6 +15,55 @@ import {
 import { Separator } from "./ui/separator";
 import { SidebarTrigger } from "./ui/sidebar";
 import UploadButtonWithDialog from "./upload-button-with-dialog";
+
+const MOVE_TYPE = "application/x-openinary-move"
+
+function DroppableBreadcrumbLink({
+  targetPath,
+  segment,
+  onNavigate,
+}: {
+  targetPath: string | null
+  segment: string
+  onNavigate: () => void
+}) {
+  const queryClient = useQueryClient()
+  const [isDragOver, setIsDragOver] = useState(false)
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+    const src = e.dataTransfer.getData(MOVE_TYPE)
+    if (!src) return
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
+    const name = src.split('/').pop()
+    const dest = targetPath ? `${targetPath}/${name}` : name
+    if (dest === src) return
+    fetch(`${baseUrl}/storage/move`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sourcePath: src, targetPath: dest }),
+      credentials: "include",
+    }).finally(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] }))
+  }
+
+  return (
+    <BreadcrumbLink
+      onClick={onNavigate}
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes(MOVE_TYPE)) {
+          e.preventDefault()
+          setIsDragOver(true)
+        }
+      }}
+      onDragLeave={() => setIsDragOver(false)}
+      onDrop={handleDrop}
+      className={cn("cursor-pointer px-1", isDragOver && "text-primary font-semibold outline-dashed outline-1 outline-primary rounded")}
+    >
+      {segment}
+    </BreadcrumbLink>
+  )
+}
 
 export default function HeaderBar() {
   const [folderPath, setFolderPath] = useQueryState("folder");
@@ -28,12 +80,11 @@ export default function HeaderBar() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink
-                  onClick={() => setFolderPath(null)}
-                  className="cursor-pointer"
-                >
-                  Assets
-                </BreadcrumbLink>
+                <DroppableBreadcrumbLink
+                  targetPath={null}
+                  segment="Assets"
+                  onNavigate={() => setFolderPath(null)}
+                />
               </BreadcrumbItem>
               {folderPath &&
                 folderPath
@@ -54,12 +105,11 @@ export default function HeaderBar() {
                           {isLast ? (
                             <BreadcrumbPage>{segment}</BreadcrumbPage>
                           ) : (
-                            <BreadcrumbLink
-                              onClick={() => setFolderPath(pathToSegment)}
-                              className="cursor-pointer"
-                            >
-                              {segment}
-                            </BreadcrumbLink>
+                            <DroppableBreadcrumbLink
+                              targetPath={pathToSegment}
+                              segment={segment}
+                              onNavigate={() => setFolderPath(pathToSegment)}
+                            />
                           )}
                         </BreadcrumbItem>
                       </div>

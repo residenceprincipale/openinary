@@ -162,6 +162,8 @@ export function MediaGrid({
   const { data: treeData, isLoading, error } = useStorageTree();
   const queryClient = useQueryClient();
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const [gridDragOver, setGridDragOver] = useState(false);
   const [folderPath, setFolderPath] = useQueryState("folder");
   const [renameItem, setRenameItem] = useState<{
     id: string
@@ -174,6 +176,22 @@ export function MediaGrid({
     name: string
     path: string
   } | null>(null);
+
+  const doMove = async (sourcePath: string, targetFolder: string) => {
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
+    const name = sourcePath.split('/').pop()
+    const targetPath = targetFolder ? `${targetFolder}/${name}` : name
+    if (targetPath === sourcePath) return
+    try {
+      await fetch(`${baseUrl}/storage/move`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourcePath, targetPath }),
+        credentials: "include",
+      })
+    } catch {}
+    queryClient.invalidateQueries({ queryKey: ["storage-tree"] })
+  }
 
   const getItemPath = (name: string): string => {
     return pathSegments.length > 0
@@ -289,9 +307,29 @@ export function MediaGrid({
     preloadMedia(previewUrl, media.type);
   };
 
+  const currentFolder = pathSegments.join("/")
+
+  const gridHandlers = {
+    onDragOver: (e: React.DragEvent) => {
+      if (e.dataTransfer.types.includes("application/x-openinary-move")) {
+        e.preventDefault()
+        setGridDragOver(true)
+      }
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node)) setGridDragOver(false)
+    },
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault()
+      setGridDragOver(false)
+      const src = e.dataTransfer.getData("application/x-openinary-move")
+      if (src) doMove(src, currentFolder)
+    },
+  }
+
   if (folders.length === 0 && files.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 text-muted-foreground space-y-4">
+      <div className={cn("flex flex-col items-center justify-center h-64 rounded-lg border-2 border-dashed transition-colors text-muted-foreground space-y-4", gridDragOver && "border-primary bg-accent/30 outline-dashed outline-2 outline-primary outline-offset-2")} {...gridHandlers}>
         <FileImage className="h-12 w-12 opacity-50" />
         <p>This folder is empty.</p>
       </div>
@@ -299,7 +337,7 @@ export function MediaGrid({
   }
 
   return (
-    <div className={`grid ${gridColsClass} gap-4`}>
+    <div className={cn(`grid ${gridColsClass} gap-4`, gridDragOver && "outline-dashed outline-2 outline-primary outline-offset-2 rounded-lg")} {...gridHandlers}>
       {/* Render folders */}
       {folders.map((folder) => {
         const isHovered = hoveredId === folder.id;
@@ -310,10 +348,35 @@ export function MediaGrid({
           <ContextMenu key={folder.id}>
             <ContextMenuTrigger asChild>
               <div
-                className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted/50 cursor-pointer transition-all hover:border-primary/30 hover:shadow-md"
+                className={cn(
+                  "group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted/50 cursor-pointer transition-all hover:border-primary/30 hover:shadow-md",
+                   dragOverId === folder.id && "outline-dashed outline-2 outline-primary outline-offset-2"
+                )}
                 onClick={() => handleFolderClick(folder.path)}
                 onMouseEnter={() => setHoveredId(folder.id)}
                 onMouseLeave={() => setHoveredId(null)}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("application/x-openinary-move", folder.path)
+                  e.dataTransfer.effectAllowed = "move"
+                }}
+                onDragOver={(e) => {
+                  if (e.dataTransfer.types.includes("application/x-openinary-move")) {
+                    e.preventDefault()
+                    e.dataTransfer.dropEffect = "move"
+                    setDragOverId(folder.id)
+                  }
+                }}
+                onDragLeave={(e) => {
+                  if (e.currentTarget.contains(e.relatedTarget as Node)) return
+                  setDragOverId(null)
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setDragOverId(null)
+                  const src = e.dataTransfer.getData("application/x-openinary-move")
+                  if (src) doMove(src, folder.path)
+                }}
               >
             <div className="relative w-full h-full">
               {folderImages.length === 4 ? (
@@ -454,6 +517,11 @@ export function MediaGrid({
                   handleMediaHover(media);
                 }}
                 onMouseLeave={() => setHoveredId(null)}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("application/x-openinary-move", getItemPath(media.name))
+                  e.dataTransfer.effectAllowed = "move"
+                }}
               >
             {media.type === "image" ? (
               <img

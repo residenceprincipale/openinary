@@ -8,9 +8,10 @@ import type { MediaFile } from "./types"
 interface AssetPreviewProps {
   asset: MediaFile
   previewUrl: string
+  mediaUrl: string
 }
 
-export function AssetPreview({ asset, previewUrl }: AssetPreviewProps) {
+export function AssetPreview({ asset, previewUrl, mediaUrl }: AssetPreviewProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
 
@@ -32,7 +33,7 @@ export function AssetPreview({ asset, previewUrl }: AssetPreviewProps) {
   return (
     <div className="space-y-2">
       <h3 className="text-sm font-semibold">Preview</h3>
-      <div className="relative aspect-square rounded-lg overflow-hidden border border-border bg-muted">
+      <button className="relative w-full aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer text-left" onClick={() => window.open(mediaUrl, '_blank')}>
         {asset.type === "video" ? (
           <VideoThumbnail
             src={previewUrl}
@@ -61,7 +62,7 @@ export function AssetPreview({ asset, previewUrl }: AssetPreviewProps) {
             )}
           </>
         )}
-      </div>
+      </button>
     </div>
   )
 }

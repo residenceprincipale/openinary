@@ -84,7 +84,7 @@ export function AssetDetailsSidebar({
           </div>
         ) : (
           <div className="p-4 space-y-4">
-            <AssetPreview asset={asset} previewUrl={previewUrl} />
+            <AssetPreview asset={asset} previewUrl={previewUrl} mediaUrl={mediaUrl} />
 
             <Separator />
 

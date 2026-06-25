@@ -22,7 +22,7 @@ const selectedTreeVariants = cva(
 )
 
 const dragOverVariants = cva(
-    'before:opacity-100 before:bg-primary/20 text-primary-foreground'
+    'outline-dashed outline-1 outline-primary'
 )
 
 interface TreeDataItem {
@@ -47,6 +47,7 @@ type TreeProps = React.HTMLAttributes<HTMLDivElement> & {
     defaultNodeIcon?: any
     defaultLeafIcon?: any
     onDocumentDrag?: (sourceItem: TreeDataItem, targetItem: TreeDataItem) => void
+    onExternalDrop?: (sourcePath: string, targetPath: string) => void
     onMediaSelect?: (media: MediaFile) => void
     onContextMenu?: (item: TreeDataItem, e: React.MouseEvent) => void
 }
@@ -92,6 +93,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
             onDocumentDrag,
             onMediaSelect,
             onContextMenu,
+            onExternalDrop,
             ...props
         },
         ref
@@ -101,6 +103,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
         >(initialSelectedItemId)
         
         const [draggedItem, setDraggedItem] = React.useState<TreeDataItem | null>(null)
+        const [rootDragOver, setRootDragOver] = React.useState(false)
 
         const handleSelectChange = React.useCallback(
             (item: TreeDataItem | undefined) => {
@@ -154,23 +157,41 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
         }, [data, expandAll, initialSelectedItemId])
 
         return (
-            <div className={cn('overflow-hidden relative', className)}>
+            <div
+                className={cn('overflow-hidden relative min-h-[2rem]', className, rootDragOver && 'bg-accent/20 outline-dashed outline-2 outline-offset-2 outline-primary rounded-md')}
+                onDragOver={(e) => {
+                    if (e.dataTransfer.types.includes("application/x-openinary-move")) {
+                        e.preventDefault()
+                        setRootDragOver(true)
+                    }
+                }}
+                onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setRootDragOver(false)
+                }}
+                onDrop={(e) => {
+                    e.preventDefault()
+                    setRootDragOver(false)
+                    const src = e.dataTransfer.getData("application/x-openinary-move")
+                    if (src) onExternalDrop?.(src, "")
+                }}
+            >
                 <TreeItem
                     data={data}
                     ref={ref}
                     selectedItemId={selectedItemId}
                     handleSelectChange={handleSelectChange}
                     expandedItemIds={expandedItemIds}
-                    defaultLeafIcon={defaultLeafIcon}
-                    defaultNodeIcon={defaultNodeIcon}
-                    handleDragStart={handleDragStart}
-                    handleDrop={handleDrop}
-                    draggedItem={draggedItem}
-                    onMediaSelect={onMediaSelect}
-                    onContextMenu={onContextMenu}
-                    treeData={data}
-                    {...props}
-                />
+            defaultLeafIcon={defaultLeafIcon}
+            defaultNodeIcon={defaultNodeIcon}
+            handleDragStart={handleDragStart}
+            handleDrop={handleDrop}
+            draggedItem={draggedItem}
+            onMediaSelect={onMediaSelect}
+            onContextMenu={onContextMenu}
+            onExternalDrop={onExternalDrop}
+            treeData={data}
+            {...props}
+        />
             </div>
         )
     }
@@ -185,6 +206,7 @@ type TreeItemProps = TreeProps & {
     defaultLeafIcon?: any
     handleDragStart?: (item: TreeDataItem) => void
     handleDrop?: (item: TreeDataItem) => void
+    onExternalDrop?: (sourcePath: string, targetPath: string) => void
     draggedItem: TreeDataItem | null
     treeData?: TreeDataItem[] | TreeDataItem
 }
@@ -201,6 +223,7 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
             defaultLeafIcon,
             handleDragStart,
             handleDrop,
+            onExternalDrop,
             draggedItem,
             onMediaSelect,
             treeData,
@@ -225,6 +248,7 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
                                 defaultLeafIcon={defaultLeafIcon}
                                 handleDragStart={handleDragStart}
                                 handleDrop={handleDrop}
+                                onExternalDrop={onExternalDrop}
                                 draggedItem={draggedItem}
                                 onMediaSelect={onMediaSelect}
                                 treeData={treeData}
@@ -237,6 +261,7 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
                                 defaultLeafIcon={defaultLeafIcon}
                                 handleDragStart={handleDragStart}
                                 handleDrop={handleDrop}
+                                onExternalDrop={onExternalDrop}
                                 draggedItem={draggedItem}
                                 onMediaSelect={onMediaSelect}
                                 treeData={treeData}
@@ -259,6 +284,7 @@ const TreeNode = ({
     defaultLeafIcon,
     handleDragStart,
     handleDrop,
+    onExternalDrop,
     draggedItem,
     onMediaSelect,
     onContextMenu,
@@ -272,6 +298,7 @@ const TreeNode = ({
     defaultLeafIcon?: any
     handleDragStart?: (item: TreeDataItem) => void
     handleDrop?: (item: TreeDataItem) => void
+    onExternalDrop?: (sourcePath: string, targetPath: string) => void
     draggedItem: TreeDataItem | null
     onMediaSelect?: (media: MediaFile) => void
     onContextMenu?: (item: TreeDataItem, e: React.MouseEvent) => void
@@ -287,25 +314,33 @@ const TreeNode = ({
             e.preventDefault()
             return
         }
-        e.dataTransfer.setData('text/plain', item.id)
+        e.dataTransfer.setData("application/x-openinary-move", item.id)
+        e.dataTransfer.effectAllowed = "move"
         handleDragStart?.(item)
     }
 
     const onDragOver = (e: React.DragEvent) => {
-        if (item.droppable !== false && draggedItem && draggedItem.id !== item.id) {
+        const isExternal = e.dataTransfer.types.includes("application/x-openinary-move")
+        if (isExternal || (item.droppable !== false && draggedItem && draggedItem.id !== item.id)) {
             e.preventDefault()
             setIsDragOver(true)
         }
     }
 
-    const onDragLeave = () => {
+    const onDragLeave = (e: React.DragEvent) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return
         setIsDragOver(false)
     }
 
     const onDrop = (e: React.DragEvent) => {
         e.preventDefault()
+        e.stopPropagation()
         setIsDragOver(false)
         handleDrop?.(item)
+        const src = e.dataTransfer.getData("application/x-openinary-move")
+        if (src && item.children) {
+            onExternalDrop?.(src, item.id)
+        }
     }
 
     return (
@@ -357,6 +392,7 @@ const TreeNode = ({
                         defaultNodeIcon={defaultNodeIcon}
                         handleDragStart={handleDragStart}
                         handleDrop={handleDrop}
+                        onExternalDrop={onExternalDrop}
                         draggedItem={draggedItem}
                         onMediaSelect={onMediaSelect}
                         onContextMenu={onContextMenu}
@@ -407,7 +443,8 @@ const TreeLeaf = React.forwardRef<
                 e.preventDefault()
                 return
             }
-            e.dataTransfer.setData('text/plain', item.id)
+            e.dataTransfer.setData("application/x-openinary-move", item.id)
+            e.dataTransfer.effectAllowed = "move"
             handleDragStart?.(item)
         }
 
@@ -418,7 +455,8 @@ const TreeLeaf = React.forwardRef<
             }
         }
 
-        const onDragLeave = () => {
+        const onDragLeave = (e: React.DragEvent) => {
+            if (e.currentTarget.contains(e.relatedTarget as Node)) return
             setIsDragOver(false)
         }
 
@@ -442,6 +480,7 @@ const TreeLeaf = React.forwardRef<
                     type: mediaCheck.type!,
                 }
                 onMediaSelect(media)
+                handleSelectChange(item)
                 return
             }
             

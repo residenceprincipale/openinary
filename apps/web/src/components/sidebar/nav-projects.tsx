@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { TreeView } from "@/components/ui/tree-view"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useStorageTree } from "@/hooks/use-storage-tree"
@@ -70,6 +71,21 @@ export function NavProjects({ onMediaSelect }: NavProjectsProps) {
     return () => document.removeEventListener("click", close)
   }, [contextMenu])
 
+  const queryClient = useQueryClient()
+
+  const handleExternalDrop = useCallback((sourcePath: string, targetPath: string) => {
+    const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
+    const name = sourcePath.split('/').pop()
+    const dest = targetPath ? `${targetPath}/${name}` : name
+    if (dest === sourcePath) return
+    fetch(`${baseUrl}/storage/move`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sourcePath, targetPath: dest }),
+      credentials: "include",
+    }).finally(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] }))
+  }, [queryClient])
+
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>Assets</SidebarGroupLabel>
@@ -88,6 +104,7 @@ export function NavProjects({ onMediaSelect }: NavProjectsProps) {
             e.preventDefault()
             setContextMenu({ item, isFolder: !!item.children, x: e.clientX, y: e.clientY })
           }}
+          onExternalDrop={handleExternalDrop}
         />
       )}
 
@@ -112,6 +129,26 @@ export function NavProjects({ onMediaSelect }: NavProjectsProps) {
               onClick={() => { document.body.style.pointerEvents = ""; setMoveItem(contextMenu); setContextMenu(null) }}
             >
               Move to...
+            </button>
+            <div className="border-t my-1" />
+            <button
+              className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent text-destructive"
+              onClick={() => {
+                document.body.style.pointerEvents = ""
+                const item = contextMenu.item
+                const msg = contextMenu.isFolder
+                  ? `Delete folder "${item.name}" and all contents?`
+                  : `Delete "${item.name}"?`
+                if (confirm(msg)) {
+                  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
+                  const encoded = item.id.split("/").map(encodeURIComponent).join("/")
+                  fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" })
+                    .then(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] }))
+                }
+                setContextMenu(null)
+              }}
+            >
+              Delete
             </button>
           </div>
         </div>

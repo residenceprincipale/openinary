@@ -72,6 +72,7 @@ async function fetchStorageTree(): Promise<TreeDataItem[]> {
         id: item.id,
         name: item.name,
         icon,
+        draggable: true,
         children: sortedChildren,
       };
     };
