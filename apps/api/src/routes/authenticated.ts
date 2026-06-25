@@ -158,6 +158,22 @@ t.get('/*', async (c) => {
       return c.text(errorMessage, 500);
     }
 
+    // Support HTTP Range requests for video seeking
+    c.header('Accept-Ranges', 'bytes');
+
+    const range = c.req.header('Range');
+    if (range) {
+      const match = range.match(/bytes=(\d+)-(\d*)/);
+      if (match) {
+        const start = parseInt(match[1], 10);
+        const end = match[2] ? parseInt(match[2], 10) : result.buffer.length - 1;
+        const chunk = result.buffer.subarray(start, end + 1);
+        c.header('Content-Range', `bytes ${start}-${end}/${result.buffer.length}`);
+        c.header('Content-Length', chunk.length.toString());
+        return c.body(new Uint8Array(chunk), 206);
+      }
+    }
+
     return c.body(new Uint8Array(result.buffer));
   } catch (error) {
     logger.error({ error: serializeError(error), path }, 'Authenticated transform route error');
