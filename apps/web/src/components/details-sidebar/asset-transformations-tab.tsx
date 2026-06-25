@@ -49,7 +49,7 @@ export function AssetTransformationsTab({
               />
               <CopyInput
                 label="Volume 50%"
-                value={`${apiBaseUrl}/t/v_0.5/${asset.path}`}
+                value={`${apiBaseUrl}/t/v_50/${asset.path}`}
               />
               <CopyInput
                 label="Mono"

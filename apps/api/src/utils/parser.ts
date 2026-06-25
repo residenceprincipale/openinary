@@ -36,7 +36,7 @@ const TRANSFORM_VALUE_PATTERNS: Readonly<Record<string, RegExp>> = {
   tt: /^\d+(?:\.\d+)?$/,
   r:  /^max$|^\d+(?::\d+){0,3}$/,
   sr: /^\d+$/,
-  v:  /^\d+(?:\.\d+)?$/,
+  v:  /^\d+$/,
   ch: /^(mono|stereo|\d+)$/,
 };
 
@@ -56,7 +56,7 @@ const isValidTransformPair = (part: string): boolean => {
  * on folder names like "w_photos", "f_family", or "bg_images".
  */
 export const isTransformSegment = (segment: string): boolean => {
-  if (!segment || segment.includes(".")) return false;
+  if (!segment) return false;
   const parts = segment.split(",").filter(Boolean);
   return parts.length > 0 && parts.every(isValidTransformPair);
 };

@@ -10,7 +10,7 @@ type MediaFile = {
     id: string
     name: string
     path: string
-    type: "image" | "video"
+    type: "image" | "video" | "audio"
 }
 
 const treeVariants = cva(
@@ -54,7 +54,7 @@ type TreeProps = React.HTMLAttributes<HTMLDivElement> & {
 
 // Helper function to find the path of an item in the tree
 // Helper function to check if an item is a media file
-function isMediaFile(item: TreeDataItem): { isMedia: boolean; type?: "image" | "video" } {
+function isMediaFile(item: TreeDataItem): { isMedia: boolean; type?: "image" | "video" | "audio" } {
     const lowerName = item.name.toLowerCase()
     
     const isImage =
@@ -70,11 +70,22 @@ function isMediaFile(item: TreeDataItem): { isMedia: boolean; type?: "image" | "
         lowerName.endsWith(".mov") ||
         lowerName.endsWith(".webm")
     
+    const isAudio =
+        lowerName.endsWith(".mp3") ||
+        lowerName.endsWith(".wav") ||
+        lowerName.endsWith(".ogg") ||
+        lowerName.endsWith(".flac") ||
+        lowerName.endsWith(".aac") ||
+        lowerName.endsWith(".m4a")
+    
     if (isImage) {
         return { isMedia: true, type: "image" }
     }
     if (isVideo) {
         return { isMedia: true, type: "video" }
+    }
+    if (isAudio) {
+        return { isMedia: true, type: "audio" }
     }
     
     return { isMedia: false }

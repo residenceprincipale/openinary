@@ -17,7 +17,7 @@ type MediaFile = {
   id: string
   name: string
   path: string
-  type: "image" | "video"
+  type: "image" | "video" | "audio"
 }
 
 type ContextMenuState = {
