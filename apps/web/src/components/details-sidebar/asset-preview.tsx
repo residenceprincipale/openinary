@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { FileAudio } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { VideoThumbnail } from "@/components/video-thumbnail"
 import type { MediaFile } from "./types"
@@ -40,6 +41,10 @@ export function AssetPreview({ asset, previewUrl, mediaUrl }: AssetPreviewProps)
             alt={asset.name}
             loading="eager"
           />
+        ) : asset.type === "audio" ? (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-600/20 to-green-800/20">
+            <FileAudio className="w-24 h-24 text-green-500/40" />
+          </div>
         ) : (
           <>
             {isLoading && (

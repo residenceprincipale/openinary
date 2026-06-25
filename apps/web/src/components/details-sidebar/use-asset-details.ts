@@ -174,11 +174,12 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
   }, [asset])
 
   const mediaUrl = asset ? `${transformBaseUrl}/t/${asset.path}` : ""
-  // For preview: use thumbnail extraction for videos with crop mode to avoid stretching
   const previewUrl = asset
     ? asset.type === "image"
       ? `${transformBaseUrl}/t/w_500,h_500,q_80/${asset.path}`
-      : `${transformBaseUrl}/t/t_true,tt_5,f_webp,w_500,h_500,c_fill,q_80/${asset.path}`
+      : asset.type === "video"
+        ? `${transformBaseUrl}/t/t_true,tt_5,f_webp,w_500,h_500,c_fill,q_80/${asset.path}`
+        : `${transformBaseUrl}/t/${asset.path}`
     : ""
 
   // Preload preview media when asset changes

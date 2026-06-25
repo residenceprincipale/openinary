@@ -37,6 +37,12 @@ t.get('/*', async (c) => {
         mp4: 'video/mp4',
         mov: 'video/quicktime',
         webm: 'video/webm',
+        mp3: 'audio/mpeg',
+        wav: 'audio/wav',
+        ogg: 'audio/ogg',
+        flac: 'audio/flac',
+        aac: 'audio/aac',
+        m4a: 'audio/mp4',
       };
       const contentType =
         contentTypeMap[ext || ''] || 'application/octet-stream';

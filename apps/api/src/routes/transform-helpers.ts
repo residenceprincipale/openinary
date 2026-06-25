@@ -4,6 +4,7 @@ import { CloudStorage } from "../utils/storage/index";
 import { parseParams } from "../utils/parser";
 import { transformImage } from "../utils/image/index";
 import { transformVideo } from "../utils/video/index";
+import { transformAudio } from "../utils/audio/index";
 import { Compression } from "../utils/image/compression";
 import logger, { serializeError } from "../utils/logger";
 import {
@@ -23,8 +24,8 @@ export function setContentTypeHeader(
 ): void {
   if (!extensionOrContentType) return;
 
-  // If it's already a content-type (starts with "image/" or "video/"), use it directly
-  if (extensionOrContentType.startsWith("image/") || extensionOrContentType.startsWith("video/")) {
+  // If it's already a content-type, use it directly
+  if (extensionOrContentType.startsWith("image/") || extensionOrContentType.startsWith("video/") || extensionOrContentType.startsWith("audio/")) {
     c.header("Content-Type", extensionOrContentType);
     return;
   }
@@ -40,6 +41,12 @@ export function setContentTypeHeader(
     mp4: "video/mp4",
     mov: "video/quicktime",
     webm: "video/webm",
+    mp3: "audio/mpeg",
+    wav: "audio/wav",
+    ogg: "audio/ogg",
+    flac: "audio/flac",
+    aac: "audio/aac",
+    m4a: "audio/mp4",
   };
 
   const normalizedExt = extensionOrContentType.toLowerCase();
@@ -382,6 +389,26 @@ export async function processVideo(
   }
 
   return { buffer, contentType };
+}
+
+/**
+ * Processes an audio file
+ */
+export async function processAudio(
+  originalPath: string,
+  params: ReturnType<typeof parseParams>
+): Promise<{ buffer: Buffer; contentType: string }> {
+  const buffer = await transformAudio(originalPath, params);
+  const format = params.format?.toLowerCase() || originalPath.split('.').pop()?.toLowerCase() || 'mp3';
+  const audioTypes: Record<string, string> = {
+    mp3: 'audio/mpeg',
+    wav: 'audio/wav',
+    ogg: 'audio/ogg',
+    flac: 'audio/flac',
+    aac: 'audio/aac',
+    m4a: 'audio/mp4',
+  };
+  return { buffer, contentType: audioTypes[format] || 'audio/mpeg' };
 }
 
 /**

@@ -14,6 +14,7 @@ import {
   prepareSourceFile,
   processImage,
   processVideo,
+  processAudio,
   saveToCaches,
   cleanupTempFile,
   performPeriodicCacheCleanup,
@@ -220,8 +221,7 @@ export class TransformService {
       'Content-Length': buffer.length.toString(),
     };
 
-    // For videos, add video-specific headers
-    if (ext?.match(/mp4|mov|webm/)) {
+    if (ext?.match(/mp4|mov|webm|mp3|wav|ogg/)) {
       headers['X-Video-Status'] = 'ready';
     }
 
@@ -278,6 +278,10 @@ export class TransformService {
           sourcePath !== localPath
         );
         return result; // Video processing returns immediately
+      } else if (ext?.match(/mp3|wav|ogg|flac|aac|m4a/)) {
+        const result = await this.processAudioFile(sourcePath, effectiveParams);
+        buffer = result.buffer;
+        contentType = result.contentType;
       } else {
         throw new Error('Unsupported file type');
       }
@@ -391,6 +395,16 @@ export class TransformService {
       cachePath,
       isTempFile
     );
+  }
+
+  /**
+   * Process audio file (synchronous, no job queue)
+   */
+  private async processAudioFile(
+    sourcePath: string,
+    params: any
+  ): Promise<{ buffer: Buffer; contentType: string }> {
+    return await processAudio(sourcePath, params);
   }
 
   /**

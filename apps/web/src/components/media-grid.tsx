@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  FileImage, FileVideo, ArrowUpRight, Folder,
+  FileAudio, FileImage, FileVideo, ArrowUpRight, Folder,
   CheckCircle, Circle, Trash2, Pencil,
 } from "lucide-react";
 import { useQueryState } from "nuqs";
@@ -38,7 +38,7 @@ type MediaFile = {
   id: string;
   name: string;
   path: string;
-  type: "image" | "video";
+  type: "image" | "video" | "audio";
 };
 
 type FolderItem = {
@@ -135,12 +135,20 @@ function findItemsInPath(
         lowerName.endsWith(".mov") ||
         lowerName.endsWith(".webm");
 
-      if (isImage || isVideo) {
+      const isAudio =
+        lowerName.endsWith(".mp3") ||
+        lowerName.endsWith(".wav") ||
+        lowerName.endsWith(".ogg") ||
+        lowerName.endsWith(".flac") ||
+        lowerName.endsWith(".aac") ||
+        lowerName.endsWith(".m4a");
+
+      if (isImage || isVideo || isAudio) {
         files.push({
           id: item.id,
           name: item.name,
           path: item.id,
-          type: isImage ? "image" : "video",
+          type: isImage ? "image" : isVideo ? "video" : "audio",
         });
       }
     }
@@ -333,7 +341,7 @@ export function MediaGrid({
             <EmptyTitle>No Media Files Yet</EmptyTitle>
             <EmptyDescription>
               You haven&apos;t uploaded any media files yet. Get started by
-              uploading your first image or video.
+              uploading your first image, video, or audio file.
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
@@ -382,8 +390,7 @@ export function MediaGrid({
 
   // Preload preview when hovering over a media item
   const handleMediaHover = (media: MediaFile) => {
-    // For images: load the transformed image
-    // For videos: preload the full video (not the thumbnail, which is already loaded)
+    if (media.type === "audio") return;
     const previewUrl =
       media.type === "image"
         ? `${transformBaseUrl}/t/w_500,h_500,q_80/${media.path}`
@@ -465,7 +472,7 @@ export function MediaGrid({
     return (
       <div className="relative" {...gridMouseHandlers}>
       <div className={cn("flex flex-col items-center justify-center h-64 rounded-lg border-2 border-dashed transition-colors text-muted-foreground space-y-4 select-none", gridDragOver && "border-primary bg-accent/30 outline-dashed outline-2 outline-primary outline-offset-2")} {...gridHandlers}>
-        <FileImage className="h-12 w-12 opacity-50" />
+        <FileAudio className="h-12 w-12 opacity-50" />
         <p>This folder is empty.</p>
       </div>
       </div>
@@ -715,13 +722,17 @@ export function MediaGrid({
                 className="w-full h-full object-cover transition-transform group-hover:scale-105"
                 loading="lazy"
               />
-            ) : (
+            ) : media.type === "video" ? (
               <VideoThumbnail
                 src={thumbnailUrl}
                 alt={media.name}
                 className="transition-transform group-hover:scale-105"
                 loading="lazy"
               />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-600/20 to-green-800/20">
+                <FileAudio className="w-16 h-16 text-green-500/60" />
+              </div>
             )}
             <div
               className={cn(

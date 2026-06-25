@@ -5,6 +5,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2,
+  FileAudio,
   FileImage,
   FileVideo,
   Folder,
@@ -51,6 +52,7 @@ export function UploadSection({ uploadToFolder }: { uploadToFolder?: string }) {
     accept: {
       "image/*": [".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif", ".psd"],
       "video/*": [".mp4", ".mov", ".webm"],
+      "audio/*": [".mp3", ".wav", ".ogg", ".flac", ".aac", ".m4a"],
     },
   });
 
@@ -118,6 +120,10 @@ export function UploadSection({ uploadToFolder }: { uploadToFolder?: string }) {
       return (
         <FileVideo className="h-4 w-4 text-purple-500 dark:text-purple-400" />
       );
+    } else if (file.type.startsWith("audio/")) {
+      return (
+        <FileAudio className="h-4 w-4 text-green-500 dark:text-green-400" />
+      );
     }
     return <Folder className="h-4 w-4 text-muted-foreground" />;
   };
@@ -165,7 +171,7 @@ export function UploadSection({ uploadToFolder }: { uploadToFolder?: string }) {
                   Drop files here, or click to select files
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Supports: JPG, PNG, WebP, AVIF, GIF, PSD, MP4, MOV, WebM
+                  Supports: JPG, PNG, WebP, AVIF, GIF, PSD, MP4, MOV, WebM, MP3, WAV, OGG
                 </p>
                 <div className="flex gap-2 mt-2">
                   <Button

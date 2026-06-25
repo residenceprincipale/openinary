@@ -25,7 +25,7 @@ const TRANSFORM_VALUE_PATTERNS: Readonly<Record<string, RegExp>> = {
   c:  /^(fill|lfill|fill_pad|fit|limit|mfit|scale|crop|thumb|pad|lpad)$/,
   g:  /^(center|c|north(?:_center)?|n|south(?:_center)?|s|east|e|west|w|faces?(?:_center)?|auto)$/,
   q:  /^\d+$|^auto$/,
-  f:  /^(webp|jpe?g|png|avif|gif|psd|mp4|webm|mov|avi|mp3|wav|ogg|pdf|auto)$/,
+  f:  /^(webp|jpe?g|png|avif|gif|psd|mp4|webm|mov|avi|mp3|wav|ogg|flac|aac|m4a|pdf|auto)$/,
   a:  /^-?\d+$|^auto$/,
   ar: /^\d+:\d+$|^\d+(?:\.\d+)?$/,
   b:  /^(transparent|white|black|rgb:[0-9a-fA-F]{3,8}|#?[0-9a-fA-F]{3,8})$/,
@@ -35,6 +35,9 @@ const TRANSFORM_VALUE_PATTERNS: Readonly<Record<string, RegExp>> = {
   t:  /^(true|1|\d+)$/,
   tt: /^\d+(?:\.\d+)?$/,
   r:  /^max$|^\d+(?::\d+){0,3}$/,
+  sr: /^\d+$/,
+  v:  /^\d+(?:\.\d+)?$/,
+  ch: /^(mono|stereo|\d+)$/,
 };
 
 const isValidTransformPair = (part: string): boolean => {
@@ -74,9 +77,12 @@ type TransformKey =
   | "bg"
   | "so"
   | "eo"
-  | "t"   // FIX H12: Add thumbnail parameter
-  | "tt"  // FIX H12: Add thumbnail time parameter
-  | "r";  // Round corners
+  | "t"
+  | "tt"
+  | "r"
+  | "sr"
+  | "v"
+  | "ch";
 
 /**
  * Parse a single transformation segment into our
@@ -156,8 +162,16 @@ const parseTransform = (
       case "r":
         params.radius = value;
         break;
+      case "sr":
+        params.sampleRate = value;
+        break;
+      case "v":
+        params.volume = value;
+        break;
+      case "ch":
+        params.channels = value;
+        break;
       default:
-        // Ignore unsupported/unknown directives for now
         break;
     }
   }

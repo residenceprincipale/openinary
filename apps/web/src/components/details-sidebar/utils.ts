@@ -22,12 +22,20 @@ export function findAssetInTree(
       lowerName.endsWith(".mov") ||
       lowerName.endsWith(".webm")
 
-    if ((isImage || isVideo) && item.id === assetId) {
+    const isAudio =
+      lowerName.endsWith(".mp3") ||
+      lowerName.endsWith(".wav") ||
+      lowerName.endsWith(".ogg") ||
+      lowerName.endsWith(".flac") ||
+      lowerName.endsWith(".aac") ||
+      lowerName.endsWith(".m4a")
+
+    if ((isImage || isVideo || isAudio) && item.id === assetId) {
       return {
         id: item.id,
         name: item.name,
         path: item.id,
-        type: isImage ? "image" : "video",
+        type: isImage ? "image" : isVideo ? "video" : "audio",
       }
     }
 
@@ -54,6 +62,7 @@ export function formatDate(date: Date | null): string {
 export function getFileType(asset: MediaFile | null): string {
   if (!asset) return "Unknown"
   const ext = asset.name.split(".").pop()?.toUpperCase() || ""
-  return `${ext} ${asset.type === "image" ? "Image" : "Video"}`
+  const label = asset.type === "image" ? "Image" : asset.type === "video" ? "Video" : "Audio"
+  return `${ext} ${label}`
 }
 

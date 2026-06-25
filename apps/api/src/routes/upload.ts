@@ -39,6 +39,13 @@ const ALLOWED_TYPES = {
   "video/mp4": [".mp4"],
   "video/quicktime": [".mov"],
   "video/webm": [".webm"],
+  // Audio
+  "audio/mpeg": [".mp3", ".mpga"],
+  "audio/wav": [".wav"],
+  "audio/ogg": [".ogg", ".oga"],
+  "audio/flac": [".flac"],
+  "audio/aac": [".aac"],
+  "audio/mp4": [".m4a"],
 };
 
 interface UploadResult {
@@ -213,11 +220,12 @@ function validateFileType(filename: string, mimeType: string): boolean {
   const allowedExtensions =
     ALLOWED_TYPES[mimeType as keyof typeof ALLOWED_TYPES];
 
-  if (!allowedExtensions) {
-    return false;
+  if (allowedExtensions) {
+    return allowedExtensions.includes(ext);
   }
 
-  return allowedExtensions.includes(ext);
+  // ponytail: fallback to extension-only check — MIME types vary wildly per browser/OS
+  return Object.values(ALLOWED_TYPES).some((exts) => exts.includes(ext));
 }
 
 /**
@@ -446,7 +454,7 @@ upload.post("/", async (c) => {
       if (!validateFileType(filename, mimeType)) {
         failedUploads.push({
           filename: rawSanitizedPath,
-          error: `Invalid file type: ${mimeType}. Allowed types: images (jpg, jpeg, png, webp, avif, gif, heic, heif, psd) and videos (mp4, mov, webm)`,
+          error: `Invalid file type: ${mimeType}. Allowed types: images (jpg, jpeg, png, webp, avif, gif, heic, heif, psd), videos (mp4, mov, webm), and audio (mp3, wav, ogg, flac, aac, m4a)`,
         });
         continue;
       }
