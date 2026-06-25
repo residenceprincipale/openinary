@@ -12,6 +12,7 @@ import logger, { serializeError } from "./utils/logger";
 import queueEvents from "./routes/queue-events";
 import queue from "./routes/queue";
 import invalidateRoute from "./routes/invalidate";
+import cacheRoute from "./routes/cache";
 import usersRoute from "./routes/users";
 import configRoute from "./routes/config";
 import { apiKeyAuth } from "./middleware/auth";
@@ -101,9 +102,12 @@ app.route("/upload", upload);
 app.use("/storage/*", apiKeyAuth);
 app.route("/storage", storageRoute);
 
-// Cache invalidation route (protected)
+// Cache invalidation and management routes (protected)
 app.use("/invalidate/*", apiKeyAuth);
 app.route("/invalidate", invalidateRoute);
+
+app.use("/cache/*", apiKeyAuth);
+app.route("/cache", cacheRoute);
 
 // Queue management routes (protected)
 // Note: /queue/events is public (registered above), but other /queue/* routes require auth

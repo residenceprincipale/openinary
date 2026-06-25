@@ -4,6 +4,7 @@ import Image from "next/image";
 import {
   AudioWaveform,
   Command,
+  Database,
   GalleryVerticalEnd,
   Image as ImageIcon,
   Package,
@@ -44,6 +45,7 @@ function useNavItems() {
   return [
     { title: "Assets", url: "/", icon: Package, isActive: true },
     ...(isAdmin ? [{ title: "Users", url: "/users", icon: Users }] : []),
+    { title: "Cache", url: "/cache", icon: Database },
     { title: "Config", url: "/config", icon: Settings },
     // { title: "Image", url: "/", icon: ImageIcon, disabled: true },
     // { title: "Video", url: "/", icon: Video, disabled: true },

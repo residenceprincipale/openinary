@@ -397,6 +397,24 @@ export class CloudStorage {
   }
 
   /**
+   * Lists all cached transformations in cloud storage
+   */
+  async listAllCachedTransformations(): Promise<{ key: string; size: number; lastModified: Date }[]> {
+    const objects = await this.s3Client.listObjects("cache/")
+    return objects.map((o) => ({ key: o.key, size: o.size ?? 0, lastModified: o.lastModified ?? new Date(0) }))
+  }
+
+  /**
+   * Deletes all cached transformations in cloud storage
+   */
+  async clearAllCachedTransformations(): Promise<number> {
+    const objects = await this.s3Client.listObjects("cache/")
+    if (objects.length === 0) return 0
+    const keys = objects.map((o) => o.key)
+    return await this.s3Client.deleteObjects(keys)
+  }
+
+  /**
    * Invalidates all cache entries for a given original path
    * This clears the in-memory cache for both the original file and all its transformations
    */
