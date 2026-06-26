@@ -97,8 +97,16 @@ export function AssetDetailsTab({
       <Separator />
 
       <div className="space-y-2">
-        <h3 className="text-sm font-semibold">Actions</h3>
         <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRename}
+            className="gap-2"
+          >
+            <Pencil className="h-4 w-4" />
+            Rename
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -129,15 +137,6 @@ export function AssetDetailsTab({
           <Button
             variant="outline"
             size="sm"
-            onClick={onDownload}
-            className="gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Download
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
             onClick={onOpenInNewTab}
             className="gap-2"
           >
@@ -147,11 +146,11 @@ export function AssetDetailsTab({
           <Button
             variant="outline"
             size="sm"
-            onClick={onRename}
+            onClick={onDownload}
             className="gap-2"
           >
-            <Pencil className="h-4 w-4" />
-            Rename
+            <Download className="h-4 w-4" />
+            Download
           </Button>
           <Button
             variant="outline"
