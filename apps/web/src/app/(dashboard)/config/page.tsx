@@ -36,6 +36,7 @@ const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 type TransformConfig = {
   image: { quality: number; format: string; crop: string; gravity: string };
   video: { quality: number; format: string; autoDownscale: boolean; autoDownscaleResolution: number };
+  audio: { quality: number; format: string; sampleRate: string; channels: string };
   branding: { title: string; logoUrl: string };
 };
 
@@ -275,6 +276,66 @@ function ConfigPageContent() {
                         />
                       </div>
                     )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Audio</CardTitle>
+                    <CardDescription>Default audio transformation parameters</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Bitrate (kbps, 32-320)</Label>
+                        <Input
+                          type="number" min={32} max={320} step={32}
+                          value={config.audio.quality}
+                          onChange={(e) => setConfig({ ...config, audio: { ...config.audio, quality: +e.target.value } })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Format</Label>
+                        <select
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={config.audio.format}
+                          onChange={(e) => setConfig({ ...config, audio: { ...config.audio, format: e.target.value } })}
+                        >
+                          <option value="mp3">MP3</option>
+                          <option value="aac">AAC</option>
+                          <option value="ogg">OGG</option>
+                          <option value="wav">WAV</option>
+                          <option value="flac">FLAC</option>
+                          <option value="m4a">M4A</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Sample Rate (Hz)</Label>
+                        <select
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={config.audio.sampleRate}
+                          onChange={(e) => setConfig({ ...config, audio: { ...config.audio, sampleRate: e.target.value } })}
+                        >
+                          <option value="8000">8000</option>
+                          <option value="11025">11025</option>
+                          <option value="16000">16000</option>
+                          <option value="22050">22050</option>
+                          <option value="44100">44100</option>
+                          <option value="48000">48000</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Channels</Label>
+                        <select
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={config.audio.channels}
+                          onChange={(e) => setConfig({ ...config, audio: { ...config.audio, channels: e.target.value } })}
+                        >
+                          <option value="stereo">Stereo</option>
+                          <option value="mono">Mono</option>
+                        </select>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </>

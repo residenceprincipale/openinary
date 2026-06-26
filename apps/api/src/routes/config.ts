@@ -9,6 +9,7 @@ const CONFIG_PATH = join(process.cwd(), "data", "transforms.json");
 const defaults = {
   image: { quality: 80, format: "auto", crop: "fill", gravity: "center" },
   video: { quality: 60, format: "mp4", autoDownscale: true, autoDownscaleResolution: 720 },
+  audio: { quality: 192, format: "mp3", sampleRate: "44100", channels: "stereo" },
   branding: { title: "Openinary", logoUrl: "" },
 };
 
@@ -19,6 +20,7 @@ function readConfig(): typeof defaults {
       return {
         image: { ...defaults.image, ...(saved.image || {}) },
         video: { ...defaults.video, ...(saved.video || {}) },
+        audio: { ...defaults.audio, ...(saved.audio || {}) },
         branding: { ...defaults.branding, ...(saved.branding || {}) },
       };
     }
@@ -43,6 +45,7 @@ config.put("/transforms", async (c) => {
     const merged = {
       image: { ...current.image, ...body.image },
       video: { ...current.video, ...body.video },
+      audio: { ...current.audio, ...body.audio },
       branding: { ...current.branding, ...body.branding },
     };
     const dir = join(process.cwd(), "data");
