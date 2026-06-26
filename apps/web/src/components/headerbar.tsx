@@ -129,7 +129,6 @@ export default function HeaderBar() {
           )}
           <CreateFolderButtonWithDialog
             uploadToFolder={folderPath || undefined}
-            onSuccessfulCreate={(v) => setFolderPath(v)}
           />
           <UploadButtonWithDialog uploadToFolder={folderPath || undefined} />
         </div>
