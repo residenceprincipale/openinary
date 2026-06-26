@@ -39,6 +39,7 @@ export function AssetDetailsSidebar({
     updatedAt,
     isDeleting,
     mediaUrl,
+    rawUrl,
     previewUrl,
     transformBaseUrl,
     videoStatus,
@@ -102,6 +103,7 @@ export function AssetDetailsSidebar({
                   optimizedSize={optimizedSize}
                   createdAt={createdAt}
                   mediaUrl={mediaUrl}
+                  rawUrl={rawUrl}
                   isDeleting={isDeleting}
                   videoStatus={videoStatus}
                   videoProgress={videoProgress}
@@ -113,7 +115,7 @@ export function AssetDetailsSidebar({
               </TabsContent>
 
               <TabsContent value="transformations" className="space-y-4 mt-4">
-                <AssetTransformationsTab asset={asset} apiBaseUrl={transformBaseUrl} />
+                <AssetTransformationsTab asset={asset} apiBaseUrl={transformBaseUrl} rawUrl={rawUrl} />
               </TabsContent>
 
               <TabsContent value="metadata" className="space-y-4 mt-4">

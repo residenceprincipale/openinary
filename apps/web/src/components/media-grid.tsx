@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  FileAudio, FileImage, FileVideo, ArrowUpRight, Folder,
+  FileAudio, FileImage, FileVideo, File, ArrowUpRight, Folder,
   CheckCircle, Circle, Trash2, Pencil,
 } from "lucide-react";
 import { useQueryState } from "nuqs";
@@ -38,7 +38,7 @@ type MediaFile = {
   id: string;
   name: string;
   path: string;
-  type: "image" | "video" | "audio";
+  type: "image" | "video" | "audio" | "other";
 };
 
 type FolderItem = {
@@ -143,12 +143,16 @@ function findItemsInPath(
         lowerName.endsWith(".aac") ||
         lowerName.endsWith(".m4a");
 
-      if (isImage || isVideo || isAudio) {
+      const isDoc =
+        lowerName.endsWith(".zip") ||
+        lowerName.endsWith(".pdf");
+
+      if (isImage || isVideo || isAudio || isDoc) {
         files.push({
           id: item.id,
           name: item.name,
           path: item.id,
-          type: isImage ? "image" : isVideo ? "video" : "audio",
+          type: isImage ? "image" : isVideo ? "video" : isAudio ? "audio" : "other",
         });
       }
     }
@@ -193,6 +197,7 @@ export function MediaGrid({
   const [batchRenameItems, setBatchRenameItems] = useState<{name: string; path: string}[] | null>(null);
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [selectionBox, setSelectionBox] = useState<{left: number; top: number; width: number; height: number} | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<{type: 'uploading' | 'done'; count: number; error?: string} | null>(null);
 
   const toggleSelection = useCallback((path: string) => {
     setSelectedPaths(prev => {
@@ -304,6 +309,27 @@ export function MediaGrid({
     return () => document.removeEventListener('keydown', onKeyDown)
   }, [allItems])
 
+  const uploadFiles = useCallback(async (files: File[], folder: string) => {
+    const formData = new FormData()
+    if (folder) formData.append("folder", folder)
+    files.forEach(f => formData.append("files", f))
+    setUploadStatus({ type: 'uploading', count: files.length })
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
+      const r = await fetch(`${apiUrl}/upload`, { method: "POST", body: formData, credentials: "include" })
+      const d = await r.json()
+      if (d.success) {
+        setUploadStatus({ type: 'done', count: files.length })
+        queryClient.invalidateQueries({ queryKey: ["storage-tree"] })
+      } else {
+        setUploadStatus({ type: 'done', count: 0, error: d.error || 'Upload failed' })
+      }
+    } catch (e) {
+      setUploadStatus({ type: 'done', count: 0, error: 'Network error during upload' })
+    }
+    setTimeout(() => setUploadStatus(null), 3000)
+  }, [queryClient])
+
   // Adjust grid columns based on sidebar state
   const gridColsClass = sidebarOpen
     ? "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
@@ -390,7 +416,7 @@ export function MediaGrid({
 
   // Preload preview when hovering over a media item
   const handleMediaHover = (media: MediaFile) => {
-    if (media.type === "audio") return;
+    if (media.type === "audio" || media.type === "other") return;
     const previewUrl =
       media.type === "image"
         ? `${transformBaseUrl}/t/w_500,h_500,q_80/${media.path}`
@@ -402,7 +428,7 @@ export function MediaGrid({
 
   const gridHandlers = {
     onDragOver: (e: React.DragEvent) => {
-      if (e.dataTransfer.types.includes("application/x-openinary-move")) {
+      if (e.dataTransfer.types.includes("application/x-openinary-move") || e.dataTransfer.types.includes("Files")) {
         e.preventDefault()
         setGridDragOver(true)
       }
@@ -413,6 +439,11 @@ export function MediaGrid({
     onDrop: (e: React.DragEvent) => {
       e.preventDefault()
       setGridDragOver(false)
+      // Handle file drops (direct upload)
+      if (e.dataTransfer.files.length > 0) {
+        uploadFiles(Array.from(e.dataTransfer.files), currentFolder)
+        return
+      }
       const src = e.dataTransfer.getData("application/x-openinary-move")
       if (src) doMove(src, currentFolder)
     },
@@ -470,18 +501,29 @@ export function MediaGrid({
 
   if (folders.length === 0 && files.length === 0) {
     return (
-      <div className="relative" {...gridMouseHandlers}>
-      <div className={cn("flex flex-col items-center justify-center h-64 rounded-lg border-2 border-dashed transition-colors text-muted-foreground space-y-4 select-none", gridDragOver && "border-primary bg-accent/30 outline-dashed outline-2 outline-primary outline-offset-2")} {...gridHandlers}>
+      <div className="relative" {...gridMouseHandlers} {...gridHandlers}>
+      <div className={cn("flex flex-col items-center justify-center h-64 rounded-lg border-2 border-dashed transition-colors text-muted-foreground space-y-4 select-none", gridDragOver && "border-primary bg-accent/30 outline-dashed outline-2 outline-primary outline-offset-2")}>
         <FileAudio className="h-12 w-12 opacity-50" />
         <p>This folder is empty.</p>
       </div>
+      {uploadStatus && (
+        <div className="fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg border bg-background text-sm animate-in slide-in-from-top-2">
+          {uploadStatus.type === 'uploading' ? (
+            <span className="flex items-center gap-2"><span className="size-3 rounded-full border-2 border-primary border-t-transparent animate-spin" /> Uploading {uploadStatus.count} file{uploadStatus.count > 1 ? 's' : ''}…</span>
+          ) : uploadStatus.error ? (
+            <span className="flex items-center gap-2 text-destructive">✕ {uploadStatus.error}</span>
+          ) : (
+            <span className="flex items-center gap-2 text-green-600 dark:text-green-400">✓ Uploaded {uploadStatus.count} file{uploadStatus.count > 1 ? 's' : ''}</span>
+          )}
+        </div>
+      )}
       </div>
     );
   }
 
   return (
-    <div className="relative h-full" {...gridMouseHandlers}>
-    <div className={cn(`grid ${gridColsClass} gap-4 select-none`, gridDragOver && "outline-dashed outline-2 outline-primary outline-offset-2 rounded-lg")} {...gridHandlers}>
+    <div className={cn("relative h-full", gridDragOver && "outline-dashed outline-2 outline-primary outline-offset-2 rounded-lg")} {...gridMouseHandlers} {...gridHandlers}>
+    <div className={cn(`grid ${gridColsClass} gap-4 select-none`)} >
       {/* Render folders */}
       {folders.map((folder, i) => {
         const isHovered = hoveredId === folder.id;
@@ -729,9 +771,13 @@ export function MediaGrid({
                 className="transition-transform group-hover:scale-105"
                 loading="lazy"
               />
-            ) : (
+            ) : media.type === "audio" ? (
               <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-600/20 to-green-800/20">
                 <FileAudio className="w-16 h-16 text-green-500/60" />
+              </div>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-600/20 to-orange-800/20">
+                <File className="w-16 h-16 text-orange-500/60" />
               </div>
             )}
             <div
@@ -857,6 +903,18 @@ export function MediaGrid({
             height: selectionBox.height,
           }}
         />
+      )}
+
+      {uploadStatus && (
+        <div className="fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg border bg-background text-sm animate-in slide-in-from-top-2">
+          {uploadStatus.type === 'uploading' ? (
+            <span className="flex items-center gap-2"><span className="size-3 rounded-full border-2 border-primary border-t-transparent animate-spin" /> Uploading {uploadStatus.count} file{uploadStatus.count > 1 ? 's' : ''}…</span>
+          ) : uploadStatus.error ? (
+            <span className="flex items-center gap-2 text-destructive">✕ {uploadStatus.error}</span>
+          ) : (
+            <span className="flex items-center gap-2 text-green-600 dark:text-green-400">✓ Uploaded {uploadStatus.count} file{uploadStatus.count > 1 ? 's' : ''}</span>
+          )}
+        </div>
       )}
     </div>
     </div>

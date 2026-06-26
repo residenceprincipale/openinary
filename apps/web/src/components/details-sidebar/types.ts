@@ -2,6 +2,6 @@ export type MediaFile = {
   id: string
   name: string
   path: string
-  type: "image" | "video" | "audio"
+  type: "image" | "video" | "audio" | "other"
 }
 

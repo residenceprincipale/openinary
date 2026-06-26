@@ -174,6 +174,7 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
   }, [asset])
 
   const mediaUrl = asset ? `${transformBaseUrl}/t/${asset.path}` : ""
+  const rawUrl = asset ? `${transformBaseUrl}/raw/${asset.path}` : ""
   const previewUrl = asset
     ? asset.type === "image"
       ? `${transformBaseUrl}/t/w_500,h_500,q_80/${asset.path}`
@@ -330,6 +331,7 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
     updatedAt,
     isDeleting,
     mediaUrl,
+    rawUrl,
     previewUrl,
     apiBaseUrl,
     transformBaseUrl,

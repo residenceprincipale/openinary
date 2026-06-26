@@ -46,6 +46,9 @@ const ALLOWED_TYPES = {
   "audio/flac": [".flac"],
   "audio/aac": [".aac"],
   "audio/mp4": [".m4a"],
+  // Documents
+  "application/zip": [".zip"],
+  "application/pdf": [".pdf"],
 };
 
 interface UploadResult {
@@ -454,7 +457,7 @@ upload.post("/", async (c) => {
       if (!validateFileType(filename, mimeType)) {
         failedUploads.push({
           filename: rawSanitizedPath,
-          error: `Invalid file type: ${mimeType}. Allowed types: images (jpg, jpeg, png, webp, avif, gif, heic, heif, psd), videos (mp4, mov, webm), and audio (mp3, wav, ogg, flac, aac, m4a)`,
+          error: `Invalid file type: ${mimeType}. Allowed types: images (jpg, jpeg, png, webp, avif, gif, heic, heif, psd), videos (mp4, mov, webm), audio (mp3, wav, ogg, flac, aac, m4a), and documents (zip, pdf)`,
         });
         continue;
       }

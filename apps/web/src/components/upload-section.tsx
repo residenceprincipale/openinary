@@ -53,6 +53,8 @@ export function UploadSection({ uploadToFolder }: { uploadToFolder?: string }) {
       "image/*": [".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif", ".psd"],
       "video/*": [".mp4", ".mov", ".webm"],
       "audio/*": [".mp3", ".wav", ".ogg", ".flac", ".aac", ".m4a"],
+      "application/zip": [".zip"],
+      "application/pdf": [".pdf"],
     },
   });
 
@@ -171,7 +173,7 @@ export function UploadSection({ uploadToFolder }: { uploadToFolder?: string }) {
                   Drop files here, or click to select files
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Supports: JPG, PNG, WebP, AVIF, GIF, PSD, MP4, MOV, WebM, MP3, WAV, OGG
+                  Supports: JPG, PNG, WebP, AVIF, GIF, PSD, MP4, MOV, WebM, MP3, WAV, OGG, ZIP, PDF
                 </p>
                 <div className="flex gap-2 mt-2">
                   <Button

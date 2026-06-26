@@ -71,6 +71,19 @@ cacheRoute.delete("/", async (c) => {
   return c.json({ success: true, data: { localDeleted, cloudDeleted } })
 })
 
+cacheRoute.delete("/:name", async (c) => {
+  const name = c.req.param("name")
+  if (!name) return c.json({ success: false, error: "File name required" }, 400)
+  const filePath = join(CACHE_DIR, name)
+  if (!existsSync(filePath)) return c.json({ success: false, error: "File not found" }, 404)
+  try {
+    await fs.unlink(filePath)
+    return c.json({ success: true, data: { deleted: name } })
+  } catch (err) {
+    return c.json({ success: false, error: (err as Error).message }, 500)
+  }
+})
+
 cacheRoute.delete("/old", async (c) => {
   const age = parseInt(c.req.query("age") || String(7 * 24 * 60 * 60 * 1000))
   const cutoff = Date.now() - age

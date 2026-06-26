@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Trash2, RefreshCw, Cloud } from "lucide-react";
+import { Trash2, RefreshCw, Cloud, XCircle, X } from "lucide-react";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -197,7 +197,7 @@ function CachePageContent() {
                   </CardContent>
                 </Card>
 
-                {local.files.length > 0 && (
+                  {local.files.length > 0 && (
                   <Card>
                     <CardHeader>
                       <CardTitle>Local Cached Files</CardTitle>
@@ -211,6 +211,7 @@ function CachePageContent() {
                               <th className="pb-2 font-medium">Name</th>
                               <th className="pb-2 font-medium text-right">Size</th>
                               <th className="pb-2 font-medium text-right">Last Modified</th>
+                              <th className="pb-2 w-8"></th>
                             </tr>
                           </thead>
                           <tbody>
@@ -219,6 +220,23 @@ function CachePageContent() {
                                 <td className="py-1.5 pr-4 font-mono text-xs truncate max-w-[300px]">{f.name}</td>
                                 <td className="py-1.5 text-right text-muted-foreground whitespace-nowrap">{formatBytes(f.size)}</td>
                                 <td className="py-1.5 text-right text-muted-foreground whitespace-nowrap">{formatDate(f.lastModified)}</td>
+                                <td className="py-1.5 text-right">
+                                  <button
+                                    className="text-muted-foreground hover:text-destructive transition-colors"
+                                    title="Delete this cache file"
+                                    onClick={async () => {
+                                      if (!confirm(`Delete cache file "${f.name}"?`)) return
+                                      try {
+                                        const r = await fetch(`${apiBaseUrl}/cache/${encodeURIComponent(f.name)}`, { method: "DELETE", credentials: "include" })
+                                        const d = await r.json()
+                                        setMessage(d.success ? `Deleted ${f.name}` : "Failed to delete")
+                                        fetchStats()
+                                      } catch { setMessage("Failed to delete") }
+                                    }}
+                                  >
+                                    <X className="size-3.5" />
+                                  </button>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -227,6 +245,62 @@ function CachePageContent() {
                     </CardContent>
                   </Card>
                 )}
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <XCircle className="size-4" /> Invalidate Asset Cache
+                    </CardTitle>
+                    <CardDescription>Delete all cached transformations for a specific asset</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={async (e) => {
+                      e.preventDefault()
+                      const fd = new FormData(e.currentTarget)
+                      const path = fd.get("assetPath") as string
+                      if (!path) return
+                      if (!confirm(`Delete all cached variants of "${path}"?`)) return
+                      try {
+                        const encoded = path.split("/").map(encodeURIComponent).join("/")
+                        const r = await fetch(`${apiBaseUrl}/invalidate/${encoded}`, { method: "DELETE", credentials: "include" })
+                        const d = await r.json()
+                        setMessage(d.success ? `Invalidated: ${d.data?.localCacheFilesDeleted || d.localCacheFilesDeleted || 0} local, ${d.data?.cloudCacheFilesDeleted || d.cloudCacheFilesDeleted || 0} cloud` : "Failed to invalidate")
+                        fetchStats()
+                      } catch {
+                        setMessage("Failed to invalidate")
+                      }
+                    }} className="flex items-end gap-2">
+                      <div className="flex-1 space-y-1">
+                        <Label htmlFor="assetPath">Asset path</Label>
+                        <Input id="assetPath" name="assetPath" list="cached-files" placeholder="folder/my-image.jpg" className="w-full" />
+                        <datalist id="cached-files">
+                          {local?.files.map(f => (
+                            <option key={f.name} value={f.name.replace(/^cache_[a-f0-9]+_/, '').replace(/_/g, '/')} />
+                          ))}
+                        </datalist>
+                      </div>
+                      <Button type="submit" variant="destructive" size="sm">Invalidate</Button>
+                    </form>
+                    {local && local.files.length > 0 && (
+                      <details className="mt-3">
+                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Suggestions from cache ({Math.min(local.files.length, 20)} shown)</summary>
+                        <div className="mt-2 flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+                          {local.files.slice(0, 20).map(f => {
+                            const guess = f.name.replace(/^cache_[a-f0-9]+_/, '').replace(/_/g, '/')
+                            return (
+                              <button key={f.name} type="button" onClick={() => {
+                                const input = document.getElementById('assetPath') as HTMLInputElement
+                                if (input) input.value = guess
+                              }} className="text-xs px-2 py-0.5 rounded bg-muted hover:bg-accent text-muted-foreground hover:text-foreground transition-colors truncate max-w-48">
+                                {guess}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </details>
+                    )}
+                  </CardContent>
+                </Card>
 
                 {cloud?.enabled && (
                   <Card>

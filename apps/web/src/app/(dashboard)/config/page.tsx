@@ -23,12 +23,19 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Info } from "lucide-react";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
 type TransformConfig = {
   image: { quality: number; format: string; crop: string; gravity: string };
-  video: { quality: number; format: string; autoDownscale: boolean };
+  video: { quality: number; format: string; autoDownscale: boolean; autoDownscaleResolution: number };
 };
 
 function ConfigPageContent() {
@@ -215,8 +222,34 @@ function ConfigPageContent() {
                         checked={config.video.autoDownscale}
                         onChange={(e) => setConfig({ ...config, video: { ...config.video, autoDownscale: e.target.checked } })}
                       />
-                      <Label htmlFor="autoDownscale">Auto-downscale to 720p</Label>
+                      <Label htmlFor="autoDownscale" className="flex items-center gap-1">
+                        Auto-downscale
+                        <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-64">
+                            Automatically downscale videos to reduce processing load. This prevents high-resolution videos (4K, 5K, 8K) from overwhelming the system. Only applies if no explicit resize parameters are provided<br/><br/>
+                            Uses 720p instead of 1080p for faster processing of very large videos (8K, 5K)<br/>
+                            - 8K (7680x4320) {"->"} 720p = 98% pixel reduction (vs 94% to 1080p)<br/>
+                            - Processing time reduced by ~50% compared to 1080p output                          </TooltipContent>
+                        </Tooltip>
+                        </TooltipProvider>
+                      </Label>
                     </div>
+                    {config.video.autoDownscale && (
+                      <div className="flex items-center gap-2 ml-6">
+                        <Label htmlFor="downscaleRes" className="text-sm text-muted-foreground">Max height (px):</Label>
+                        <Input
+                          id="downscaleRes"
+                          type="number" min={240} max={2160} step={10}
+                          className="w-24 h-8"
+                          value={config.video.autoDownscaleResolution}
+                          onChange={(e) => setConfig({ ...config, video: { ...config.video, autoDownscaleResolution: +e.target.value } })}
+                        />
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 

@@ -8,13 +8,17 @@ const CONFIG_PATH = join(process.cwd(), "data", "transforms.json");
 
 const defaults = {
   image: { quality: 80, format: "auto", crop: "fill", gravity: "center" },
-  video: { quality: 60, format: "mp4", autoDownscale: true },
+  video: { quality: 60, format: "mp4", autoDownscale: true, autoDownscaleResolution: 720 },
 };
 
 function readConfig(): typeof defaults {
   try {
     if (existsSync(CONFIG_PATH)) {
-      return { ...defaults, ...JSON.parse(readFileSync(CONFIG_PATH, "utf-8")) };
+      const saved = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
+      return {
+        image: { ...defaults.image, ...(saved.image || {}) },
+        video: { ...defaults.video, ...(saved.video || {}) },
+      };
     }
   } catch {
     logger.warn("Failed to read config, using defaults");

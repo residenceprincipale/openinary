@@ -10,7 +10,7 @@ type MediaFile = {
     id: string
     name: string
     path: string
-    type: "image" | "video" | "audio"
+    type: "image" | "video" | "audio" | "other"
 }
 
 const treeVariants = cva(
@@ -39,7 +39,7 @@ interface TreeDataItem {
     disabled?: boolean
 }
 
-type TreeProps = React.HTMLAttributes<HTMLDivElement> & {
+type TreeProps = Omit<React.HTMLAttributes<HTMLDivElement>, 'onContextMenu'> & {
     data: TreeDataItem[] | TreeDataItem
     initialSelectedItemId?: string
     onSelectChange?: (item: TreeDataItem | undefined) => void
@@ -53,8 +53,7 @@ type TreeProps = React.HTMLAttributes<HTMLDivElement> & {
 }
 
 // Helper function to find the path of an item in the tree
-// Helper function to check if an item is a media file
-function isMediaFile(item: TreeDataItem): { isMedia: boolean; type?: "image" | "video" | "audio" } {
+function isMediaFile(item: TreeDataItem): { isMedia: boolean; type?: "image" | "video" | "audio" | "other" } {
     const lowerName = item.name.toLowerCase()
     
     const isImage =
@@ -63,7 +62,8 @@ function isMediaFile(item: TreeDataItem): { isMedia: boolean; type?: "image" | "
         lowerName.endsWith(".png") ||
         lowerName.endsWith(".webp") ||
         lowerName.endsWith(".gif") ||
-        lowerName.endsWith(".avif")
+        lowerName.endsWith(".avif") ||
+        lowerName.endsWith(".psd")
     
     const isVideo =
         lowerName.endsWith(".mp4") ||
@@ -86,6 +86,11 @@ function isMediaFile(item: TreeDataItem): { isMedia: boolean; type?: "image" | "
     }
     if (isAudio) {
         return { isMedia: true, type: "audio" }
+    }
+
+    // ponytail: treat all non-folder files as clickable — zip, pdf, etc.
+    if (!item.children) {
+        return { isMedia: true, type: "other" }
     }
     
     return { isMedia: false }
@@ -209,7 +214,7 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
 )
 TreeView.displayName = 'TreeView'
 
-type TreeItemProps = TreeProps & {
+type TreeItemProps = Omit<TreeProps, 'onContextMenu'> & {
     selectedItemId?: string
     handleSelectChange: (item: TreeDataItem | undefined) => void
     expandedItemIds: string[]
@@ -219,6 +224,7 @@ type TreeItemProps = TreeProps & {
     handleDrop?: (item: TreeDataItem) => void
     onExternalDrop?: (sourcePath: string, targetPath: string) => void
     draggedItem: TreeDataItem | null
+    onContextMenu?: (item: TreeDataItem, e: React.MouseEvent) => void
     treeData?: TreeDataItem[] | TreeDataItem
 }
 
@@ -237,6 +243,7 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
             onExternalDrop,
             draggedItem,
             onMediaSelect,
+            onContextMenu,
             treeData,
             ...props
         },
@@ -262,6 +269,7 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
                                 onExternalDrop={onExternalDrop}
                                 draggedItem={draggedItem}
                                 onMediaSelect={onMediaSelect}
+                                onContextMenu={onContextMenu}
                                 treeData={treeData}
                             />
                         ) : (
@@ -272,9 +280,9 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
                                 defaultLeafIcon={defaultLeafIcon}
                                 handleDragStart={handleDragStart}
                                 handleDrop={handleDrop}
-                                onExternalDrop={onExternalDrop}
                                 draggedItem={draggedItem}
                                 onMediaSelect={onMediaSelect}
+                                onContextMenu={onContextMenu}
                                 treeData={treeData}
                             />
                         )}
@@ -417,7 +425,7 @@ const TreeNode = ({
 
 const TreeLeaf = React.forwardRef<
     HTMLDivElement,
-    React.HTMLAttributes<HTMLDivElement> & {
+    Omit<React.HTMLAttributes<HTMLDivElement>, 'onContextMenu'> & {
         item: TreeDataItem
         selectedItemId?: string
         handleSelectChange: (item: TreeDataItem | undefined) => void

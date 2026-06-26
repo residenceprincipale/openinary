@@ -29,6 +29,7 @@ interface AssetDetailsTabProps {
   optimizedSize: number | null
   createdAt: Date | null
   mediaUrl: string
+  rawUrl: string
   isDeleting: boolean
   videoStatus?: VideoStatus
   videoProgress?: number
@@ -44,6 +45,7 @@ export function AssetDetailsTab({
   optimizedSize,
   createdAt,
   mediaUrl,
+  rawUrl,
   isDeleting,
   videoStatus,
   videoProgress = 0,
@@ -162,6 +164,13 @@ export function AssetDetailsTab({
             Asset URL
           </label>
           <CopyInput value={mediaUrl} />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium flex items-center gap-2">
+            <Download className="h-4 w-4" />
+            Direct URL (no transform)
+          </label>
+          <CopyInput value={rawUrl} />
         </div>
       </div>
 
