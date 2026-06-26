@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   FileAudio, FileImage, FileVideo, File, ArrowUpRight, Folder, FolderPlus,
-  CheckCircle, Circle, Trash2, Pencil, Upload,
+  CheckCircle, Circle, MoreHorizontal, Trash2, Pencil, Upload,
   ArrowUpDown, Filter, List, LayoutGrid, RefreshCw,
 } from "lucide-react";
 import { useQueryState } from "nuqs";
@@ -36,6 +36,13 @@ import {
   ContextMenuRadioGroup,
   ContextMenuRadioItem,
 } from "@/components/ui/context-menu";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { RenameDialog } from "@/components/rename-dialog";
 import { MoveDialog } from "@/components/move-dialog";
@@ -1116,6 +1123,81 @@ export function MediaGrid({
                     <Circle className="size-5 text-white/80 drop-shadow-md" />
                   )}
                 </div>
+            {/* Type icon */}
+            <div className="absolute bottom-2 left-2 z-10 rounded-md bg-black/40 p-1 group-hover:opacity-0 transition-opacity">
+                {media.type === "image" ? (
+                  <FileImage className="size-4 text-white" />
+                ) : media.type === "video" ? (
+                  <FileVideo className="size-4 text-white" />
+                ) : media.type === "audio" ? (
+                  <FileAudio className="size-4 text-white" />
+                ) : (
+                  <File className="size-4 text-white" />
+                )}
+            </div>
+            {/* More actions */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="absolute top-2 right-2 z-10 flex items-center justify-center size-6 rounded-md bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="size-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => {
+                  document.body.style.pointerEvents = ""
+                  setRenameItem({
+                    id: media.id,
+                    name: media.name,
+                    path: getItemPath(media.name),
+                    isFolder: false,
+                  })
+                }}>
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  document.body.style.pointerEvents = ""
+                  setMoveItem({ id: media.id, name: media.name, path: getItemPath(media.name) })
+                }}>
+                  Move to...
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigator.clipboard.writeText(`${transformBaseUrl}/${media.path}`)}>
+                  Copy URL
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => window.open(`${transformBaseUrl}/${media.path}`, "_blank")}>
+                  Open
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  const encoded = media.path.split("/").map(encodeURIComponent).join("/");
+                  const a = document.createElement("a");
+                  a.href = `${apiBaseUrl}/download/${encoded}`;
+                  a.download = media.name;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                }}>
+                  Download
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => {
+                    const path = getItemPath(media.name);
+                    if (confirm(`Delete "${media.name}"?`)) {
+                      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+                      const encoded = path.split("/").map(encodeURIComponent).join("/");
+                      fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" })
+                        .then(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] }));
+                    }
+                  }}
+                >
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {media.type === "image" ? (
               <img
                 src={thumbnailUrl}
