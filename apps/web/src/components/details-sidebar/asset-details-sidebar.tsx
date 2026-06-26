@@ -14,6 +14,7 @@ import { AssetPreview } from "./asset-preview"
 import { AssetDetailsTab } from "./asset-details-tab"
 import { AssetTransformationsTab } from "./asset-transformations-tab"
 import { AssetMetadataTab } from "./asset-metadata-tab"
+import { RenameDialog } from "@/components/rename-dialog"
 
 export function AssetDetailsSidebar({
   items,
@@ -42,11 +43,13 @@ export function AssetDetailsSidebar({
     rawUrl,
     previewUrl,
     transformBaseUrl,
-    videoStatus,
-    videoProgress,
+    isRenaming,
+    renameItem,
     handleCopyUrl,
     handleDownload,
     handleOpenInNewTab,
+    handleRename,
+    handleCloseRename,
     handleClose,
     handleDelete,
   } = useAssetDetails(onOpenChange)
@@ -100,16 +103,13 @@ export function AssetDetailsSidebar({
                 <AssetDetailsTab
                   asset={asset}
                   fileSize={fileSize}
-                  optimizedSize={optimizedSize}
                   createdAt={createdAt}
-                  mediaUrl={mediaUrl}
                   rawUrl={rawUrl}
                   isDeleting={isDeleting}
-                  videoStatus={videoStatus}
-                  videoProgress={videoProgress}
                   onCopyUrl={handleCopyUrl}
                   onDownload={handleDownload}
                   onOpenInNewTab={handleOpenInNewTab}
+                  onRename={handleRename}
                   onDelete={handleDelete}
                 />
               </TabsContent>
@@ -125,6 +125,13 @@ export function AssetDetailsSidebar({
           </div>
         )}
       </ScrollArea>
+
+      <RenameDialog
+        isOpen={isRenaming}
+        item={renameItem}
+        isFolder={false}
+        onClose={handleCloseRename}
+      />
     </div>
   )
 }

@@ -22,6 +22,7 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
   const [createdAt, setCreatedAt] = useState<Date | null>(null)
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isRenaming, setIsRenaming] = useState(false)
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
   // Use dedicated transform base URL (empty in Docker, falls back to apiBaseUrl without /api)
@@ -216,8 +217,8 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
   }, [asset?.type, asset?.path, transformBaseUrl])
 
   const handleCopyUrl = () => {
-    if (mediaUrl) {
-      navigator.clipboard.writeText(mediaUrl)
+    if (rawUrl) {
+      navigator.clipboard.writeText(rawUrl)
     }
   }
 
@@ -236,10 +237,15 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
   }
 
   const handleOpenInNewTab = () => {
-    if (mediaUrl) {
-      window.open(mediaUrl, "_blank")
+    if (rawUrl) {
+      window.open(rawUrl, "_blank")
     }
   }
+
+  const renameItem = asset ? { id: asset.id, name: asset.name, path: asset.path } : null
+
+  const handleRename = () => setIsRenaming(true)
+  const handleCloseRename = () => setIsRenaming(false)
 
   const handleClose = () => {
     setAssetId(null)
@@ -330,6 +336,8 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
     createdAt,
     updatedAt,
     isDeleting,
+    isRenaming,
+    renameItem,
     mediaUrl,
     rawUrl,
     previewUrl,
@@ -340,6 +348,8 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
     handleCopyUrl,
     handleDownload,
     handleOpenInNewTab,
+    handleRename,
+    handleCloseRename,
     handleClose,
     handleDelete,
   }
