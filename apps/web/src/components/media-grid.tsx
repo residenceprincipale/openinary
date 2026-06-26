@@ -718,7 +718,7 @@ export function MediaGrid({
         const thumbnailUrl =
           media.type === "image"
             ? `${transformBaseUrl}/t/w_500,h_500,q_80/${media.path}`
-            : `${transformBaseUrl}/t/t_true,tt_5,f_webp,w_500,h_500,c_fill,q_80/${media.path}`;
+            : `${transformBaseUrl}/t/so_5,f_webp,w_500,h_500,c_fill,q_80/${media.path}`;
         const isHovered = hoveredId === media.id;
         const filePath = getItemPath(media.name)
         const isSelected = selectedPaths.has(filePath)

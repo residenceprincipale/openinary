@@ -167,9 +167,13 @@ export class VideoWorker extends EventEmitter {
 
         // Upload to cloud storage if configured
         if (this.storage) {
-          const contentType = params.format === "jpg" || params.format === "png"
-            ? `image/${params.format}`
-            : "video/mp4";
+          const fmt = params.format?.toLowerCase();
+          const imageTypes: Record<string, string> = {
+            jpg: 'image/jpeg', jpeg: 'image/jpeg',
+            png: 'image/png', webp: 'image/webp',
+            avif: 'image/avif', gif: 'image/gif',
+          };
+          const contentType = fmt ? (imageTypes[fmt] ?? 'video/mp4') : 'video/mp4';
           await this.storage.upload(job.file_path, params, buffer, contentType);
         }
 

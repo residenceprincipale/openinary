@@ -32,8 +32,6 @@ const TRANSFORM_VALUE_PATTERNS: Readonly<Record<string, RegExp>> = {
   bg: /^(transparent|white|black|rgb:[0-9a-fA-F]{3,8}|#?[0-9a-fA-F]{3,8})$/,
   so: /^\d+(?:\.\d+)?$/,
   eo: /^\d+(?:\.\d+)?$/,
-  t:  /^(true|1|\d+)$/,
-  tt: /^\d+(?:\.\d+)?$/,
   r:  /^max$|^\d+(?::\d+){0,3}$/,
   sr: /^\d+$/,
   v:  /^\d+$/,
@@ -77,8 +75,6 @@ type TransformKey =
   | "bg"
   | "so"
   | "eo"
-  | "t"
-  | "tt"
   | "r"
   | "sr"
   | "v"
@@ -150,14 +146,6 @@ const parseTransform = (
       case "eo":
         // End offset (in seconds) for video/audio
         endOffset = value;
-        break;
-      case "t":
-        // FIX H12: Parse thumbnail parameter
-        params.thumbnail = value;
-        break;
-      case "tt":
-        // FIX H12: Parse thumbnail time parameter
-        params.thumbnailTime = value;
         break;
       case "r":
         params.radius = value;

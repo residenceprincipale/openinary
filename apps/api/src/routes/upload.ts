@@ -263,9 +263,8 @@ async function queueThumbnailGeneration(
   storage: ReturnType<typeof createStorageClient>,
 ): Promise<void> {
   try {
-    // Define default thumbnail parameters (matching frontend defaults)
-    // t_true (thumbnail), tt_5 (time at 5s), f_webp, w_500, h_500, c_fill, q_80
-    const transformPath = `/t/t_true,tt_5,f_webp,w_500,h_500,c_fill,q_80/${filePath}`;
+    // Default thumbnail: so_5 (start offset 5s), f_webp, w_500, h_500, c_fill, q_80
+    const transformPath = `/t/so_5,f_webp,w_500,h_500,c_fill,q_80/${filePath}`;
     const params = parseParams(transformPath);
     const cachePath = getCachePath(transformPath);
 
@@ -321,7 +320,7 @@ async function queueVideoTransformations(
       ? `./temp/${path.basename(filePath)}`
       : path.join("./public", filePath);
     const isThumbnailRequest =
-      params.thumbnail === "true" || params.thumbnail === "1";
+      /^(jpe?g|png|webp|avif|gif)$/i.test(params.format ?? "");
     const priority = isThumbnailRequest
       ? THUMBNAIL_PRIORITY
       : TRANSFORMATION_PRIORITY;

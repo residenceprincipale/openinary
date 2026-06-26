@@ -225,9 +225,23 @@ export class TransformService {
       headers['X-Video-Status'] = 'ready';
     }
 
+    let contentType = '';
+    const fmt = effectiveParams.format?.toLowerCase();
+    if (fmt) {
+      const imageTypes: Record<string, string> = {
+        jpeg: 'image/jpeg', jpg: 'image/jpeg',
+        png: 'image/png', webp: 'image/webp',
+        avif: 'image/avif', gif: 'image/gif',
+      };
+      const videoTypes: Record<string, string> = {
+        mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
+      };
+      contentType = imageTypes[fmt] || videoTypes[fmt] || '';
+    }
+
     return {
       buffer,
-      contentType: '', // Will be determined by the route handler
+      contentType,
       headers,
       isProcessing: false,
     };
@@ -369,13 +383,20 @@ export class TransformService {
     cachePath: string,
     isTempFile?: boolean
   ): Promise<TransformResult> {
-    // Check if this is a thumbnail extraction
-    const isThumbnailRequest =
-      params.thumbnail === 'true' || params.thumbnail === '1';
+    // ponytail: image format on video → thumbnail (auto-detect, no t_true needed)
+    const isThumbnailRequest = /^(jpe?g|png|webp|avif|gif)$/i.test(params.format);
 
-    // For thumbnail extraction: process synchronously
     if (isThumbnailRequest) {
       const result = await processVideo(sourcePath, params);
+
+      await saveToCaches(
+        this.storage,
+        filePath,
+        params,
+        cachePath,
+        result.buffer,
+        result.contentType
+      );
 
       return {
         buffer: result.buffer,

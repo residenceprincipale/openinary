@@ -3,7 +3,6 @@ import type { VideoContext } from './types';
 import { applyResize } from './resize';
 import { applyQuality } from './quality';
 import { applyTrimming } from './trim';
-import { applyThumbnailExtraction } from './thumbnail';
 
 /**
  * Parameter processor function type for video transformations
@@ -46,33 +45,6 @@ export interface VideoParamDefinition {
  * Single source of truth for all video transformation parameters
  */
 export const VIDEO_PARAMS: readonly VideoParamDefinition[] = [
-  {
-    param: 't',
-    name: 'Thumbnail',
-    description: 'Extracts a single frame as an image thumbnail. When enabled, the output will be an image format (jpg, png, webp, etc.) instead of a video.',
-    example: 't_true',
-    defaultValue: false,
-    validValues: ['true', 'false', '1', '0'],
-    processor: (command, _value, context) => {
-      return applyThumbnailExtraction(command, context);
-    },
-    priority: 1, // Thumbnail extraction should happen first
-  },
-  {
-    param: 'tt',
-    name: 'Thumbnail Time',
-    description: 'Specifies the time (in seconds) from which to extract the thumbnail. Works in conjunction with the thumbnail parameter.',
-    example: 'tt_5.5',
-    defaultValue: 0,
-    validValues: ['any positive number (seconds)'],
-    aliases: ['thumbnail_time'],
-    dependencies: ['t'],
-    processor: (command, _value, context) => {
-      // Thumbnail time is used by thumbnail extraction
-      return command;
-    },
-    priority: 0, // Config parameter
-  },
   {
     param: 'so',
     name: 'Start Offset',

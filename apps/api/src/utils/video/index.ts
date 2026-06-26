@@ -10,12 +10,12 @@ import { applyAutoDownscale } from './auto-downscale';
 import { applyResize } from './resize';
 import { applyQuality } from './quality';
 import { VideoCommandBuilder } from './command-builder';
+import { getVideoInfo } from './video-info';
 import type { VideoContext } from './types';
 
 // Re-export types for backward compatibility
 export * from './types';
 export * from './param-registry';
-export * from './video-info';
 
 /**
  * Image formats that ffmpeg cannot encode natively in all builds.
@@ -65,7 +65,7 @@ async function convertWithSharp(
  * - 5-minute timeout protection (accommodates 8K videos)
  *
  * Thumbnail pipeline detail:
- *   1. ffmpeg probes duration, then seeks to min(tt_N, duration-0.5) and
+ *   1. ffmpeg probes duration, then clamps so_N to duration-0.5 and
  *      extracts one JPEG frame (universal support).
  *   2. If the requested format needs sharp (webp, avif, png, gif), the JPEG
  *      buffer is post-processed by sharp — this avoids relying on optional
@@ -99,16 +99,13 @@ export const transformVideo = async (
   // Generate output path using the ffmpeg-friendly format
   const outputPath = join(tmpDir, `${randomUUID()}.${ffmpegFormat}`);
 
-  // Probe duration so thumbnail extraction can clamp to a valid position
+  // ponytail: always probe duration for startOffset clamping
   let duration: number | undefined;
-  if (isThumbnail) {
-    try {
-      const { getVideoInfo } = await import('./video-info');
-      const info = await getVideoInfo(inputPath);
-      duration = info.duration;
-    } catch {
-      // probe failure is non-fatal — thumbnail will fall back to seeking 0
-    }
+  try {
+    const info = await getVideoInfo(inputPath);
+    duration = info.duration;
+  } catch {
+    // probe failure is non-fatal — will fall back to seeking 0
   }
 
   // Build context object

@@ -6,6 +6,7 @@ import { transformImage } from "../utils/image/index";
 import { transformVideo } from "../utils/video/index";
 import { transformAudio } from "../utils/audio/index";
 import { Compression } from "../utils/image/compression";
+import { getVideoInfo, getResolutionLabel } from "../utils/video/video-info";
 import logger, { serializeError } from "../utils/logger";
 import {
   existsInCache,
@@ -336,7 +337,6 @@ export async function processVideo(
   
   // Get video information for better diagnostics
   try {
-    const { getVideoInfo, getResolutionLabel } = await import("../utils/video/video-info");
     const videoInfo = await getVideoInfo(originalPath);
     const resLabel = getResolutionLabel(videoInfo);
     

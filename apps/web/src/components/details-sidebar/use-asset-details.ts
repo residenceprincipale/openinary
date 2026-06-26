@@ -179,7 +179,7 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
     ? asset.type === "image"
       ? `${transformBaseUrl}/t/w_500,h_500,q_80/${asset.path}`
       : asset.type === "video"
-        ? `${transformBaseUrl}/t/t_true,tt_5,f_webp,w_500,h_500,c_fill,q_80/${asset.path}`
+        ? `${transformBaseUrl}/t/so_5,f_webp,w_500,h_500,c_fill,q_80/${asset.path}`
         : `${transformBaseUrl}/t/${asset.path}`
     : ""
 
