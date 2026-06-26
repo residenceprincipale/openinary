@@ -213,6 +213,7 @@ export function MediaGrid({
   const [sortBy, setSortBy] = useQueryState("sort");
   const [filterType, setFilterType] = useQueryState("filter");
   const [view, setView] = useQueryState("view");
+  const [search, setSearch] = useQueryState("q");
   const [fileMeta, setFileMeta] = useState<Record<string, { size: number; createdAt: string }>>({});
 
   const toggleSelection = useCallback((path: string) => {
@@ -307,6 +308,18 @@ export function MediaGrid({
 
   const visibleFolders = useMemo(() => sortItems(folders, null), [folders, sortItems])
   const visibleFiles = useMemo(() => sortItems(filteredFiles, sortBy), [filteredFiles, sortBy, sortItems])
+
+  const searchFolders = useMemo(() => {
+    if (!search) return visibleFolders
+    const q = search.toLowerCase()
+    return visibleFolders.filter(f => f.name.toLowerCase().includes(q))
+  }, [visibleFolders, search])
+
+  const searchFiles = useMemo(() => {
+    if (!search) return visibleFiles
+    const q = search.toLowerCase()
+    return visibleFiles.filter(f => f.name.toLowerCase().includes(q))
+  }, [visibleFiles, search])
 
   const allItems = useMemo(() => [
     ...visibleFolders.map(f => ({ path: f.path, name: f.name })),
@@ -621,8 +634,8 @@ export function MediaGrid({
     <div>
       <div className="flex items-center gap-2 pb-3 mb-3 border-b">
         <div className="flex items-center gap-1">
-          <button onClick={() => setView(view === "list" ? null : "list")} className={cn("p-1.5 rounded hover:bg-accent/50", view === "list" && "bg-accent")} title="List view"><List className="size-4" /></button>
           <button onClick={() => setView(null)} className={cn("p-1.5 rounded hover:bg-accent/50", view !== "list" && "bg-accent")} title="Grid view"><LayoutGrid className="size-4" /></button>
+          <button onClick={() => setView(view === "list" ? null : "list")} className={cn("p-1.5 rounded hover:bg-accent/50", view === "list" && "bg-accent")} title="List view"><List className="size-4" /></button>
         </div>
         <Separator orientation="vertical" className="h-5" />
         <div className="flex items-center gap-1 text-xs">
@@ -630,11 +643,18 @@ export function MediaGrid({
             <button key={t} onClick={() => setFilterType(t === "all" ? null : t)} className={cn("px-2 py-1 rounded capitalize", (filterType || "all") === t ? "bg-accent font-medium" : "hover:bg-accent/50 text-muted-foreground")}>{t}</button>
           ))}
         </div>
-        <div className="text-xs text-muted-foreground ml-3">
-          {visibleFolders.length + visibleFiles.length} item{(visibleFolders.length + visibleFiles.length) !== 1 ? 's' : ''}
-          {filterType && ` (${folders.length + files.length} total)`}
+        <div className="text-xs text-muted-foreground ml-3 whitespace-nowrap">
+          {searchFolders.length + searchFiles.length} item{(searchFolders.length + searchFiles.length) !== 1 ? 's' : ''}
+          {(search || filterType) && ` (${folders.length + files.length} total)`}
         </div>
         <div className="ml-auto flex items-center gap-2">
+          <input
+            type="search"
+            placeholder="Search…"
+            value={search || ""}
+            onChange={e => setSearch(e.target.value || null)}
+            className="h-7 w-36 text-xs bg-transparent border rounded px-2 py-1 placeholder:text-muted-foreground/50"
+          />
           <select value={sortBy || "name"} onChange={e => setSortBy(e.target.value === "name" ? null : e.target.value)} className="text-xs bg-transparent border rounded px-2 py-1">
             <option value="name">Name</option>
             <option value="type">Type</option>
@@ -656,7 +676,7 @@ export function MediaGrid({
             </tr>
           </thead>
           <tbody>
-      {visibleFolders.map((folder, i) => {
+      {searchFolders.map((folder, i) => {
         const isSelected = selectedPaths.has(folder.path)
         return (
           <ContextMenu key={folder.id}>
@@ -765,7 +785,7 @@ export function MediaGrid({
           </ContextMenu>
         );
       })}
-      {visibleFiles.map((media, i) => {
+      {searchFiles.map((media, i) => {
         const filePath = getItemPath(media.name)
         const isSelected = selectedPaths.has(filePath)
         const Icon = media.type === "image" ? FileImage : media.type === "video" ? FileVideo : media.type === "audio" ? FileAudio : File
@@ -866,7 +886,7 @@ export function MediaGrid({
         </table>
       ) : (
         <div className={cn(`grid ${gridColsClass} gap-4`, "select-none")} >
-      {visibleFolders.map((folder, i) => {
+      {searchFolders.map((folder, i) => {
         const isHovered = hoveredId === folder.id;
         const isSelected = selectedPaths.has(folder.path)
         const folderImages = treeData
@@ -1046,8 +1066,8 @@ export function MediaGrid({
           </ContextMenuContent>
         </ContextMenu>
       );
-    })}
-      {visibleFiles.map((media, i) => {
+      })}
+      {searchFiles.map((media, i) => {
         const thumbnailUrl =
           media.type === "image"
             ? `${transformBaseUrl}/t/w_500,h_500,q_80/${media.path}`
@@ -1313,8 +1333,8 @@ export function MediaGrid({
       <ContextMenuSeparator />
       <ContextMenuItem onClick={() => {
         const all = [
-          ...visibleFolders.map(f => f.path),
-          ...visibleFiles.map(f => getItemPath(f.name))
+          ...searchFolders.map(f => f.path),
+          ...searchFiles.map(f => getItemPath(f.name))
         ]
         setSelectedPaths(new Set(all))
       }}>
