@@ -9,7 +9,7 @@ export default function DashboardLayout({
   return (
     <SidebarProvider>
       {children}
-      <ChatbotButton />
+      {/*<ChatbotButton />*/}
     </SidebarProvider>
   );
 }
