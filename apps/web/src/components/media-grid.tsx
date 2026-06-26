@@ -458,7 +458,7 @@ export function MediaGrid({
   // ponytail: rectangle drag-select, O(n) intersection on mouseup
   const gridMouseHandlers = {
     onMouseDown: (e: React.MouseEvent) => {
-      if (!(e.target as HTMLElement).closest('[data-item-path], button, a, [role="button"]')) {
+      if (!(e.target as HTMLElement).closest('[data-item-path], button, a, [role="button"], input')) {
         e.preventDefault()
         const container = e.currentTarget as HTMLElement
         const startX = e.clientX
