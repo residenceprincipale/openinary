@@ -1174,6 +1174,24 @@ export function MediaGrid({
               Move to...
             </ContextMenuItem>
             <ContextMenuSeparator />
+            <ContextMenuItem onClick={() => navigator.clipboard.writeText(`${transformBaseUrl}/${media.path}`)}>
+              Copy URL
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => window.open(`${transformBaseUrl}/${media.path}`, "_blank")}>
+              Open
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => {
+              const encoded = media.path.split("/").map(encodeURIComponent).join("/");
+              const a = document.createElement("a");
+              a.href = `${apiBaseUrl}/download/${encoded}`;
+              a.download = media.name;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+            }}>
+              Download
+            </ContextMenuItem>
+            <ContextMenuSeparator />
             <ContextMenuItem
               variant="destructive"
               onClick={() => {
