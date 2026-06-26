@@ -1005,14 +1005,14 @@ export function MediaGrid({
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-muted">
-                  <span className="text-muted-foreground text-2xl font-bold tracking-wide">
+                  <span className="text-muted-foreground text-2xl font-bold tracking-wide translate-y-[2px]">
                     {getFolderInitials(folder.name)}
                   </span>
                 </div>
               )}
             </div>
             <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-              <Folder className="w-16 h-16 text-white opacity-80" />
+              <Folder className="w-16 h-16 text-muted-foreground opacity-80" />
             </div>
             <div
               className={cn(
