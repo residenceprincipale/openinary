@@ -5,7 +5,6 @@ import authenticated from "./routes/authenticated";
 import upload from "./routes/upload";
 import storageRoute from "./routes/storage";
 import download from "./routes/download";
-import raw from "./routes/raw";
 import apiKeys from "./routes/api-keys";
 import health from "./routes/health";
 import videoStatus from "./routes/video-status";
@@ -19,6 +18,9 @@ import configRoute from "./routes/config";
 import { apiKeyAuth } from "./middleware/auth";
 import { publicRateLimit } from "./middleware/rate-limit";
 import { validateApiSecret } from "./utils/signature";
+import { createStorageClient } from "./utils/storage/index";
+import fs from "fs";
+import path from "path";
 
 // Validate API_SECRET at startup if authenticated routes are enabled
 // This ensures the application fails fast if the secret is not configured properly
@@ -84,11 +86,6 @@ app.use("/download", publicRateLimit);
 app.use("/download/*", publicRateLimit);
 app.route("/download", download);
 
-// Original file served inline (no Content-Disposition: attachment)
-app.use("/raw", publicRateLimit);
-app.use("/raw/*", publicRateLimit);
-app.route("/raw", raw);
-
 // Authenticated image transformation route (with signature verification)
 app.use("/authenticated", publicRateLimit);
 app.use("/authenticated/*", publicRateLimit);
@@ -130,5 +127,37 @@ app.route("/users", usersRoute);
 // Config routes (protected)
 app.use("/config/*", apiKeyAuth);
 app.route("/config", configRoute);
+
+// Catch-all: serve raw files at root path (e.g. /my-image.jpg)
+app.use("/*", publicRateLimit);
+app.get("/*", async (c) => {
+  const rawFilePath = c.req.path.replace(/^\//, "");
+  if (!rawFilePath) return c.text("Openinary API Server is running.", 200);
+
+  const filePath = decodeURIComponent(rawFilePath).replace(/\.\./g, "").replace(/\\/g, "/").replace(/\/+/g, "/").replace(/^\/+/, "");
+  if (!filePath) return c.text("Invalid path", 400);
+
+  const storage = createStorageClient();
+  try {
+    let buffer;
+    if (storage) {
+      try { buffer = await storage.downloadOriginal(filePath); } catch { return c.text("File not found", 404); }
+    } else {
+      const localPath = path.join("./public", filePath);
+      if (!fs.existsSync(localPath) || fs.statSync(localPath).isDirectory()) return c.text("File not found", 404);
+      buffer = fs.readFileSync(localPath);
+    }
+    const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+    const ctype: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", webp: "image/webp", avif: "image/avif", gif: "image/gif", psd: "image/vnd.adobe.photoshop", mp4: "video/mp4", mov: "video/quicktime", webm: "video/webm", mp3: "audio/mpeg", wav: "audio/wav", ogg: "audio/ogg", flac: "audio/flac", aac: "audio/aac", m4a: "audio/mp4", zip: "application/zip", pdf: "application/pdf" };
+    const contentType = ctype[ext] ?? "application/octet-stream";
+    c.header("Content-Type", contentType);
+    c.header("Content-Length", buffer.length.toString());
+    c.header("Cache-Control", "public, max-age=31536000, immutable");
+    return c.body(new Uint8Array(buffer));
+  } catch (error) {
+    logger.error({ error: serializeError(error), filePath }, "Catch-all raw fetch failed");
+    return c.text("Internal server error", 500);
+  }
+});
 
 export default app;
