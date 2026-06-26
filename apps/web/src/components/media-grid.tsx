@@ -3,7 +3,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  FileAudio, FileImage, FileVideo, File, ArrowUpRight, Folder,
+  FileAudio, FileImage, FileVideo, File, ArrowUpRight, Folder, FolderPlus,
   CheckCircle, Circle, Trash2, Pencil,
 } from "lucide-react";
 import { useQueryState } from "nuqs";
@@ -33,6 +33,9 @@ import {
 import { RenameDialog } from "@/components/rename-dialog";
 import { MoveDialog } from "@/components/move-dialog";
 import { BatchRenameDialog } from "@/components/batch-rename-dialog";
+import { CreateFolderSection } from "@/components/create-folder-section";
+import DefaultDialog from "@/components/default-dialog";
+
 
 type MediaFile = {
   id: string;
@@ -198,6 +201,7 @@ export function MediaGrid({
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [selectionBox, setSelectionBox] = useState<{left: number; top: number; width: number; height: number} | null>(null);
   const [uploadStatus, setUploadStatus] = useState<{type: 'uploading' | 'done'; count: number; error?: string} | null>(null);
+  const [showCreateFolder, setShowCreateFolder] = useState(false);
 
   const toggleSelection = useCallback((path: string) => {
     setSelectedPaths(prev => {
@@ -507,6 +511,8 @@ export function MediaGrid({
 
   if (folders.length === 0 && files.length === 0) {
     return (
+      <ContextMenu>
+      <ContextMenuTrigger asChild>
       <div className="relative" {...gridMouseHandlers} {...gridHandlers}>
       <div className={cn("flex flex-col items-center justify-center h-64 rounded-lg border-2 border-dashed transition-colors text-muted-foreground space-y-4 select-none", gridDragOver && "border-primary bg-accent/30 outline-dashed outline-2 outline-primary outline-offset-2")}>
         <FileAudio className="h-12 w-12 opacity-50" />
@@ -524,10 +530,28 @@ export function MediaGrid({
         </div>
       )}
       </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onClick={() => {
+          document.body.style.pointerEvents = ""
+          setShowCreateFolder(true)
+        }}>
+          <FolderPlus className="mr-2 h-4 w-4" /> Create folder
+        </ContextMenuItem>
+      </ContextMenuContent>
+      <DefaultDialog title="Create folder" isOpen={showCreateFolder} onClose={() => setShowCreateFolder(false)}>
+        <CreateFolderSection
+          uploadToFolder={currentFolder || undefined}
+          onSuccessfulCreate={() => setShowCreateFolder(false)}
+        />
+      </DefaultDialog>
+      </ContextMenu>
     );
   }
 
   return (
+    <ContextMenu>
+    <ContextMenuTrigger asChild>
     <div className={cn("relative h-full", gridDragOver && "outline-dashed outline-2 outline-primary outline-offset-2 rounded-lg")} {...gridMouseHandlers} {...gridHandlers}>
     <div className={cn(`grid ${gridColsClass} gap-4 select-none`)} >
       {/* Render folders */}
@@ -925,5 +949,25 @@ export function MediaGrid({
       )}
     </div>
     </div>
+    </ContextMenuTrigger>
+    <ContextMenuContent>
+      <ContextMenuItem onClick={() => {
+        document.body.style.pointerEvents = ""
+        setShowCreateFolder(true)
+      }}>
+        <FolderPlus className="mr-2 h-4 w-4" /> Create folder
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+      <ContextMenuItem onClick={() => setSelectedPaths(new Set(allItems.map(i => i.path)))}>
+        Select all
+      </ContextMenuItem>
+    </ContextMenuContent>
+    <DefaultDialog title="Create folder" isOpen={showCreateFolder} onClose={() => setShowCreateFolder(false)}>
+      <CreateFolderSection
+        uploadToFolder={currentFolder || undefined}
+        onSuccessfulCreate={() => setShowCreateFolder(false)}
+      />
+    </DefaultDialog>
+    </ContextMenu>
   );
 }
