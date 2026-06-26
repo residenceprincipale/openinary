@@ -1,6 +1,5 @@
 "use client"
 
-import Image from "next/image";
 import {
   AudioWaveform,
   Command,
@@ -13,6 +12,7 @@ import {
   Video,
 } from "lucide-react"
 import { useSession } from "@/lib/auth-client";
+import { useBranding } from "@/components/branding-provider";
 
 import { NavMain } from "@/components/sidebar/nav-main"
 import { NavProjects } from "@/components/sidebar/nav-projects"
@@ -38,6 +38,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import Link from "next/link"
+import {cn} from "@/lib/utils";
 
 function useNavItems() {
   const { data: session } = useSession();
@@ -60,18 +61,21 @@ export function AppSidebar({ onMediaSelect, ...props }: AppSidebarProps) {
   const { state } = useSidebar()
   const isCollapsed = state === "collapsed"
   const navItems = useNavItems()
+  const branding = useBranding()
+  const logoSrc = branding.logoUrl || "/icon.svg"
   
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader className="pl-4 pt-4">
         <Link href="/" className="flex items-center">
-          <Image
-            src={isCollapsed ? "/icon.svg" : "/openinary.svg"}
-            alt="Openinary"
-            width={100}
-            height={25}
-            className="dark:invert h-[25px] w-auto"
+          <img
+            src={logoSrc}
+            alt={branding.title}
+            className={cn("h-[25px] w-auto", !branding.logoUrl && 'dark:invert')}
           />
+          {!isCollapsed && (
+            <span className="ml-2 text-lg font-semibold">{branding.title || 'Openinary'}</span>
+          )}
         </Link>
       </SidebarHeader>
       <SidebarContent>

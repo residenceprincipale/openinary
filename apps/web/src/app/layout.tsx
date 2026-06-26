@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { NuqsAdapter } from 'nuqs/adapters/next/app'
 import { ThemeProvider } from "@/components/theme-provider";
 import { QueryProvider } from "@/components/query-provider";
+import { BrandingProvider } from "@/components/branding-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -40,7 +41,9 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <NuqsAdapter>{children}</NuqsAdapter>
+            <NuqsAdapter>
+              <BrandingProvider>{children}</BrandingProvider>
+            </NuqsAdapter>
           </ThemeProvider>
         </QueryProvider>
       </body>

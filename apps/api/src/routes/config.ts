@@ -9,6 +9,7 @@ const CONFIG_PATH = join(process.cwd(), "data", "transforms.json");
 const defaults = {
   image: { quality: 80, format: "auto", crop: "fill", gravity: "center" },
   video: { quality: 60, format: "mp4", autoDownscale: true, autoDownscaleResolution: 720 },
+  branding: { title: "Openinary", logoUrl: "" },
 };
 
 function readConfig(): typeof defaults {
@@ -18,6 +19,7 @@ function readConfig(): typeof defaults {
       return {
         image: { ...defaults.image, ...(saved.image || {}) },
         video: { ...defaults.video, ...(saved.video || {}) },
+        branding: { ...defaults.branding, ...(saved.branding || {}) },
       };
     }
   } catch {
@@ -41,6 +43,7 @@ config.put("/transforms", async (c) => {
     const merged = {
       image: { ...current.image, ...body.image },
       video: { ...current.video, ...body.video },
+      branding: { ...current.branding, ...body.branding },
     };
     const dir = join(process.cwd(), "data");
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });

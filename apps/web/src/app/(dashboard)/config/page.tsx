@@ -36,6 +36,7 @@ const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 type TransformConfig = {
   image: { quality: number; format: string; crop: string; gravity: string };
   video: { quality: number; format: string; autoDownscale: boolean; autoDownscaleResolution: number };
+  branding: { title: string; logoUrl: string };
 };
 
 function ConfigPageContent() {
@@ -108,11 +109,11 @@ function ConfigPageContent() {
         </header>
         <div className="px-6 py-8">
           <div className="mx-auto max-w-2xl space-y-8">
-            <div className="space-y-1">
+            <div className="space-y-1 flex justify-between">
               <h1 className="text-3xl font-semibold lg:text-4xl">Config</h1>
-              <p className="text-muted-foreground leading-relaxed">
-                Default transformation parameters
-              </p>
+              <Button onClick={save} disabled={saving}>
+                {saving ? "Saving..." : "Save"}
+              </Button>
             </div>
 
             {message && (
@@ -123,6 +124,30 @@ function ConfigPageContent() {
 
             {config && (
               <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Branding</CardTitle>
+                    <CardDescription>White-label the interface</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Title</Label>
+                      <Input
+                        value={config.branding.title}
+                        onChange={(e) => setConfig({ ...config, branding: { ...config.branding, title: e.target.value } })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Logo URL (optional)</Label>
+                      <Input
+                        placeholder="/openinary.svg"
+                        value={config.branding.logoUrl}
+                        onChange={(e) => setConfig({ ...config, branding: { ...config.branding, logoUrl: e.target.value } })}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Card>
                   <CardHeader>
                     <CardTitle>Image</CardTitle>
@@ -252,10 +277,6 @@ function ConfigPageContent() {
                     )}
                   </CardContent>
                 </Card>
-
-                <Button onClick={save} disabled={saving}>
-                  {saving ? "Saving..." : "Save"}
-                </Button>
               </>
             )}
           </div>
