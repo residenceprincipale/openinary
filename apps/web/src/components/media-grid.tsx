@@ -890,6 +890,7 @@ export function MediaGrid({
       <MoveDialog
         isOpen={!!moveItem || !!batchMoveItems}
         item={moveItem ? { id: moveItem.id, name: moveItem.name, path: moveItem.path } : null}
+        items={batchMoveItems}
         treeData={treeData}
         onClose={() => { setMoveItem(null); setBatchMoveItems(null) }}
       />
