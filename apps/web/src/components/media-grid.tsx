@@ -319,10 +319,16 @@ export function MediaGrid({
       const r = await fetch(`${apiUrl}/upload`, { method: "POST", body: formData, credentials: "include" })
       const d = await r.json()
       if (d.success) {
-        setUploadStatus({ type: 'done', count: files.length })
+        if (d.errors?.length) {
+          const msgs = d.errors.map((e: {error: string}) => e.error).join('; ')
+          setUploadStatus({ type: 'done', count: files.length, error: msgs })
+        } else {
+          setUploadStatus({ type: 'done', count: files.length })
+        }
         queryClient.invalidateQueries({ queryKey: ["storage-tree"] })
       } else {
-        setUploadStatus({ type: 'done', count: 0, error: d.error || 'Upload failed' })
+        const error = d.error || d.errors?.map((e: {error: string}) => e.error).join('; ') || 'Upload failed'
+        setUploadStatus({ type: 'done', count: 0, error })
       }
     } catch (e) {
       setUploadStatus({ type: 'done', count: 0, error: 'Network error during upload' })
