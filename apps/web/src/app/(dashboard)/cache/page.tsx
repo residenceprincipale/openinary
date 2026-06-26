@@ -259,7 +259,7 @@ function CachePageContent() {
                       const fd = new FormData(e.currentTarget)
                       const path = fd.get("assetPath") as string
                       if (!path) return
-                      if (!confirm(`Delete all cached variants of "${path}"?`)) return
+                      if (!confirm(`Delete cached variants of "${path}"?`)) return
                       try {
                         const encoded = path.split("/").map(encodeURIComponent).join("/")
                         const r = await fetch(`${apiBaseUrl}/invalidate/${encoded}`, { method: "DELETE", credentials: "include" })
@@ -275,7 +275,7 @@ function CachePageContent() {
                         <Input id="assetPath" name="assetPath" list="cached-files" placeholder="folder/my-image.jpg" className="w-full" />
                         <datalist id="cached-files">
                           {local?.files.map(f => (
-                            <option key={f.name} value={f.name.replace(/^cache_[a-f0-9]+_/, '').replace(/_/g, '/')} />
+                            <option key={f.name} value={f.name.split('_').pop() ?? f.name} />
                           ))}
                         </datalist>
                       </div>
@@ -283,16 +283,16 @@ function CachePageContent() {
                     </form>
                     {local && local.files.length > 0 && (
                       <details className="mt-3">
-                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Suggestions from cache ({Math.min(local.files.length, 20)} shown)</summary>
+                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Suggestions ({Math.min(local.files.length, 20)} shown)</summary>
                         <div className="mt-2 flex flex-wrap gap-1 max-h-32 overflow-y-auto">
                           {local.files.slice(0, 20).map(f => {
-                            const guess = f.name.replace(/^cache_[a-f0-9]+_/, '').replace(/_/g, '/')
+                            const orig = f.name.split('_').pop() ?? f.name
                             return (
                               <button key={f.name} type="button" onClick={() => {
                                 const input = document.getElementById('assetPath') as HTMLInputElement
-                                if (input) input.value = guess
+                                if (input) input.value = orig
                               }} className="text-xs px-2 py-0.5 rounded bg-muted hover:bg-accent text-muted-foreground hover:text-foreground transition-colors truncate max-w-48">
-                                {guess}
+                                {orig}
                               </button>
                             )
                           })}
