@@ -48,6 +48,8 @@ export function AssetDetailsSidebar({
     renameItem,
     isReplacing,
     replaceItem,
+    videoStatus,
+    videoProgress,
     handleCopyUrl,
     handleDownload,
     handleOpenInNewTab,
@@ -109,9 +111,12 @@ export function AssetDetailsSidebar({
                 <AssetDetailsTab
                   asset={asset}
                   fileSize={fileSize}
+                  optimizedSize={optimizedSize}
                   createdAt={createdAt}
                   rawUrl={rawUrl}
                   isDeleting={isDeleting}
+                  videoStatus={videoStatus}
+                  videoProgress={videoProgress}
                   onCopyUrl={handleCopyUrl}
                   onDownload={handleDownload}
                   onOpenInNewTab={handleOpenInNewTab}

@@ -12,20 +12,27 @@ import {
   Trash2,
   Pencil,
   Upload,
+  Zap,
+  AlertCircle,
 } from "lucide-react"
 import { CopyInput } from "@/components/ui/copy-input"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import type { MediaFile } from "./types"
+import type { VideoStatus } from "@/hooks/use-video-status"
 import { formatFileSize, formatDate, getFileType } from "./utils"
+import { Spinner } from "@/components/ui/spinner"
 
 interface AssetDetailsTabProps {
   asset: MediaFile
   fileSize: number | null
+  optimizedSize: number | null
   createdAt: Date | null
   rawUrl: string
   isDeleting: boolean
+  videoStatus?: VideoStatus
+  videoProgress?: number
   onCopyUrl: () => void
   onDownload: () => void
   onOpenInNewTab: () => void
@@ -37,9 +44,12 @@ interface AssetDetailsTabProps {
 export function AssetDetailsTab({
   asset,
   fileSize,
+  optimizedSize,
   createdAt,
   rawUrl,
   isDeleting,
+  videoStatus,
+  videoProgress = 0,
   onCopyUrl,
   onDownload,
   onOpenInNewTab,
@@ -47,7 +57,7 @@ export function AssetDetailsTab({
   onReplace,
   onDelete,
 }: AssetDetailsTabProps) {
-  const [copied, setCopied] = useState<boolean>(false)
+  const [copied, setCopied] = useState(false)
 
   const handleCopyUrl = () => {
     onCopyUrl()
@@ -69,12 +79,45 @@ export function AssetDetailsTab({
         <div className="space-y-2">
           <label className="text-sm font-medium flex items-center gap-2">
             <HardDrive className="h-4 w-4" />
-            Asset Size
+            {asset.type === "video" ? "Original Size" : "Asset Size"}
           </label>
           <div className="text-sm text-muted-foreground">
             {formatFileSize(fileSize)}
           </div>
         </div>
+
+        {asset.type === "video" && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Optimized Size (default transformation)
+            </label>
+            <div className={cn(
+              "text-sm flex items-center gap-2",
+              optimizedSize && fileSize && optimizedSize > fileSize
+                ? "text-destructive"
+                : "text-muted-foreground"
+            )}>
+              {!videoStatus || videoStatus === "unknown" ? (
+                <span className="opacity-50">Checking...</span>
+              ) : videoStatus === "processing" ? (
+                <>
+                  <Spinner size={16} className="text-primary" />
+                  {videoProgress > 0 ? `${Math.round(videoProgress)}%` : "Processing..."}
+                </>
+              ) : videoStatus === "ready" && optimizedSize ? (
+                formatFileSize(optimizedSize)
+              ) : videoStatus === "error" ? (
+                <>
+                  <AlertCircle className="h-3 w-3 text-destructive shrink-0" />
+                  <span>Failed</span>
+                </>
+              ) : (
+                "—"
+              )}
+            </div>
+          </div>
+        )}
 
         <div className="space-y-2">
           <label className="text-sm font-medium flex items-center gap-2">
@@ -126,24 +169,7 @@ export function AssetDetailsTab({
             className="gap-2"
             disabled={copied}
           >
-            <div className="relative h-4 w-4">
-              <div
-                className={cn(
-                  "absolute inset-0 transition-all",
-                  copied ? "scale-100 opacity-100" : "scale-0 opacity-0"
-                )}
-              >
-                <Check className="h-4 w-4 stroke-emerald-500" />
-              </div>
-              <div
-                className={cn(
-                  "absolute inset-0 transition-all",
-                  copied ? "scale-0 opacity-0" : "scale-100 opacity-100"
-                )}
-              >
-                <Copy className="h-4 w-4" />
-              </div>
-            </div>
+            {copied ? <Check className="h-4 w-4 stroke-emerald-500" /> : <Copy className="h-4 w-4" />}
             Copy URL
           </Button>
           <Button
