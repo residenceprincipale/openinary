@@ -225,10 +225,6 @@ export class TransformService {
       'Content-Length': buffer.length.toString(),
     };
 
-    if (ext?.match(/mp4|mov|webm|mp3|wav|ogg/)) {
-      headers['X-Video-Status'] = 'ready';
-    }
-
     let contentType = '';
     const fmt = effectiveParams.format?.toLowerCase();
     if (fmt) {
@@ -240,7 +236,16 @@ export class TransformService {
       const videoTypes: Record<string, string> = {
         mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm',
       };
-      contentType = imageTypes[fmt] || videoTypes[fmt] || '';
+      const audioTypes: Record<string, string> = {
+        mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg',
+        flac: 'audio/flac', aac: 'audio/aac', m4a: 'audio/mp4',
+      };
+      contentType = imageTypes[fmt] || videoTypes[fmt] || audioTypes[fmt] || '';
+    }
+
+    const isAudioFormat = !!(fmt && /^(mp3|wav|ogg|flac|aac|m4a)$/.test(fmt));
+    if (!isAudioFormat && ext?.match(/mp4|mov|webm|mp3|wav|ogg/)) {
+      headers['X-Video-Status'] = 'ready';
     }
 
     return {
@@ -390,9 +395,33 @@ export class TransformService {
   ): Promise<TransformResult> {
     // ponytail: image format on video → thumbnail (auto-detect, no t_true needed)
     const isThumbnailRequest = /^(jpe?g|png|webp|avif|gif)$/i.test(params.format);
+    const isAudioExtraction = /^(mp3|wav|ogg|flac|aac|m4a)$/i.test(params.format);
 
     if (isThumbnailRequest) {
       const result = await processVideo(sourcePath, params);
+
+      await saveToCaches(
+        this.storage,
+        filePath,
+        params,
+        cachePath,
+        result.buffer,
+        result.contentType
+      );
+
+      return {
+        buffer: result.buffer,
+        contentType: result.contentType,
+        headers: {
+          'Content-Length': result.buffer.length.toString(),
+          'Cache-Control': 'public, max-age=31536000, must-revalidate',
+        },
+      };
+    }
+
+    if (isAudioExtraction) {
+      // ponytail: extract audio from video synchronously (ffmpeg handles this natively)
+      const result = await processAudio(sourcePath, params);
 
       await saveToCaches(
         this.storage,
