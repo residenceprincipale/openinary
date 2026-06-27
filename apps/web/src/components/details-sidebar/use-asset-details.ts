@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useQueryState, parseAsString } from "nuqs"
-import { useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useStorageTree } from "@/hooks/use-storage-tree"
 import { usePreloadMedia } from "@/hooks/use-preload-media"
 import { useVideoStatus } from "@/hooks/use-video-status"
@@ -23,6 +23,12 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isRenaming, setIsRenaming] = useState(false)
+  const [isReplacing, setIsReplacing] = useState(false)
+  const { data: bustKey = 0 } = useQuery({
+    queryKey: ["bust-nonce"],
+    queryFn: () => 0,
+    staleTime: Infinity,
+  }) // ponytail: incrementing counter, use Date.now() if browser cache persists
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
   // Use dedicated transform base URL (empty in Docker, falls back to apiBaseUrl without /api)
@@ -174,14 +180,15 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
     }
   }, [asset])
 
-  const mediaUrl = asset ? `${transformBaseUrl}/t/${asset.path}` : ""
-  const rawUrl = asset ? `${transformBaseUrl}/${asset.path}` : ""
+  const bustSuffix = bustKey > 0 ? `?n=${bustKey}` : ""
+  const mediaUrl = asset ? `${transformBaseUrl}/t/${asset.path}${bustSuffix}` : ""
+  const rawUrl = asset ? `${transformBaseUrl}/${asset.path}${bustSuffix}` : ""
   const previewUrl = asset
     ? asset.type === "image"
-      ? `${transformBaseUrl}/t/w_500,h_500,q_80/${asset.path}`
+      ? `${transformBaseUrl}/t/w_500,h_500,q_80/${asset.path}${bustSuffix}`
       : asset.type === "video"
-        ? `${transformBaseUrl}/t/so_5,f_webp,w_500,h_500,c_fill,q_80/${asset.path}`
-        : `${transformBaseUrl}/t/${asset.path}`
+        ? `${transformBaseUrl}/t/so_5,f_webp,w_500,h_500,c_fill,q_80/${asset.path}${bustSuffix}`
+        : `${transformBaseUrl}/t/${asset.path}${bustSuffix}`
     : ""
 
   // Preload preview media when asset changes
@@ -246,6 +253,10 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
 
   const handleRename = () => setIsRenaming(true)
   const handleCloseRename = () => setIsRenaming(false)
+
+  const handleReplace = () => setIsReplacing(true)
+  const handleCloseReplace = () => setIsReplacing(false)
+  const handleAfterReplace = () => { queryClient.setQueryData(["bust-nonce"], Date.now()) }
 
   const handleClose = () => {
     setAssetId(null)
@@ -338,6 +349,8 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
     isDeleting,
     isRenaming,
     renameItem,
+    isReplacing,
+    replaceItem: renameItem,
     mediaUrl,
     rawUrl,
     previewUrl,
@@ -350,6 +363,9 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
     handleOpenInNewTab,
     handleRename,
     handleCloseRename,
+    handleReplace,
+    handleCloseReplace,
+    handleAfterReplace,
     handleClose,
     handleDelete,
   }

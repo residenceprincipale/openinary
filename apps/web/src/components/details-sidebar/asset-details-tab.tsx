@@ -11,6 +11,7 @@ import {
   Download,
   Trash2,
   Pencil,
+  Upload,
 } from "lucide-react"
 import { CopyInput } from "@/components/ui/copy-input"
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,7 @@ interface AssetDetailsTabProps {
   onDownload: () => void
   onOpenInNewTab: () => void
   onRename: () => void
+  onReplace: () => void
   onDelete: () => void
 }
 
@@ -42,6 +44,7 @@ export function AssetDetailsTab({
   onDownload,
   onOpenInNewTab,
   onRename,
+  onReplace,
   onDelete,
 }: AssetDetailsTabProps) {
   const [copied, setCopied] = useState<boolean>(false)
@@ -106,6 +109,15 @@ export function AssetDetailsTab({
           >
             <Pencil className="h-4 w-4" />
             Rename
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onReplace}
+            className="gap-2"
+          >
+            <Upload className="h-4 w-4" />
+            Replace
           </Button>
           <Button
             variant="outline"

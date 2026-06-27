@@ -15,6 +15,7 @@ import { AssetDetailsTab } from "./asset-details-tab"
 import { AssetTransformationsTab } from "./asset-transformations-tab"
 import { AssetMetadataTab } from "./asset-metadata-tab"
 import { RenameDialog } from "@/components/rename-dialog"
+import { ReplaceFileDialog } from "@/components/replace-file-dialog"
 
 export function AssetDetailsSidebar({
   items,
@@ -45,11 +46,16 @@ export function AssetDetailsSidebar({
     transformBaseUrl,
     isRenaming,
     renameItem,
+    isReplacing,
+    replaceItem,
     handleCopyUrl,
     handleDownload,
     handleOpenInNewTab,
     handleRename,
     handleCloseRename,
+    handleReplace,
+    handleCloseReplace,
+    handleAfterReplace,
     handleClose,
     handleDelete,
   } = useAssetDetails(onOpenChange)
@@ -110,6 +116,7 @@ export function AssetDetailsSidebar({
                   onDownload={handleDownload}
                   onOpenInNewTab={handleOpenInNewTab}
                   onRename={handleRename}
+                  onReplace={handleReplace}
                   onDelete={handleDelete}
                 />
               </TabsContent>
@@ -131,6 +138,12 @@ export function AssetDetailsSidebar({
         item={renameItem}
         isFolder={false}
         onClose={handleCloseRename}
+      />
+      <ReplaceFileDialog
+        isOpen={isReplacing}
+        item={replaceItem}
+        onClose={handleCloseReplace}
+        onSuccess={handleAfterReplace}
       />
     </div>
   )

@@ -5,6 +5,7 @@ import fs from "fs";
 import path from "path";
 import logger, { serializeError } from "../utils/logger";
 import { deleteAssetCompletely } from "../utils/asset-deletion";
+import { deleteCachedFiles } from "../utils/cache";
 import type { AuthVariables } from "../middleware/auth";
 
 type StorageNode = {
@@ -374,6 +375,73 @@ storageRoute.put("/move", async (c) => {
       },
       500,
     );
+  }
+});
+
+/**
+ * Replace a file — overwrite original + invalidate all caches
+ * PUT /storage/replace/*
+ */
+storageRoute.put("/replace/*", async (c) => {
+  const requestPath = c.req.path;
+  const pathWithoutPrefix = requestPath.replace(/^\/storage\/replace\/?/, "");
+
+  if (!pathWithoutPrefix) {
+    return c.json({ success: false, error: "File path is required" }, 400);
+  }
+
+  let filePath = pathWithoutPrefix.replace(/^\/+/, "").replace(/\/+$/, "");
+  try { filePath = decodeURIComponent(filePath); } catch {}
+
+  try {
+    const formData = await c.req.formData();
+    const file = formData.get("file");
+
+    if (!(file instanceof File)) {
+      return c.json({ success: false, error: "No file provided" }, 400);
+    }
+
+    const newExt = path.extname(file.name).toLowerCase();
+    const origExt = path.extname(filePath).toLowerCase();
+    if (newExt !== origExt) {
+      return c.json({ success: false, error: `Format mismatch: expected "${origExt}", got "${newExt}"` }, 400);
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    if (storageClient) {
+      const ext = path.extname(filePath).toLowerCase();
+      const mimeMap: Record<string, string> = {
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+        ".webp": "image/webp", ".gif": "image/gif", ".avif": "image/avif",
+        ".psd": "image/vnd.adobe.photoshop", ".mp4": "video/mp4", ".mov": "video/quicktime",
+        ".webm": "video/webm", ".mp3": "audio/mpeg", ".wav": "audio/wav",
+        ".ogg": "audio/ogg", ".flac": "audio/flac", ".aac": "audio/aac",
+        ".m4a": "audio/mp4", ".zip": "application/zip", ".pdf": "application/pdf",
+      };
+      const contentType = mimeMap[ext] ?? "application/octet-stream";
+
+      await storageClient.uploadOriginal(filePath, buffer, contentType);
+      await storageClient.deleteAllCachedTransformations(filePath);
+      storageClient.invalidateAllCacheEntries(filePath);
+    } else {
+      const localPath = path.join(".", "public", filePath);
+      const dir = path.dirname(localPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(localPath, buffer);
+      await deleteCachedFiles(filePath);
+    }
+
+    logger.info({ filePath }, "File replaced");
+    return c.json({ success: true });
+  } catch (error) {
+    logger.error({ error: serializeError(error), filePath }, "Failed to replace file");
+    return c.json({
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    }, 500);
   }
 });
 

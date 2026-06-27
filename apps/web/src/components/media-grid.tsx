@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   FileAudio, FileImage, FileVideo, File, ArrowUpRight, Folder, FolderPlus,
   CheckCircle, Circle, MoreHorizontal, Trash2, Pencil, Upload,
-  ArrowUpDown, Filter, List, LayoutGrid, RefreshCw,
+  ArrowUpDown, Filter, List, LayoutGrid, RefreshCw, Download,
+  ExternalLink, Link,
 } from "lucide-react";
 import { useQueryState } from "nuqs";
 import { useStorageTree } from "@/hooks/use-storage-tree";
@@ -45,6 +46,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import { RenameDialog } from "@/components/rename-dialog";
+import { ReplaceFileDialog } from "@/components/replace-file-dialog";
 import { MoveDialog } from "@/components/move-dialog";
 import { BatchRenameDialog } from "@/components/batch-rename-dialog";
 import { CreateFolderSection } from "@/components/create-folder-section";
@@ -204,6 +206,11 @@ export function MediaGrid({
     path: string
     isFolder: boolean
   } | null>(null);
+  const [replaceItem, setReplaceItem] = useState<{
+    id: string
+    name: string
+    path: string
+  } | null>(null);
   const [moveItem, setMoveItem] = useState<{
     id: string
     name: string
@@ -214,6 +221,11 @@ export function MediaGrid({
   const [batchRenameItems, setBatchRenameItems] = useState<{name: string; path: string}[] | null>(null);
   const [lastClickedIndex, setLastClickedIndex] = useState<number | null>(null);
   const [selectionBox, setSelectionBox] = useState<{left: number; top: number; width: number; height: number} | null>(null);
+  const { data: bustNonce = 0 } = useQuery({
+    queryKey: ["bust-nonce"],
+    queryFn: () => 0,
+    staleTime: Infinity,
+  })
   const [uploadStatus, setUploadStatus] = useState<{type: 'uploading' | 'done'; count: number; error?: string} | null>(null);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
@@ -499,6 +511,8 @@ export function MediaGrid({
       ? process.env.NEXT_PUBLIC_TRANSFORM_BASE_URL
       : apiBaseUrl.replace(/\/api$/, "");
 
+  const bustSuffix = bustNonce > 0 ? `?n=${bustNonce}` : ""
+
   const handleFolderClick = (folderPath: string) => {
     setFolderPath(folderPath);
   };
@@ -508,8 +522,8 @@ export function MediaGrid({
     if (media.type === "audio" || media.type === "other") return;
     const previewUrl =
       media.type === "image"
-        ? `${transformBaseUrl}/t/w_500,h_500,q_80/${media.path}`
-        : `${transformBaseUrl}/t/${media.path}`;
+        ? `${transformBaseUrl}/t/w_500,h_500,q_80/${media.path}${bustSuffix}`
+        : `${transformBaseUrl}/t/${media.path}${bustSuffix}`;
     preloadMedia(previewUrl, media.type);
   };
 
@@ -763,7 +777,7 @@ export function MediaGrid({
                   })
                 }}
               >
-                Rename
+                <Pencil className="mr-2 h-4 w-4" /> Rename
               </ContextMenuItem>
               <ContextMenuItem
                 onClick={() => {
@@ -771,7 +785,7 @@ export function MediaGrid({
                   setMoveItem({ id: folder.id, name: folder.name, path: folder.path })
                 }}
               >
-                Move to...
+                <Folder className="mr-2 h-4 w-4" /> Move to...
               </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem
@@ -786,7 +800,7 @@ export function MediaGrid({
                   }
                 }}
               >
-                Delete
+                <Trash2 className="mr-2 h-4 w-4" /> Delete
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
@@ -860,7 +874,7 @@ export function MediaGrid({
                   })
                 }}
               >
-                Rename
+                <Pencil className="mr-2 h-4 w-4" /> Rename
               </ContextMenuItem>
               <ContextMenuItem
                 onClick={() => {
@@ -868,7 +882,15 @@ export function MediaGrid({
                   setMoveItem({ id: media.id, name: media.name, path: getItemPath(media.name) })
                 }}
               >
-                Move to...
+                <Folder className="mr-2 h-4 w-4" /> Move to...
+              </ContextMenuItem>
+              <ContextMenuItem
+                onClick={() => {
+                  document.body.style.pointerEvents = ""
+                  setReplaceItem({ id: media.id, name: media.name, path: getItemPath(media.name) })
+                }}
+              >
+                <Upload className="mr-2 h-4 w-4" /> Replace
               </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuItem
@@ -883,7 +905,7 @@ export function MediaGrid({
                   }
                 }}
               >
-                Delete
+                <Trash2 className="mr-2 h-4 w-4" /> Delete
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>
@@ -961,7 +983,7 @@ export function MediaGrid({
                   {folderImages.map((src, i) => (
                     <div key={i} className="overflow-hidden">
                       <img
-                        src={`${transformBaseUrl}/t/w_250,h_250,q_70/${src}`}
+                        src={`${transformBaseUrl}/t/w_250,h_250,q_70/${src}${bustSuffix}`}
                         alt=""
                         className="w-full h-full object-cover"
                         loading="lazy"
@@ -973,7 +995,7 @@ export function MediaGrid({
                 <div className="grid grid-cols-2 gap-0.5 w-full h-full">
                   <div className="overflow-hidden row-span-2">
                     <img
-                      src={`${transformBaseUrl}/t/w_250,h_500,q_70/${folderImages[0]}`}
+                      src={`${transformBaseUrl}/t/w_250,h_500,q_70/${folderImages[0]}${bustSuffix}`}
                       alt=""
                       className="w-full h-full object-cover"
                       loading="lazy"
@@ -982,7 +1004,7 @@ export function MediaGrid({
                   {folderImages.slice(1).map((src, i) => (
                     <div key={i} className="overflow-hidden">
                       <img
-                        src={`${transformBaseUrl}/t/w_250,h_250,q_70/${src}`}
+                        src={`${transformBaseUrl}/t/w_250,h_250,q_70/${src}${bustSuffix}`}
                         alt=""
                         className="w-full h-full object-cover"
                         loading="lazy"
@@ -995,7 +1017,7 @@ export function MediaGrid({
                   {folderImages.map((src, i) => (
                     <div key={i} className="overflow-hidden">
                       <img
-                        src={`${transformBaseUrl}/t/w_250,h_500,q_70/${src}`}
+                        src={`${transformBaseUrl}/t/w_250,h_500,q_70/${src}${bustSuffix}`}
                         alt=""
                         className="w-full h-full object-cover"
                         loading="lazy"
@@ -1005,7 +1027,7 @@ export function MediaGrid({
                 </div>
               ) : folderImages.length === 1 ? (
                 <img
-                  src={`${transformBaseUrl}/t/w_500,h_500,q_70/${folderImages[0]}`}
+                  src={`${transformBaseUrl}/t/w_500,h_500,q_70/${folderImages[0]}${bustSuffix}`}
                   alt=""
                   className="w-full h-full object-cover"
                   loading="lazy"
@@ -1045,7 +1067,7 @@ export function MediaGrid({
                 })
               }}
             >
-              Rename
+              <Pencil className="mr-2 h-4 w-4" /> Rename
             </ContextMenuItem>
             <ContextMenuItem
               onClick={() => {
@@ -1053,7 +1075,7 @@ export function MediaGrid({
                 setMoveItem({ id: folder.id, name: folder.name, path: folder.path })
               }}
             >
-              Move to...
+              <Folder className="mr-2 h-4 w-4" /> Move to...
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem
@@ -1068,7 +1090,7 @@ export function MediaGrid({
                 }
               }}
             >
-              Delete
+              <Trash2 className="mr-2 h-4 w-4" /> Delete
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
@@ -1077,8 +1099,8 @@ export function MediaGrid({
       {searchFiles.map((media, i) => {
         const thumbnailUrl =
           media.type === "image"
-            ? `${transformBaseUrl}/t/w_500,h_500,q_80/${media.path}`
-            : `${transformBaseUrl}/t/so_5,f_webp,w_500,h_500,c_fill,q_80/${media.path}`;
+            ? `${transformBaseUrl}/t/w_500,h_500,q_80/${media.path}${bustSuffix}`
+            : `${transformBaseUrl}/t/so_5,f_webp,w_500,h_500,c_fill,q_80/${media.path}${bustSuffix}`;
         const isHovered = hoveredId === media.id;
         const filePath = getItemPath(media.name)
         const isSelected = selectedPaths.has(filePath)
@@ -1155,20 +1177,26 @@ export function MediaGrid({
                     isFolder: false,
                   })
                 }}>
-                  Rename
+                  <Pencil className="mr-2 h-4 w-4" /> Rename
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
                   document.body.style.pointerEvents = ""
                   setMoveItem({ id: media.id, name: media.name, path: getItemPath(media.name) })
                 }}>
-                  Move to...
+                  <Folder className="mr-2 h-4 w-4" /> Move to...
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => {
+                  document.body.style.pointerEvents = ""
+                  setReplaceItem({ id: media.id, name: media.name, path: getItemPath(media.name) })
+                }}>
+                  <Upload className="mr-2 h-4 w-4" /> Replace
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigator.clipboard.writeText(`${transformBaseUrl}/${media.path}`)}>
-                  Copy URL
+                  <Link className="mr-2 h-4 w-4" /> Copy URL
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => window.open(`${transformBaseUrl}/${media.path}`, "_blank")}>
-                  Open
+                  <ExternalLink className="mr-2 h-4 w-4" /> Open
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
                   const encoded = media.path.split("/").map(encodeURIComponent).join("/");
@@ -1179,7 +1207,7 @@ export function MediaGrid({
                   a.click();
                   document.body.removeChild(a);
                 }}>
-                  Download
+                  <Download className="mr-2 h-4 w-4" /> Download
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -1194,7 +1222,7 @@ export function MediaGrid({
                     }
                   }}
                 >
-                  Delete
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1245,7 +1273,7 @@ export function MediaGrid({
                 })
               }}
             >
-              Rename
+              <Pencil className="mr-2 h-4 w-4" /> Rename
             </ContextMenuItem>
             <ContextMenuItem
               onClick={() => {
@@ -1253,14 +1281,22 @@ export function MediaGrid({
                 setMoveItem({ id: media.id, name: media.name, path: getItemPath(media.name) })
               }}
             >
-              Move to...
+              <Folder className="mr-2 h-4 w-4" /> Move to...
+            </ContextMenuItem>
+            <ContextMenuItem
+              onClick={() => {
+                document.body.style.pointerEvents = ""
+                setReplaceItem({ id: media.id, name: media.name, path: getItemPath(media.name) })
+              }}
+            >
+              <Upload className="mr-2 h-4 w-4" /> Replace
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem onClick={() => navigator.clipboard.writeText(`${transformBaseUrl}/${media.path}`)}>
-              Copy URL
+              <Link className="mr-2 h-4 w-4" /> Copy URL
             </ContextMenuItem>
             <ContextMenuItem onClick={() => window.open(`${transformBaseUrl}/${media.path}`, "_blank")}>
-              Open
+              <ExternalLink className="mr-2 h-4 w-4" /> Open
             </ContextMenuItem>
             <ContextMenuItem onClick={() => {
               const encoded = media.path.split("/").map(encodeURIComponent).join("/");
@@ -1271,7 +1307,7 @@ export function MediaGrid({
               a.click();
               document.body.removeChild(a);
             }}>
-              Download
+              <Download className="mr-2 h-4 w-4" /> Download
             </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem
@@ -1286,7 +1322,7 @@ export function MediaGrid({
                 }
               }}
             >
-              Delete
+              <Trash2 className="mr-2 h-4 w-4" /> Delete
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
@@ -1341,6 +1377,12 @@ export function MediaGrid({
         item={renameItem ? { id: renameItem.id, name: renameItem.name, path: renameItem.path } : null}
         isFolder={renameItem?.isFolder ?? false}
         onClose={() => setRenameItem(null)}
+      />
+      <ReplaceFileDialog
+        isOpen={!!replaceItem}
+        item={replaceItem ? { id: replaceItem.id, name: replaceItem.name, path: replaceItem.path } : null}
+        onClose={() => setReplaceItem(null)}
+        onSuccess={() => queryClient.setQueryData(["bust-nonce"], Date.now())}
       />
       <MoveDialog
         isOpen={!!moveItem || !!batchMoveItems}
