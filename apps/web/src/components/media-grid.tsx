@@ -25,6 +25,7 @@ import { preloadMedia } from "@/hooks/use-preload-media";
 import { VideoThumbnail } from "@/components/video-thumbnail";
 import type { TreeDataItem } from "@/components/ui/tree-view";
 import UploadButtonWithDialog from "./upload-button-with-dialog";
+import { ListView } from "./list-view";
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -233,7 +234,20 @@ export function MediaGrid({
   const [filterType, setFilterType] = useQueryState("filter");
   const [view, setView] = useQueryState("view");
   const [search, setSearch] = useQueryState("q");
-  const [fileMeta, setFileMeta] = useState<Record<string, { size: number; createdAt: string }>>({});
+  type TreeDataItemWithMeta = TreeDataItem & { size?: number; createdAt?: string }
+  const fileMeta = useMemo(() => {
+    if (!treeData) return {}
+    const meta: Record<string, { size: number; createdAt: string }> = {}
+    const walk = (items: TreeDataItem[]) => {
+      for (const item of items) {
+        if (item.children) { walk(item.children); continue }
+        const n = item as unknown as TreeDataItemWithMeta
+        if (n.size != null && n.createdAt) meta[item.id] = { size: n.size, createdAt: n.createdAt }
+      }
+    }
+    walk(treeData)
+    return meta
+  }, [treeData])
 
   const toggleSelection = useCallback((path: string) => {
     setSelectedPaths(prev => {
@@ -346,25 +360,6 @@ export function MediaGrid({
     ...visibleFiles.map(f => ({ path: getItemPath(f.name), name: f.name })),
   ], [visibleFolders, visibleFiles, getItemPath])
 
-  // ponytail: N+1 metadata fetches per file — fine for <100 files, add batch endpoint if sluggish
-  useEffect(() => {
-    if (view !== "list") return
-    const paths = visibleFiles.map(f => getItemPath(f.name))
-    if (!paths.length) return
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
-    Promise.allSettled(paths.map(async (p) => {
-      const encoded = p.split("/").map(encodeURIComponent).join("/")
-      const res = await fetch(`${apiBaseUrl}/storage/${encoded}/metadata`, { credentials: "include" })
-      if (!res.ok) return null
-      return { path: p, ...await res.json() }
-    })).then(results => {
-      const next: Record<string, { size: number; createdAt: string }> = {}
-      for (const r of results) {
-        if (r.status === "fulfilled" && r.value) next[r.value.path] = { size: r.value.size, createdAt: r.value.createdAt }
-      }
-      setFileMeta(next)
-    })
-  }, [view, visibleFiles, getItemPath])
 
   // ponytail: shift-click range, no ctrl+click toggle-on-main-click needed yet
   const selectRange = useCallback((fromIdx: number, toIdx: number) => {
@@ -688,233 +683,28 @@ export function MediaGrid({
         </div>
       </div>
       {view === "list" ? (
-        <table className="w-full select-none">
-          <thead>
-            <tr className="text-left text-xs text-muted-foreground border-b">
-              <th className="pb-2 font-medium">Name</th>
-              <th className="pb-2 font-medium">Type</th>
-              <th className="pb-2 font-medium">Size</th>
-              <th className="pb-2 font-medium">Date</th>
-              <th className="pb-2 font-medium w-20">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-      {searchFolders.map((folder, i) => {
-        const isSelected = selectedPaths.has(folder.path)
-        return (
-          <ContextMenu key={folder.id}>
-            <ContextMenuTrigger asChild>
-              <tr
-                data-item-path={folder.path}
-                className={cn(
-                  "group cursor-pointer transition-colors hover:bg-accent/50 border-b border-border/50",
-                  dragOverId === folder.id && "outline-dashed outline-2 outline-primary outline-offset-2",
-                  isSelected && "bg-accent"
-                )}
-                onClick={(e) => {
-                  if (e.metaKey || e.ctrlKey || e.shiftKey) {
-                    handleItemClick({ path: folder.path, name: folder.name }, i, e)
-                  } else {
-                    handleFolderClick(folder.path)
-                  }
-                }}
-                onMouseEnter={() => setHoveredId(folder.id)}
-                onMouseLeave={() => setHoveredId(null)}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData("application/x-openinary-move", folder.path)
-                  e.dataTransfer.effectAllowed = "move"
-                }}
-                onDragOver={(e) => {
-                  if (e.dataTransfer.types.includes("application/x-openinary-move")) {
-                    e.preventDefault()
-                    e.dataTransfer.dropEffect = "move"
-                    setDragOverId(folder.id)
-                  }
-                }}
-                onDragLeave={(e) => {
-                  if (e.currentTarget.contains(e.relatedTarget as Node)) return
-                  setDragOverId(null)
-                }}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  setDragOverId(null)
-                  const src = e.dataTransfer.getData("application/x-openinary-move")
-                  if (src) doMove(src, folder.path)
-                }}
-              >
-                <td className="py-2 px-3">
-                  <div className="flex items-center gap-3">
-                    <div onClick={(e) => { e.stopPropagation(); toggleSelection(folder.path) }}>
-                      {isSelected ? (
-                        <CheckCircle className="size-4 text-primary" />
-                      ) : (
-                        <Circle className="size-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
-                      )}
-                    </div>
-                    <Folder className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="truncate text-sm">{folder.name}</span>
-                  </div>
-                </td>
-                <td className="py-2 px-3 text-sm text-muted-foreground">folder</td>
-                <td className="py-2 px-3 text-sm text-muted-foreground">—</td>
-                <td className="py-2 px-3 text-sm text-muted-foreground">—</td>
-                <td className="py-2 px-3">
-                  <div className="flex items-center gap-1">
-                    <button onClick={(e) => { e.stopPropagation(); document.body.style.pointerEvents = ""; setRenameItem({ id: folder.id, name: folder.name, path: folder.path, isFolder: true }) }} className="p-1 hover:text-foreground text-muted-foreground"><Pencil className="size-3.5" /></button>
-                    <button onClick={(e) => { e.stopPropagation(); const p = folder.path; if (confirm(`Delete folder "${folder.name}" and all contents?`)) { const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""; const encoded = p.split("/").map(encodeURIComponent).join("/"); fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" }).then(() => { queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] }); }) } }} className="p-1 hover:text-destructive text-muted-foreground"><Trash2 className="size-3.5" /></button>
-                  </div>
-                </td>
-              </tr>
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-              <ContextMenuItem
-                onClick={() => {
-                  document.body.style.pointerEvents = ""
-                  setRenameItem({
-                    id: folder.id,
-                    name: folder.name,
-                    path: folder.path,
-                    isFolder: true,
-                  })
-                }}
-              >
-                <Pencil className="mr-2 h-4 w-4" /> Rename
-              </ContextMenuItem>
-              <ContextMenuItem
-                onClick={() => {
-                  document.body.style.pointerEvents = ""
-                  setMoveItem({ id: folder.id, name: folder.name, path: folder.path })
-                }}
-              >
-                <Folder className="mr-2 h-4 w-4" /> Move to...
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuItem
-                variant="destructive"
-                onClick={() => {
-                  const p = folder.path;
-                  if (confirm(`Delete folder "${folder.name}" and all contents?`)) {
-                    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-                    const encoded = p.split("/").map(encodeURIComponent).join("/");
-                    fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" })
-                      .then(() => { queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] }); });
-                  }
-                }}
-              >
-                <Trash2 className="mr-2 h-4 w-4" /> Delete
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
-        );
-      })}
-      {searchFiles.map((media, i) => {
-        const filePath = getItemPath(media.name)
-        const isSelected = selectedPaths.has(filePath)
-        const Icon = media.type === "image" ? FileImage : media.type === "video" ? FileVideo : media.type === "audio" ? FileAudio : File
-        const typeLabels: Record<string, string> = { image: "image", video: "video", audio: "audio" }
-        return (
-          <ContextMenu key={media.id}>
-            <ContextMenuTrigger asChild>
-              <tr
-                data-item-path={filePath}
-                className={cn(
-                  "group cursor-pointer transition-colors hover:bg-accent/50 border-b border-border/50",
-                  isSelected && "bg-accent"
-                )}
-                onClick={(e) => {
-                  if (e.metaKey || e.ctrlKey || e.shiftKey) {
-                    handleItemClick({ path: filePath, name: media.name }, visibleFolders.length + i, e)
-                  } else {
-                    onMediaSelect(media)
-                  }
-                }}
-                onMouseEnter={() => {
-                  setHoveredId(media.id);
-                  handleMediaHover(media);
-                }}
-                onMouseLeave={() => setHoveredId(null)}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData("application/x-openinary-move", filePath)
-                  e.dataTransfer.effectAllowed = "move"
-                }}
-              >
-                <td className="py-2 px-3">
-                  <div className="flex items-center gap-3">
-                    <div onClick={(e) => { e.stopPropagation(); toggleSelection(filePath) }}>
-                      {isSelected ? (
-                        <CheckCircle className="size-4 text-primary" />
-                      ) : (
-                        <Circle className="size-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
-                      )}
-                    </div>
-                    <Icon className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="truncate text-sm">{media.name}</span>
-                  </div>
-                </td>
-                <td className="py-2 px-3 text-sm text-muted-foreground capitalize">{typeLabels[media.type] || "other"}</td>
-                <td className="py-2 px-3 text-sm text-muted-foreground">{fileMeta[filePath] ? `${(fileMeta[filePath].size / 1024).toFixed(1)} KB` : "—"}</td>
-                <td className="py-2 px-3 text-sm text-muted-foreground">{fileMeta[filePath] ? new Date(fileMeta[filePath].createdAt).toLocaleDateString() : "—"}</td>
-                <td className="py-2 px-3">
-                  <div className="flex items-center gap-1">
-                    <button onClick={(e) => { e.stopPropagation(); document.body.style.pointerEvents = ""; setRenameItem({ id: media.id, name: media.name, path: getItemPath(media.name), isFolder: false }) }} className="p-1 hover:text-foreground text-muted-foreground"><Pencil className="size-3.5" /></button>
-                    <button onClick={(e) => { e.stopPropagation(); const path = getItemPath(media.name); if (confirm(`Delete "${media.name}"?`)) { const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""; const encoded = path.split("/").map(encodeURIComponent).join("/"); fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" }).then(() => { queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] }); }) } }} className="p-1 hover:text-destructive text-muted-foreground"><Trash2 className="size-3.5" /></button>
-                  </div>
-                </td>
-              </tr>
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-              <ContextMenuItem
-                onClick={() => {
-                  document.body.style.pointerEvents = ""
-                  setRenameItem({
-                    id: media.id,
-                    name: media.name,
-                    path: getItemPath(media.name),
-                    isFolder: false,
-                  })
-                }}
-              >
-                <Pencil className="mr-2 h-4 w-4" /> Rename
-              </ContextMenuItem>
-              <ContextMenuItem
-                onClick={() => {
-                  document.body.style.pointerEvents = ""
-                  setMoveItem({ id: media.id, name: media.name, path: getItemPath(media.name) })
-                }}
-              >
-                <Folder className="mr-2 h-4 w-4" /> Move to...
-              </ContextMenuItem>
-              <ContextMenuItem
-                onClick={() => {
-                  document.body.style.pointerEvents = ""
-                  setReplaceItem({ id: media.id, name: media.name, path: getItemPath(media.name) })
-                }}
-              >
-                <Upload className="mr-2 h-4 w-4" /> Replace
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuItem
-                variant="destructive"
-                onClick={() => {
-                  const path = getItemPath(media.name);
-                  if (confirm(`Delete "${media.name}"?`)) {
-                    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-                    const encoded = path.split("/").map(encodeURIComponent).join("/");
-                    fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" })
-                      .then(() => { queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] }); });
-                  }
-                }}
-              >
-                <Trash2 className="mr-2 h-4 w-4" /> Delete
-              </ContextMenuItem>
-            </ContextMenuContent>
-          </ContextMenu>
-        );
-      })}
-          </tbody>
-        </table>
+        <ListView
+          folders={searchFolders}
+          files={searchFiles}
+          selectedPaths={selectedPaths}
+          hoveredId={hoveredId}
+          dragOverId={dragOverId}
+          fileMeta={fileMeta}
+          visibleFolderCount={visibleFolders.length}
+          queryClient={queryClient}
+          onToggleSelection={toggleSelection}
+          onHoveredIdChange={setHoveredId}
+          onDragOverIdChange={setDragOverId}
+          onItemClick={handleItemClick}
+          onFolderClick={handleFolderClick}
+          onMediaSelect={onMediaSelect}
+          onMediaHover={handleMediaHover}
+          onRename={setRenameItem}
+          onMove={setMoveItem}
+          onReplace={setReplaceItem}
+          onMoveFile={doMove}
+          getItemPath={getItemPath}
+        />
       ) : (
         <div className={cn(`grid ${gridColsClass} gap-4`, "select-none")} >
       {searchFolders.map((folder, i) => {

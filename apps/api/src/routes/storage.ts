@@ -14,6 +14,8 @@ type StorageNode = {
   path: string;
   type: "file" | "directory";
   children?: StorageNode[];
+  size?: number;
+  createdAt?: string;
 };
 
 type TreeDataItem = {
@@ -23,6 +25,8 @@ type TreeDataItem = {
   draggable?: boolean;
   droppable?: boolean;
   disabled?: boolean;
+  size?: number;
+  createdAt?: string;
 };
 
 const storageRoute = new Hono<AuthVariables>();
@@ -62,10 +66,13 @@ function buildLocalTree(rootDir: string): StorageNode {
         parent.children.push(dirNode);
         walk(fullPath, relPath, dirNode);
       } else if (entry.isFile()) {
+        const stat = fs.statSync(fullPath);
         const fileNode: StorageNode = {
           name: entry.name,
           path: relPath,
           type: "file",
+          size: stat.size,
+          createdAt: stat.birthtime.toISOString(),
         };
         parent.children = parent.children || [];
         parent.children.push(fileNode);
@@ -77,7 +84,7 @@ function buildLocalTree(rootDir: string): StorageNode {
   return root;
 }
 
-function buildTreeFromKeys(keys: { key: string }[]): StorageNode {
+function buildTreeFromKeys(keys: { key: string; size?: number; lastModified?: Date }[]): StorageNode {
   const root: StorageNode = {
     name: "storage",
     path: "",
@@ -85,8 +92,8 @@ function buildTreeFromKeys(keys: { key: string }[]): StorageNode {
     children: [],
   };
 
-  for (const { key } of keys) {
-    const normalizedKey = key.replace(/^\/+/, "");
+  for (const obj of keys) {
+    const normalizedKey = obj.key.replace(/^\/+/, "");
     const isFolderMarker = normalizedKey.endsWith("/");
     const parts = normalizedKey.split("/").filter(Boolean);
 
@@ -113,7 +120,12 @@ function buildTreeFromKeys(keys: { key: string }[]): StorageNode {
             name: part,
             path: currentPath,
             type: "file",
+            size: obj.size,
+            createdAt: obj.lastModified?.toISOString(),
           });
+        } else if (!existing.size && obj.size) {
+          existing.size = obj.size;
+          existing.createdAt = obj.lastModified?.toISOString();
         }
       } else {
         current.children = current.children || [];
@@ -145,6 +157,8 @@ function storageTreeToTreeData(root: StorageNode): TreeDataItem[] {
       id: node.path || node.name,
       name: node.name || node.path,
       children: node.children?.map(mapNode),
+      size: node.size,
+      createdAt: node.createdAt,
     };
   };
 

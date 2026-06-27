@@ -8,6 +8,8 @@ type ApiTreeItem = {
   id: string;
   name: string;
   children?: ApiTreeItem[];
+  size?: number;
+  createdAt?: string;
 };
 
 async function fetchStorageTree(): Promise<TreeDataItem[]> {
@@ -74,7 +76,8 @@ async function fetchStorageTree(): Promise<TreeDataItem[]> {
         icon,
         draggable: true,
         children: sortedChildren,
-      };
+        ...(item.size != null && { size: item.size, createdAt: item.createdAt }),
+      } as TreeDataItem;
     };
 
     const mappedItems = items.map(mapItem);

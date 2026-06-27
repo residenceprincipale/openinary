@@ -25,7 +25,7 @@ export class CloudStorage {
   /**
    * Lists objects in storage (cloud only)
    */
-  async list(prefix?: string): Promise<{ key: string; size?: number }[]> {
+  async list(prefix?: string): Promise<{ key: string; size?: number; lastModified?: Date }[]> {
     return await this.s3Client.listObjects(prefix);
   }
 
