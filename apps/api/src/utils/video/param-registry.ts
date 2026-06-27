@@ -2,6 +2,7 @@ import type { FfmpegCommand } from 'fluent-ffmpeg';
 import type { VideoContext } from './types';
 import { applyResize } from './resize';
 import { applyQuality } from './quality';
+import { applyVolume } from './volume';
 import { applyTrimming } from './trim';
 
 /**
@@ -134,6 +135,15 @@ export const VIDEO_PARAMS: readonly VideoParamDefinition[] = [
       return command;
     },
     priority: 0, // Config parameter
+  },
+  {
+    param: 'v',
+    name: 'Volume',
+    description: 'Adjusts audio volume as percentage (0-100). Applied via audio filter. 100 = original volume, 50 = half, 0 = mute.',
+    example: 'v_80',
+    validValues: ['0-100'],
+    processor: (_command, _value, context) => applyVolume(_command, context),
+    priority: 4.5,
   },
   {
     param: 'q',

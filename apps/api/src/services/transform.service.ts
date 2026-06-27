@@ -442,6 +442,31 @@ export class TransformService {
       };
     }
 
+    // ponytail: lightweight video transforms (volume-only) process synchronously
+    // Heavy transforms (resize, crop, trim, quality) still go through the job queue
+    const hasHeavyParams = !!(params.resize || params.width || params.height ||
+      params.crop || params.startOffset || params.endOffset);
+    if (params.volume && !hasHeavyParams) {
+      const result = await processVideo(sourcePath, params);
+
+      await saveToCaches(
+        this.storage,
+        filePath,
+        params,
+        cachePath,
+        result.buffer,
+        result.contentType
+      );
+
+      const headers: Record<string, string> = {
+        'Content-Length': result.buffer.length.toString(),
+        'Cache-Control': 'public, max-age=31536000, must-revalidate',
+      };
+      headers['X-Video-Status'] = 'ready';
+
+      return { buffer: result.buffer, contentType: result.contentType, headers };
+    }
+
     // For video transformations: handle job queue
     return await this.handleVideoJobQueue(
       sourcePath,

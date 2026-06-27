@@ -9,6 +9,7 @@ import { applyTrimming } from './trim';
 import { applyAutoDownscale } from './auto-downscale';
 import { applyResize } from './resize';
 import { applyQuality } from './quality';
+import { applyVolume } from './volume';
 import { VideoCommandBuilder } from './command-builder';
 import { getVideoInfo } from './video-info';
 import type { VideoContext } from './types';
@@ -129,7 +130,8 @@ export const transformVideo = async (
       applyTrimming,
       applyAutoDownscale,
       applyResize,
-      applyQuality
+      applyQuality,
+      applyVolume
     )
     .execute();
 

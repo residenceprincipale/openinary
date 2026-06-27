@@ -41,6 +41,7 @@ export interface VideoTransformParams {
   crop?: CropMode;
   gravity?: GravityMode;
   quality?: number;
+  volume?: number;
 }
 
 export interface StorageConfig {
