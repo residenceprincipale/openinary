@@ -262,7 +262,7 @@ export function MediaGrid({
         })
       }),
     )
-    await queryClient.invalidateQueries({ queryKey: ["storage-tree"] })
+    await queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] })
     clearSelection()
   }, [selectedPaths, queryClient, clearSelection])
 
@@ -279,7 +279,8 @@ export function MediaGrid({
         credentials: "include",
       })
     } catch {}
-    queryClient.invalidateQueries({ queryKey: ["storage-tree"] })
+    queryClient.invalidateQueries({ queryKey: ["storage-tree"] });
+    queryClient.invalidateQueries({ queryKey: ["server-config"] });
   }
 
   const getItemPath = (name: string): string => {
@@ -420,7 +421,8 @@ export function MediaGrid({
         } else {
           setUploadStatus({ type: 'done', count: files.length })
         }
-        queryClient.invalidateQueries({ queryKey: ["storage-tree"] })
+        queryClient.invalidateQueries({ queryKey: ["storage-tree"] });
+        queryClient.invalidateQueries({ queryKey: ["server-config"] })
       } else {
         const error = d.error || d.errors?.map((e: {error: string}) => e.error).join('; ') || 'Upload failed'
         setUploadStatus({ type: 'done', count: 0, error })
@@ -760,7 +762,7 @@ export function MediaGrid({
                 <td className="py-2 px-3">
                   <div className="flex items-center gap-1">
                     <button onClick={(e) => { e.stopPropagation(); document.body.style.pointerEvents = ""; setRenameItem({ id: folder.id, name: folder.name, path: folder.path, isFolder: true }) }} className="p-1 hover:text-foreground text-muted-foreground"><Pencil className="size-3.5" /></button>
-                    <button onClick={(e) => { e.stopPropagation(); const p = folder.path; if (confirm(`Delete folder "${folder.name}" and all contents?`)) { const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""; const encoded = p.split("/").map(encodeURIComponent).join("/"); fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" }).then(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] })) } }} className="p-1 hover:text-destructive text-muted-foreground"><Trash2 className="size-3.5" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); const p = folder.path; if (confirm(`Delete folder "${folder.name}" and all contents?`)) { const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""; const encoded = p.split("/").map(encodeURIComponent).join("/"); fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" }).then(() => { queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] }); }) } }} className="p-1 hover:text-destructive text-muted-foreground"><Trash2 className="size-3.5" /></button>
                   </div>
                 </td>
               </tr>
@@ -796,7 +798,7 @@ export function MediaGrid({
                     const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
                     const encoded = p.split("/").map(encodeURIComponent).join("/");
                     fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" })
-                      .then(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] }));
+                      .then(() => { queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] }); });
                   }
                 }}
               >
@@ -857,7 +859,7 @@ export function MediaGrid({
                 <td className="py-2 px-3">
                   <div className="flex items-center gap-1">
                     <button onClick={(e) => { e.stopPropagation(); document.body.style.pointerEvents = ""; setRenameItem({ id: media.id, name: media.name, path: getItemPath(media.name), isFolder: false }) }} className="p-1 hover:text-foreground text-muted-foreground"><Pencil className="size-3.5" /></button>
-                    <button onClick={(e) => { e.stopPropagation(); const path = getItemPath(media.name); if (confirm(`Delete "${media.name}"?`)) { const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""; const encoded = path.split("/").map(encodeURIComponent).join("/"); fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" }).then(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] })) } }} className="p-1 hover:text-destructive text-muted-foreground"><Trash2 className="size-3.5" /></button>
+                    <button onClick={(e) => { e.stopPropagation(); const path = getItemPath(media.name); if (confirm(`Delete "${media.name}"?`)) { const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""; const encoded = path.split("/").map(encodeURIComponent).join("/"); fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" }).then(() => { queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] }); }) } }} className="p-1 hover:text-destructive text-muted-foreground"><Trash2 className="size-3.5" /></button>
                   </div>
                 </td>
               </tr>
@@ -901,7 +903,7 @@ export function MediaGrid({
                     const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
                     const encoded = path.split("/").map(encodeURIComponent).join("/");
                     fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" })
-                      .then(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] }));
+                      .then(() => { queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] }); });
                   }
                 }}
               >
@@ -1086,7 +1088,7 @@ export function MediaGrid({
                   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
                   const encoded = p.split("/").map(encodeURIComponent).join("/");
                   fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" })
-                    .then(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] }));
+                    .then(() => { queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] }); });
                 }
               }}
             >
@@ -1218,7 +1220,7 @@ export function MediaGrid({
                       const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
                       const encoded = path.split("/").map(encodeURIComponent).join("/");
                       fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" })
-                        .then(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] }));
+                        .then(() => { queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] }); });
                     }
                   }}
                 >
@@ -1318,7 +1320,7 @@ export function MediaGrid({
                   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
                   const encoded = path.split("/").map(encodeURIComponent).join("/");
                   fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" })
-                    .then(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] }));
+                    .then(() => { queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] }); });
                 }
               }}
             >

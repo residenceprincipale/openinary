@@ -94,7 +94,7 @@ export function BatchRenameDialog({ isOpen, items, onClose }: BatchRenameDialogP
       if (failed.length > 0) {
         throw new Error(`${failed.length} of ${items.length} renames failed`)
       }
-      await queryClient.invalidateQueries({ queryKey: ["storage-tree"] })
+      await queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] })
       close()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong")

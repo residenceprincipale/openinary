@@ -70,7 +70,7 @@ export function ReplaceFileDialog({ isOpen, item, onClose, onSuccess }: ReplaceF
         throw new Error(data.error || data.message || "Failed to replace file")
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["storage-tree"] })
+      await queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] })
       onSuccess?.()
       close()
       setNotify({ type: "done" })

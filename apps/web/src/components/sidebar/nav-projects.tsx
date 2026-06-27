@@ -83,7 +83,7 @@ export function NavProjects({ onMediaSelect }: NavProjectsProps) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sourcePath, targetPath: dest }),
       credentials: "include",
-    }).finally(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] }))
+    }).finally(() => { queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] }); })
   }, [queryClient])
 
   return (
@@ -143,7 +143,7 @@ export function NavProjects({ onMediaSelect }: NavProjectsProps) {
                   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
                   const encoded = item.id.split("/").map(encodeURIComponent).join("/")
                   fetch(`${apiBaseUrl}/storage/${encoded}`, { method: "DELETE", credentials: "include" })
-                    .then(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] }))
+                    .then(() => { queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] }); })
                 }
                 setContextMenu(null)
               }}

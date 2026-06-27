@@ -78,7 +78,7 @@ export function MoveDialog({ isOpen, item, items, treeData, onClose }: MoveDialo
           })
         }),
       )
-      await queryClient.invalidateQueries({ queryKey: ["storage-tree"] })
+      await queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] })
       close()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong")

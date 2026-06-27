@@ -63,7 +63,7 @@ export function CreateFolderSection({
 
       if (data.success) {
         // Invalidate storage tree query to refresh the data
-        queryClient.invalidateQueries({ queryKey: ["storage-tree"] });
+        queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] });
         onSuccessfulCreate?.(data.folder!);
       } else {
         folderCreateForm.setError("folder", { message: data.error });

@@ -74,6 +74,7 @@ export default function DeleteFolderButton({
 
       // Refresh the storage tree
       await queryClient.invalidateQueries({ queryKey: ["storage-tree"] });
+      queryClient.invalidateQueries({ queryKey: ["server-config"] });
       onSuccessfulDelete?.(folderPath);
     } catch (error) {
       console.error("Failed to delete file:", error);

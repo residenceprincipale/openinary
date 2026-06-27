@@ -100,6 +100,7 @@ export function UploadSection({ uploadToFolder }: { uploadToFolder?: string }) {
         setSelectedFiles([]);
         // Invalidate storage tree query to refresh the data
         queryClient.invalidateQueries({ queryKey: ["storage-tree"] });
+        queryClient.invalidateQueries({ queryKey: ["server-config"] });
       }
     } catch (error) {
       setUploadResult({

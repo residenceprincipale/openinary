@@ -62,7 +62,7 @@ export function RenameDialog({ isOpen, item, isFolder, onClose }: RenameDialogPr
         throw new Error(data.error || data.message || "Failed to rename")
       }
 
-      await queryClient.invalidateQueries({ queryKey: ["storage-tree"] })
+      await queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] })
       close()
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong")

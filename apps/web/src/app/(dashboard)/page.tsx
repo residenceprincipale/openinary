@@ -4,6 +4,7 @@ import { AssetDetailsSidebar } from "@/components/details-sidebar";
 import HeaderBar from "@/components/headerbar";
 import { MediaGrid } from "@/components/media-grid";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
+import { StatusBar } from "@/components/statusbar";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -66,15 +67,16 @@ function HomePageContent() {
   return (
     <>
       <AppSidebar onMediaSelect={handleMediaSelect} />
-      <SidebarInset>
-        <ResizablePanelGroup direction="horizontal" className="h-screen">
+      <SidebarInset className="flex flex-col">
+        <ResizablePanelGroup direction="horizontal" className="flex-1">
           <ResizablePanel
             defaultSize={assetSidebarOpen ? 70 : 100}
             minSize={30}
             id="main-panel"
+            className="flex flex-col"
           >
             <HeaderBar />
-            <div className="px-4 sm:px-6 py-6 sm:py-8 space-y-6 overflow-auto h-[calc(100vh-64px)] overflow-y-scoll">
+            <div className="flex-1 overflow-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
               <MediaGrid
                 onMediaSelect={handleMediaSelect}
                 sidebarOpen={assetSidebarOpen}
@@ -101,6 +103,7 @@ function HomePageContent() {
             </>
           )}
         </ResizablePanelGroup>
+        <StatusBar />
       </SidebarInset>
     </>
   );

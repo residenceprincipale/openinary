@@ -14,6 +14,15 @@ export class CloudStorage {
   }
 
   /**
+   * Returns total bytes stored across all objects
+   * ponytail: naive sum via ListObjectsV2, fine up to low thousands of objects
+   */
+  async getTotalSize(): Promise<number> {
+    const objects = await this.s3Client.listObjects("public/");
+    return objects.reduce((sum, o) => sum + (o.size ?? 0), 0);
+  }
+
+  /**
    * Lists objects in storage (cloud only)
    */
   async list(prefix?: string): Promise<{ key: string; size?: number }[]> {

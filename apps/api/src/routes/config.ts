@@ -1,7 +1,8 @@
 import { Hono } from "hono";
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from "fs";
 import { join } from "path";
 import { apiKeyAuth } from "../middleware/auth";
+import { createStorageClient } from "../utils/storage/factory";
 import logger, { serializeError } from "../utils/logger";
 
 const CONFIG_PATH = join(process.cwd(), "data", "transforms.json");
@@ -36,6 +37,36 @@ config.use("/*", apiKeyAuth);
 
 config.get("/transforms", (c) => {
   return c.json({ success: true, data: readConfig() });
+});
+
+function getLocalStorageUsed(): number {
+  const dir = "./public";
+  if (!existsSync(dir)) return 0;
+  let total = 0;
+  const walk = (p: string) => {
+    for (const entry of readdirSync(p, { withFileTypes: true })) {
+      const full = join(p, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.isFile()) total += statSync(full).size;
+    }
+  };
+  walk(dir);
+  return total;
+}
+
+config.get("/server", async (c) => {
+  const storageLimitMB = parseInt(process.env.STORAGE_LIMIT_MB ?? "0", 10) || 0;
+  const storage = createStorageClient();
+  const usedBytes = storage ? await storage.getTotalSize() : getLocalStorageUsed();
+
+  return c.json({
+    success: true,
+    data: {
+      maxFileSizeMB: parseInt(process.env.MAX_FILE_SIZE_MB ?? "50", 10) || 50,
+      storageLimitMB,
+      storageUsedMB: Math.round(usedBytes / (1024 * 1024) * 100) / 100,
+    },
+  });
 });
 
 config.put("/transforms", async (c) => {

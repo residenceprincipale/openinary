@@ -324,7 +324,8 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
       }
 
       // Refresh the storage tree
-      await queryClient.invalidateQueries({ queryKey: ["storage-tree"] })
+      await queryClient.invalidateQueries({ queryKey: ["storage-tree"] });
+      queryClient.invalidateQueries({ queryKey: ["server-config"] })
 
       // Close the sidebar and clear selection
       setAssetId(null)

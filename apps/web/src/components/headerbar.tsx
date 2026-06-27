@@ -44,7 +44,7 @@ function DroppableBreadcrumbLink({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ sourcePath: src, targetPath: dest }),
       credentials: "include",
-    }).finally(() => queryClient.invalidateQueries({ queryKey: ["storage-tree"] }))
+    }).finally(() => { queryClient.invalidateQueries({ queryKey: ["storage-tree"] }); queryClient.invalidateQueries({ queryKey: ["server-config"] }); })
   }
 
   return (

@@ -22,6 +22,10 @@ const transformService = new TransformService();
 
 // File size limit: configurable via MAX_FILE_SIZE_MB env var, defaults to 50MB
 const MAX_FILE_SIZE = (parseInt(process.env.MAX_FILE_SIZE_MB ?? "50", 10) || 50) * 1024 * 1024;
+
+// Global storage limit: configurable via STORAGE_LIMIT_MB env var, 0 = unlimited
+const STORAGE_LIMIT = (parseInt(process.env.STORAGE_LIMIT_MB ?? "0", 10) || 0) * 1024 * 1024;
+
 const MAX_PREWARM_TRANSFORMATIONS = 20;
 
 // Allowed file extensions and MIME types
@@ -255,6 +259,21 @@ async function localFileExists(filePath: string): Promise<boolean> {
   return fs.existsSync(fullPath);
 }
 
+function getStorageUsed(): number {
+  const dir = "./public";
+  if (!fs.existsSync(dir)) return 0;
+  let total = 0;
+  const walk = (p: string) => {
+    for (const entry of fs.readdirSync(p, { withFileTypes: true })) {
+      const full = path.join(p, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.isFile()) total += fs.statSync(full).size;
+    }
+  };
+  walk(dir);
+  return total;
+}
+
 /**
  * Queue thumbnail generation for a video
  * Uses high priority to ensure thumbnails are generated first
@@ -417,6 +436,18 @@ upload.post("/", async (c) => {
 
     if (files.length === 0) {
       return c.json({ success: false, error: "No files provided" }, 400);
+    }
+
+    if (STORAGE_LIMIT > 0) {
+      const totalNew = files.reduce((sum, f) => sum + (f instanceof File ? f.size : 0), 0);
+      const used = storage ? await storage.getTotalSize() : getStorageUsed();
+      if (used + totalNew > STORAGE_LIMIT) {
+        const limitMB = STORAGE_LIMIT / 1024 / 1024;
+        return c.json({
+          success: false,
+          error: `Storage limit of ${limitMB}MB exceeded (${(used / 1024 / 1024).toFixed(2)}MB used, ${(totalNew / 1024 / 1024).toFixed(2)}MB requested)`,
+        }, 413);
+      }
     }
 
     const successfulUploads: UploadResult[] = [];
