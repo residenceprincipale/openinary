@@ -11,11 +11,13 @@ t.get('/*', async (c) => {
   const acceptHeader = c.req.header('Accept');
 
   try {
+    const skipCache = c.req.query('skip-cache') === '1';
     const result = await transformService.transform({
       path,
       userAgent,
       acceptHeader,
       context: c,
+      skipCache,
     });
 
     // Set response headers

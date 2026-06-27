@@ -114,6 +114,7 @@ export function AssetDetailsSidebar({
                   optimizedSize={optimizedSize}
                   createdAt={createdAt}
                   rawUrl={rawUrl}
+                  previewUrl={previewUrl}
                   isDeleting={isDeleting}
                   videoStatus={videoStatus}
                   videoProgress={videoProgress}

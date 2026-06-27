@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   FileType,
   HardDrive,
@@ -17,6 +17,7 @@ import {
 } from "lucide-react"
 import { CopyInput } from "@/components/ui/copy-input"
 import { Button } from "@/components/ui/button"
+
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import type { MediaFile } from "./types"
@@ -30,6 +31,7 @@ interface AssetDetailsTabProps {
   optimizedSize: number | null
   createdAt: Date | null
   rawUrl: string
+  previewUrl: string
   isDeleting: boolean
   videoStatus?: VideoStatus
   videoProgress?: number
@@ -47,6 +49,7 @@ export function AssetDetailsTab({
   optimizedSize,
   createdAt,
   rawUrl,
+  previewUrl,
   isDeleting,
   videoStatus,
   videoProgress = 0,
@@ -58,6 +61,18 @@ export function AssetDetailsTab({
   onDelete,
 }: AssetDetailsTabProps) {
   const [copied, setCopied] = useState(false)
+  const [previewSize, setPreviewSize] = useState<number | null>(null)
+
+  // Fetch preview transformed size for non-video assets
+  useEffect(() => {
+    if (asset.type !== "video" && previewUrl) {
+      fetch(previewUrl, { method: "HEAD", credentials: "include" })
+        .then(r => { const l = r.headers.get("Content-Length"); if (l) setPreviewSize(parseInt(l, 10)) })
+        .catch(() => setPreviewSize(null))
+    } else {
+      setPreviewSize(null)
+    }
+  }, [asset.type, previewUrl])
 
   const handleCopyUrl = () => {
     onCopyUrl()
@@ -86,7 +101,7 @@ export function AssetDetailsTab({
           </div>
         </div>
 
-        {asset.type === "video" && (
+        {asset.type === "video" ? (
           <div className="space-y-2">
             <label className="text-sm font-medium flex items-center gap-2">
               <Zap className="h-4 w-4" />
@@ -117,6 +132,16 @@ export function AssetDetailsTab({
               )}
             </div>
           </div>
+        ) : (
+          <div className="space-y-2">
+            <label className="text-sm font-medium flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Optimized Size (default transformation)
+            </label>
+            <div className="text-sm text-muted-foreground">
+              {previewSize ? formatFileSize(previewSize) : "—"}
+            </div>
+          </div>
         )}
 
         <div className="space-y-2">
@@ -138,6 +163,7 @@ export function AssetDetailsTab({
             {formatDate(createdAt)}
           </div>
         </div>
+
       </div>
 
       <Separator />

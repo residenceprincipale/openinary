@@ -27,6 +27,7 @@ export interface TransformRequest {
   userAgent: string;
   acceptHeader?: string;
   context: Context;
+  skipCache?: boolean;
 }
 
 export interface TransformResult {
@@ -57,7 +58,7 @@ export class TransformService {
    * Main transformation method that handles the complete flow
    */
   async transform(request: TransformRequest): Promise<TransformResult> {
-    const { path, userAgent, acceptHeader } = request;
+    const { path, userAgent, acceptHeader, skipCache } = request;
 
     try {
       // Parse path and parameters
@@ -91,30 +92,32 @@ export class TransformService {
         throw new Error(fileCheck.error || 'File not found');
       }
 
-      // Check caches
-      const cacheResult = await this.checkCaches(
-        this.storage,
-        filePath,
-        effectiveParams,
-        cachePath
-      );
-
-      if (cacheResult.cloudCacheBuffer) {
-        return this.formatCacheResponse(
-          cacheResult.cloudCacheBuffer,
+      // Check caches (skip if estimate)
+      if (!skipCache) {
+        const cacheResult = await this.checkCaches(
+          this.storage,
+          filePath,
           effectiveParams,
-          ext,
-          'cloud'
+          cachePath
         );
-      }
 
-      if (cacheResult.localCacheBuffer) {
-        return this.formatCacheResponse(
-          cacheResult.localCacheBuffer,
-          effectiveParams,
-          ext,
-          'local'
-        );
+        if (cacheResult.cloudCacheBuffer) {
+          return this.formatCacheResponse(
+            cacheResult.cloudCacheBuffer,
+            effectiveParams,
+            ext,
+            'cloud'
+          );
+        }
+
+        if (cacheResult.localCacheBuffer) {
+          return this.formatCacheResponse(
+            cacheResult.localCacheBuffer,
+            effectiveParams,
+            ext,
+            'local'
+          );
+        }
       }
 
       // Process the file
@@ -125,7 +128,8 @@ export class TransformService {
         effectiveParams,
         cachePath,
         userAgent,
-        acceptHeader
+        acceptHeader,
+        skipCache
       );
     } catch (error) {
       return this.handleTransformationError(error, request);
@@ -257,7 +261,8 @@ export class TransformService {
     effectiveParams: any,
     cachePath: string,
     userAgent?: string,
-    acceptHeader?: string
+    acceptHeader?: string,
+    skipCache?: boolean
   ): Promise<TransformResult> {
     // Prepare source file
     const sourcePath = await prepareSourceFile(
@@ -300,8 +305,8 @@ export class TransformService {
         throw new Error('Unsupported file type');
       }
 
-      // Save to caches
-      if (cachePath) {
+      // Save to caches (skip if estimate)
+      if (cachePath && !skipCache) {
         await saveToCaches(
           this.storage,
           filePath,

@@ -1,11 +1,14 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { Sparkles, Wrench } from "lucide-react"
+import { useState, useMemo, useEffect } from "react"
+import { Sparkles, Wrench, Zap } from "lucide-react"
 import { CopyInput } from "@/components/ui/copy-input"
 import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import type { MediaFile } from "./types"
+import { Spinner } from "@/components/ui/spinner"
+import { formatFileSize } from "./utils"
 
 interface AssetTransformationsTabProps {
   asset: MediaFile
@@ -81,6 +84,23 @@ export function AssetTransformationsTab({
   const [sampleRate, setSampleRate] = useState("")
   const [volume, setVolume] = useState("")
   const [channels, setChannels] = useState("")
+  const [estimatedSize, setEstimatedSize] = useState<number | null>(null)
+  const [isEstimating, setIsEstimating] = useState(false)
+
+  // ponytail: resets on asset switch so stale size doesn't linger
+  useEffect(() => { setEstimatedSize(null) }, [asset.path])
+
+  const handleEstimate = async () => {
+    if (!builderUrl) return
+    setIsEstimating(true)
+    setEstimatedSize(null)
+    try {
+      const r = await fetch(`${builderUrl}?skip-cache=1`, { method: "HEAD", credentials: "include" })
+      const l = r.headers.get("Content-Length")
+      if (l) setEstimatedSize(parseInt(l, 10))
+    } catch {}
+    setIsEstimating(false)
+  }
 
   const builderParams = useMemo(() => {
     const parts: string[] = []
@@ -305,8 +325,22 @@ export function AssetTransformationsTab({
             </>
           )}
 
-          {!isAudio(asset.type) && builderUrl && <CopyInput label="Built URL" value={builderUrl} />}
-          {isAudio(asset.type) && builderUrl && <CopyInput label="Built URL" value={builderUrl} />}
+          {builderUrl && (
+            <div className="space-y-2">
+              <CopyInput label="Built URL" value={builderUrl} />
+              {isImage(asset.type) && (
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={handleEstimate} disabled={isEstimating} className="h-7 gap-1 text-xs">
+                    {isEstimating ? <Spinner size={12} /> : <Zap className="h-3 w-3" />}
+                    {isEstimating ? "..." : "Estimate Size"}
+                  </Button>
+                  {estimatedSize !== null && (
+                    <span className="text-xs text-muted-foreground">{formatFileSize(estimatedSize)}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
