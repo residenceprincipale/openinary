@@ -17,9 +17,9 @@ export class VideoCommandBuilder {
       .addOption('-threads', '4'); // Increased to 4 threads for better performance
 
     // -movflags and -max_muxing_queue_size are MOV/MP4 container options and are
-    // incompatible with image output formats (image2 muxer used for thumbnails).
-    // Only apply them for video output.
-    if (!context.isImageOutput) {
+    // incompatible with image output formats (image2 muxer used for thumbnails)
+    // and with WebM output.
+    if (!context.isImageOutput && context.params.format !== 'webm') {
       this.command = this.command
         .addOption('-movflags', '+faststart') // Optimize for web streaming
         .addOption('-max_muxing_queue_size', '1024'); // Prevent buffer issues
