@@ -240,7 +240,7 @@ export function AssetTransformationsTab({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Background</Label>
-                <Input placeholder="transparent, #fff, rgb:FF5733" value={background} onChange={(e) => setBackground(e.target.value)} className="h-8 text-xs" />
+                <Input placeholder="transparent, ffffff" value={background} onChange={(e) => setBackground(e.target.value)} className="h-8 text-xs" />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">Quality</Label>

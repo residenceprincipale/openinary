@@ -45,7 +45,7 @@ export async function transformAudio(
     }
 
     if (params.volume) {
-      cmd = cmd.addOption('-filter:a', `volume=${parseInt(params.volume, 10)}%`);
+      cmd = cmd.addOption('-filter:a', `volume=${Math.min(parseInt(params.volume, 10), 100) / 100}`);
     }
 
     if (params.channels) {
