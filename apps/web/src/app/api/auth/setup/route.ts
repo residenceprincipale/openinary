@@ -13,6 +13,12 @@ export async function POST(request: Request) {
     })();
 
   try {
+    // Lock setup if users already exist
+    const existingCount = db.prepare("SELECT COUNT(*) as count FROM user").get() as { count: number } | undefined;
+    if (existingCount && existingCount.count > 0) {
+      return NextResponse.json({ error: "Setup already completed" }, { status: 403 });
+    }
+
     // Parse request body
     const body = await request.json();
     const { email, password, name } = body;

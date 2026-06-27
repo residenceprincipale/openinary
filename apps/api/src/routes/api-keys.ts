@@ -97,7 +97,7 @@ apiKeys.get("/list", async (c) => {
       .prepare(
         `SELECT id, name, start, prefix, enabled, expiresAt, createdAt, updatedAt, remaining, rateLimitEnabled 
          FROM apiKey 
-         WHERE userId = ? 
+         WHERE referenceId = ? 
          ORDER BY createdAt DESC`
       )
       .all(user.id);
@@ -140,8 +140,8 @@ apiKeys.delete("/:keyId", async (c) => {
     // Verify the key belongs to this user
     const db = auth.options.database;
     const key = db
-      .prepare("SELECT userId FROM apiKey WHERE id = ?")
-      .get(keyId) as { userId: string } | undefined;
+      .prepare("SELECT referenceId FROM apiKey WHERE id = ?")
+      .get(keyId) as { referenceId: string } | undefined;
 
     if (!key) {
       return c.json(
@@ -153,7 +153,7 @@ apiKeys.delete("/:keyId", async (c) => {
       );
     }
 
-    if (key.userId !== user.id) {
+    if (key.referenceId !== user.id) {
       return c.json(
         {
           error: "Forbidden",
@@ -210,8 +210,8 @@ apiKeys.patch("/:keyId", async (c) => {
     // Verify the key belongs to this user
     const db = auth.options.database;
     const key = db
-      .prepare("SELECT userId FROM apiKey WHERE id = ?")
-      .get(keyId) as { userId: string } | undefined;
+      .prepare("SELECT referenceId FROM apiKey WHERE id = ?")
+      .get(keyId) as { referenceId: string } | undefined;
 
     if (!key) {
       return c.json(
@@ -223,7 +223,7 @@ apiKeys.patch("/:keyId", async (c) => {
       );
     }
 
-    if (key.userId !== user.id) {
+    if (key.referenceId !== user.id) {
       return c.json(
         {
           error: "Forbidden",

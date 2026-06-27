@@ -15,18 +15,14 @@ export const SIGNATURE_LENGTH = 16; // 64 bits of entropy
  * @returns Sanitized file path
  */
 export function sanitizeFilePath(filePath: string): string {
-  // Normalize the path to resolve any '..' or '.' segments
+  if (path.isAbsolute(filePath)) {
+    throw new Error('Invalid file path: absolute path not allowed');
+  }
   const normalized = path.normalize(filePath);
-
-  // Remove any leading path traversal sequences
-  const sanitized = normalized.replace(/^(\.\.[/\\])+/, '');
-
-  // Additional check: reject paths that still contain '..'
-  if (sanitized.includes('..')) {
+  if (normalized.includes('..')) {
     throw new Error('Invalid file path: path traversal detected');
   }
-
-  return sanitized;
+  return normalized;
 }
 
 /**

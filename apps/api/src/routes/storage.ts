@@ -6,6 +6,7 @@ import path from "path";
 import logger, { serializeError } from "../utils/logger";
 import { deleteAssetCompletely } from "../utils/asset-deletion";
 import { deleteCachedFiles } from "../utils/cache";
+import { safePath } from "../utils/path-security";
 import type { AuthVariables } from "../middleware/auth";
 
 type StorageNode = {
@@ -271,7 +272,7 @@ storageRoute.get("/*", async (c) => {
         updatedAt: metadata.updatedAt.toISOString(),
       });
     } else {
-      const localPath = path.join(".", "public", filePath);
+      const localPath = safePath("./public", filePath);
 
       if (!fs.existsSync(localPath)) {
         return c.json(
@@ -345,8 +346,8 @@ storageRoute.put("/move", async (c) => {
       await storageClient.move(decodedSource, decodedTarget);
       storageClient.invalidateAllCacheEntries(decodedSource);
     } else {
-      const sourceAbsolute = path.join(".", "public", decodedSource);
-      const targetAbsolute = path.join(".", "public", decodedTarget);
+      const sourceAbsolute = safePath("./public", decodedSource);
+      const targetAbsolute = safePath("./public", decodedTarget);
 
       if (!fs.existsSync(sourceAbsolute)) {
         return c.json({ error: "Source not found" }, 404);
@@ -425,7 +426,7 @@ storageRoute.put("/replace/*", async (c) => {
       await storageClient.deleteAllCachedTransformations(filePath);
       storageClient.invalidateAllCacheEntries(filePath);
     } else {
-      const localPath = path.join(".", "public", filePath);
+      const localPath = safePath("./public", filePath);
       const dir = path.dirname(localPath);
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });

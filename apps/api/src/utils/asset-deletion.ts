@@ -4,6 +4,7 @@ import logger, { serializeError } from "./logger";
 import { CloudStorage } from "./storage/cloud-storage";
 import { deleteCachedFiles } from "./cache";
 import { deleteJobsByFilePath } from "./video/queue-db";
+import { safePath } from "./path-security";
 
 export interface DeleteAssetResult {
   success: boolean;
@@ -51,7 +52,7 @@ export async function deleteAssetCompletely(
         }
       }
     } else {
-      const localPath = path.join(".", "public", filePath);
+      const localPath = safePath("./public", filePath);
       fileExists = fs.existsSync(localPath);
     }
 
@@ -124,7 +125,7 @@ export async function deleteAssetCompletely(
     } else {
       // Delete from local storage
       try {
-        const localPath = path.join(".", "public", filePath);
+        const localPath = safePath("./public", filePath);
 
         const stats = fs.statSync(localPath);
 
@@ -135,8 +136,8 @@ export async function deleteAssetCompletely(
           });
 
           for (const content of folderContents) {
-            const contentPath = path.join(localPath, content.name);
-            await deleteAssetCompletely(contentPath, storage);
+            const contentRelPath = path.posix.join(filePath, content.name);
+            await deleteAssetCompletely(contentRelPath, storage);
           }
         }
 

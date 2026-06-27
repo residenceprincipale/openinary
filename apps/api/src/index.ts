@@ -19,6 +19,7 @@ import { apiKeyAuth } from "./middleware/auth";
 import { publicRateLimit } from "./middleware/rate-limit";
 import { validateApiSecret } from "./utils/signature";
 import { createStorageClient } from "./utils/storage/index";
+import { safePath } from "./utils/path-security";
 import fs from "fs";
 import path from "path";
 
@@ -48,7 +49,7 @@ app.use(
       ].filter(Boolean);
 
       if (!origin || allowedOrigins.includes("*")) {
-        return origin || "*";
+        return origin || allowedOrigins[0];
       }
 
       return allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
@@ -143,7 +144,7 @@ app.get("/*", async (c) => {
     if (storage) {
       try { buffer = await storage.downloadOriginal(filePath); } catch { return c.text("File not found", 404); }
     } else {
-      const localPath = path.join("./public", filePath);
+      const localPath = safePath("./public", filePath);
       if (!fs.existsSync(localPath) || fs.statSync(localPath).isDirectory()) return c.text("File not found", 404);
       buffer = fs.readFileSync(localPath);
     }

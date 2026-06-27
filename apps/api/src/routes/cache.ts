@@ -5,6 +5,7 @@ import { existsSync } from "fs"
 import { apiKeyAuth, AuthVariables } from "../middleware/auth"
 import { SmartCache } from "../utils/cache"
 import { createStorageClient } from "../utils/storage"
+import { safePath } from "../utils/path-security"
 import logger from "../utils/logger"
 
 const CACHE_DIR = "./cache"
@@ -74,7 +75,7 @@ cacheRoute.delete("/", async (c) => {
 cacheRoute.delete("/:name", async (c) => {
   const name = c.req.param("name")
   if (!name) return c.json({ success: false, error: "File name required" }, 400)
-  const filePath = join(CACHE_DIR, name)
+  const filePath = safePath(CACHE_DIR, name)
   if (!existsSync(filePath)) return c.json({ success: false, error: "File not found" }, 404)
   try {
     await fs.unlink(filePath)

@@ -3,6 +3,7 @@ import { createStorageClient } from "../utils/storage/index";
 import fs from "fs";
 import path from "path";
 import logger, { serializeError } from "../utils/logger";
+import { safePath } from "../utils/path-security";
 
 const download = new Hono();
 const storage = createStorageClient();
@@ -52,7 +53,7 @@ download.get("/*", async (c) => {
       }
     } else {
       // Local storage
-      const localPath = path.join("./public", filePath);
+      const localPath = safePath("./public", filePath);
       if (!fs.existsSync(localPath) || fs.statSync(localPath).isDirectory()) {
         return c.text("File not found", 404);
       }

@@ -4,6 +4,7 @@ import type { AuthVariables } from "../middleware/auth";
 import fs from "fs";
 import path from "path";
 import logger, { serializeError } from "../utils/logger";
+import { safePath } from "../utils/path-security";
 import { getUniqueFilePath } from "../utils/get-unique-file-path";
 import { getCachePath } from "../utils/cache";
 import { videoJobQueue } from "../utils/video-job-queue";
@@ -238,7 +239,7 @@ async function saveFileLocally(
   filePath: string,
   buffer: Buffer,
 ): Promise<void> {
-  const fullPath = path.join("./public", filePath);
+  const fullPath = safePath("./public", filePath);
   const dir = path.dirname(fullPath);
 
   // Create parent directories if they don't exist
@@ -250,7 +251,7 @@ async function saveFileLocally(
 }
 
 async function localFileExists(filePath: string): Promise<boolean> {
-  const fullPath = path.join("./public", filePath);
+  const fullPath = safePath("./public", filePath);
   return fs.existsSync(fullPath);
 }
 
@@ -271,7 +272,7 @@ async function queueThumbnailGeneration(
     // Get source path
     const sourcePath = storage
       ? `./temp/${path.basename(filePath)}`
-      : path.join("./public", filePath);
+      : safePath("./public", filePath);
 
     // Add to queue with HIGH priority for thumbnails
     const jobId = await videoJobQueue.addJob(
@@ -318,7 +319,7 @@ async function queueVideoTransformations(
     const cachePath = getCachePath(transformPath);
     const sourcePath = storage
       ? `./temp/${path.basename(filePath)}`
-      : path.join("./public", filePath);
+      : safePath("./public", filePath);
     const isThumbnailRequest =
       /^(jpe?g|png|webp|avif|gif)$/i.test(params.format ?? "");
     const priority = isThumbnailRequest
@@ -758,8 +759,8 @@ upload.post("/createfolder", async (c) => {
       );
     }
 
-    const localBasePath = path.join(".", "public");
-    const localPath = path.join(".", "public", prefixedPath);
+    const localBasePath = path.resolve(".", "public");
+    const localPath = safePath("./public", prefixedPath);
 
     if (!fs.existsSync(localBasePath)) {
       logger.error({ folder }, "Local storage path does not exist");
