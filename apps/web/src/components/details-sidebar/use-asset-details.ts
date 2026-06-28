@@ -71,8 +71,6 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
 
   const fetchOptimizedSize = async (path: string) => {
     try {
-      // Use the dedicated endpoint to get optimized size
-      const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
       // Encode each segment separately to preserve slashes
       const encodedPath = path
         .split("/")
@@ -191,6 +189,22 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
         : `${transformBaseUrl}/t/${asset.path}${bustSuffix}`
     : ""
 
+  // Debug: log URL construction whenever asset or env-derived bases change
+  useEffect(() => {
+    if (!asset) return
+    console.log("[openinary:copy-url] URL state", {
+      assetPath: asset.path,
+      apiBaseUrl,
+      transformBaseUrl: transformBaseUrl || "(empty — relative URLs)",
+      transformBaseUrlFromEnv: process.env.NEXT_PUBLIC_TRANSFORM_BASE_URL,
+      rawUrl,
+      mediaUrl,
+      previewUrl,
+      windowOrigin: typeof window !== "undefined" ? window.location.origin : "(ssr)",
+      windowHref: typeof window !== "undefined" ? window.location.href : "(ssr)",
+    })
+  }, [asset, apiBaseUrl, transformBaseUrl, rawUrl, mediaUrl, previewUrl])
+
   // Preload preview media when asset changes
   // Note: Even videos are preloaded as "image" since we extract thumbnails
   usePreloadMedia(previewUrl, "image")
@@ -223,13 +237,49 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
     }
   }, [asset?.type, asset?.path, transformBaseUrl])
 
-  const handleCopyUrl = () => {
-    if (!rawUrl) return
+  const handleCopyUrl = async () => {
+    console.log("[openinary:copy-url] Copy clicked", {
+      rawUrl,
+      assetPath: asset?.path,
+      windowOrigin: window.location.origin,
+      clipboardAvailable: !!navigator.clipboard?.writeText,
+      isSecureContext: window.isSecureContext,
+    })
+
+    if (!rawUrl) {
+      console.warn("[openinary:copy-url] Aborted — rawUrl is empty")
+      return
+    }
+
     // In Docker, transformBaseUrl is empty so rawUrl is relative — prepend origin for clipboard
-    const absoluteUrl = /^https?:\/\//i.test(rawUrl)
+    const isAlreadyAbsolute = /^https?:\/\//i.test(rawUrl)
+    const absoluteUrl = isAlreadyAbsolute
       ? rawUrl
       : `${window.location.origin}${rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`}`
-    navigator.clipboard.writeText(absoluteUrl)
+
+    console.log("[openinary:copy-url] Resolved URL", {
+      rawUrl,
+      isAlreadyAbsolute,
+      absoluteUrl,
+    })
+
+    try {
+      await navigator.clipboard.writeText(absoluteUrl)
+      console.log("[openinary:copy-url] Clipboard write succeeded", { absoluteUrl })
+
+      // Verify read-back when permitted (may fail without read permission)
+      try {
+        const readBack = await navigator.clipboard.readText()
+        console.log("[openinary:copy-url] Clipboard read-back", {
+          readBack,
+          matches: readBack === absoluteUrl,
+        })
+      } catch (readError) {
+        console.log("[openinary:copy-url] Clipboard read-back unavailable", readError)
+      }
+    } catch (error) {
+      console.error("[openinary:copy-url] Clipboard write failed", error)
+    }
   }
 
   const handleDownload = () => {
