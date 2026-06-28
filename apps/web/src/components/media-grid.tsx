@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useQueryState } from "nuqs";
 import { useStorageTree } from "@/hooks/use-storage-tree";
+import { buildOriginalFileUrl, toAbsolutePublicUrl } from "@/components/details-sidebar/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
@@ -984,16 +985,15 @@ export function MediaGrid({
                   <Upload className="mr-2 h-4 w-4" /> Replace
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigator.clipboard.writeText(`${transformBaseUrl}/${media.path}`)}>
+                <DropdownMenuItem onClick={() => navigator.clipboard.writeText(toAbsolutePublicUrl(buildOriginalFileUrl(transformBaseUrl, media.path)))}>
                   <Link className="mr-2 h-4 w-4" /> Copy URL
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => window.open(`${transformBaseUrl}/${media.path}`, "_blank")}>
+                <DropdownMenuItem onClick={() => window.open(toAbsolutePublicUrl(buildOriginalFileUrl(transformBaseUrl, media.path)), "_blank", "noopener,noreferrer")}>
                   <ExternalLink className="mr-2 h-4 w-4" /> Open
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
-                  const encoded = media.path.split("/").map(encodeURIComponent).join("/");
                   const a = document.createElement("a");
-                  a.href = `${apiBaseUrl}/download/${encoded}`;
+                  a.href = toAbsolutePublicUrl(buildOriginalFileUrl(transformBaseUrl, media.path));
                   a.download = media.name;
                   document.body.appendChild(a);
                   a.click();
@@ -1084,16 +1084,15 @@ export function MediaGrid({
               <Upload className="mr-2 h-4 w-4" /> Replace
             </ContextMenuItem>
             <ContextMenuSeparator />
-            <ContextMenuItem onClick={() => navigator.clipboard.writeText(`${transformBaseUrl}/${media.path}`)}>
+            <ContextMenuItem onClick={() => navigator.clipboard.writeText(toAbsolutePublicUrl(buildOriginalFileUrl(transformBaseUrl, media.path)))}>
               <Link className="mr-2 h-4 w-4" /> Copy URL
             </ContextMenuItem>
-            <ContextMenuItem onClick={() => window.open(`${transformBaseUrl}/${media.path}`, "_blank")}>
+            <ContextMenuItem onClick={() => window.open(toAbsolutePublicUrl(buildOriginalFileUrl(transformBaseUrl, media.path)), "_blank", "noopener,noreferrer")}>
               <ExternalLink className="mr-2 h-4 w-4" /> Open
             </ContextMenuItem>
             <ContextMenuItem onClick={() => {
-              const encoded = media.path.split("/").map(encodeURIComponent).join("/");
               const a = document.createElement("a");
-              a.href = `${apiBaseUrl}/download/${encoded}`;
+              a.href = toAbsolutePublicUrl(buildOriginalFileUrl(transformBaseUrl, media.path));
               a.download = media.name;
               document.body.appendChild(a);
               a.click();

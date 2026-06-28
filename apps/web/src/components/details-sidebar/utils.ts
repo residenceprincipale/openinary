@@ -69,3 +69,20 @@ export function getFileType(asset: MediaFile | null): string {
   return `${ext} ${label}`
 }
 
+export function encodeAssetPath(path: string): string {
+  return path.split("/").map(encodeURIComponent).join("/")
+}
+
+/** Resolve a relative public media URL to an absolute URL using the current origin. */
+export function toAbsolutePublicUrl(url: string): string {
+  if (!url) return url
+  if (/^https?:\/\//i.test(url)) return url
+  if (typeof window === "undefined") return url
+  return `${window.location.origin}${url.startsWith("/") ? url : `/${url}`}`
+}
+
+/** Public URL for the original file (served at GET /download/{path}). */
+export function buildOriginalFileUrl(baseUrl: string, path: string, suffix = ""): string {
+  return `${baseUrl}/download/${encodeAssetPath(path)}${suffix}`
+}
+

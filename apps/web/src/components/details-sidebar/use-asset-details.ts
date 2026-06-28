@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useStorageTree } from "@/hooks/use-storage-tree"
 import { usePreloadMedia } from "@/hooks/use-preload-media"
 import { useVideoStatus } from "@/hooks/use-video-status"
-import { findAssetInTree } from "./utils"
+import { findAssetInTree, toAbsolutePublicUrl, buildOriginalFileUrl } from "./utils"
 import type { MediaFile } from "./types"
 
 export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
@@ -180,7 +180,7 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
 
   const bustSuffix = bustKey > 0 ? `?n=${bustKey}` : ""
   const mediaUrl = asset ? `${transformBaseUrl}/t/${asset.path}${bustSuffix}` : ""
-  const rawUrl = asset ? `${transformBaseUrl}/${asset.path}${bustSuffix}` : ""
+  const rawUrl = asset ? buildOriginalFileUrl(transformBaseUrl, asset.path, bustSuffix) : ""
   const previewUrl = asset
     ? asset.type === "image"
       ? `${transformBaseUrl}/t/w_500,h_500,q_80/${asset.path}${bustSuffix}`
@@ -188,22 +188,6 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
         ? `${transformBaseUrl}/t/so_5,f_webp,w_500,h_500,c_fill,q_80/${asset.path}${bustSuffix}`
         : `${transformBaseUrl}/t/${asset.path}${bustSuffix}`
     : ""
-
-  // Debug: log URL construction whenever asset or env-derived bases change
-  useEffect(() => {
-    if (!asset) return
-    console.log("[openinary:copy-url] URL state", {
-      assetPath: asset.path,
-      apiBaseUrl,
-      transformBaseUrl: transformBaseUrl || "(empty — relative URLs)",
-      transformBaseUrlFromEnv: process.env.NEXT_PUBLIC_TRANSFORM_BASE_URL,
-      rawUrl,
-      mediaUrl,
-      previewUrl,
-      windowOrigin: typeof window !== "undefined" ? window.location.origin : "(ssr)",
-      windowHref: typeof window !== "undefined" ? window.location.href : "(ssr)",
-    })
-  }, [asset, apiBaseUrl, transformBaseUrl, rawUrl, mediaUrl, previewUrl])
 
   // Preload preview media when asset changes
   // Note: Even videos are preloaded as "image" since we extract thumbnails
@@ -238,58 +222,18 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
   }, [asset?.type, asset?.path, transformBaseUrl])
 
   const handleCopyUrl = async () => {
-    console.log("[openinary:copy-url] Copy clicked", {
-      rawUrl,
-      assetPath: asset?.path,
-      windowOrigin: window.location.origin,
-      clipboardAvailable: !!navigator.clipboard?.writeText,
-      isSecureContext: window.isSecureContext,
-    })
-
-    if (!rawUrl) {
-      console.warn("[openinary:copy-url] Aborted — rawUrl is empty")
-      return
-    }
-
-    // In Docker, transformBaseUrl is empty so rawUrl is relative — prepend origin for clipboard
-    const isAlreadyAbsolute = /^https?:\/\//i.test(rawUrl)
-    const absoluteUrl = isAlreadyAbsolute
-      ? rawUrl
-      : `${window.location.origin}${rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`}`
-
-    console.log("[openinary:copy-url] Resolved URL", {
-      rawUrl,
-      isAlreadyAbsolute,
-      absoluteUrl,
-    })
-
+    if (!rawUrl) return
     try {
-      await navigator.clipboard.writeText(absoluteUrl)
-      console.log("[openinary:copy-url] Clipboard write succeeded", { absoluteUrl })
-
-      // Verify read-back when permitted (may fail without read permission)
-      try {
-        const readBack = await navigator.clipboard.readText()
-        console.log("[openinary:copy-url] Clipboard read-back", {
-          readBack,
-          matches: readBack === absoluteUrl,
-        })
-      } catch (readError) {
-        console.log("[openinary:copy-url] Clipboard read-back unavailable", readError)
-      }
+      await navigator.clipboard.writeText(toAbsolutePublicUrl(rawUrl))
     } catch (error) {
-      console.error("[openinary:copy-url] Clipboard write failed", error)
+      console.error("Failed to copy URL:", error)
     }
   }
 
   const handleDownload = () => {
-    if (!asset) return
-    const downloadUrl = `${apiBaseUrl}/download/${asset.path
-      .split("/")
-      .map((s) => encodeURIComponent(s))
-      .join("/")}`
+    if (!asset || !rawUrl) return
     const a = document.createElement("a")
-    a.href = downloadUrl
+    a.href = toAbsolutePublicUrl(rawUrl)
     a.download = asset.name
     document.body.appendChild(a)
     a.click()
@@ -297,9 +241,8 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
   }
 
   const handleOpenInNewTab = () => {
-    if (rawUrl) {
-      window.open(rawUrl, "_blank")
-    }
+    if (!rawUrl) return
+    window.open(toAbsolutePublicUrl(rawUrl), "_blank", "noopener,noreferrer")
   }
 
   const renameItem = asset ? { id: asset.id, name: asset.name, path: asset.path } : null
