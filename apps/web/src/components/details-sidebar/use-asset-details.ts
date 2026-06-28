@@ -224,9 +224,12 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
   }, [asset?.type, asset?.path, transformBaseUrl])
 
   const handleCopyUrl = () => {
-    if (rawUrl) {
-      navigator.clipboard.writeText(rawUrl)
-    }
+    if (!rawUrl) return
+    // In Docker, transformBaseUrl is empty so rawUrl is relative — prepend origin for clipboard
+    const absoluteUrl = /^https?:\/\//i.test(rawUrl)
+      ? rawUrl
+      : `${window.location.origin}${rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`}`
+    navigator.clipboard.writeText(absoluteUrl)
   }
 
   const handleDownload = () => {
