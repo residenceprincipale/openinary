@@ -22,8 +22,8 @@ on:
 env:
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
   REGISTRY: docker.io
-  IMAGE_FULL: openinary/openinary
-  IMAGE_API: openinary/openinary-api
+  IMAGE_FULL: residenceprincipale/openinary
+  IMAGE_API: residenceprincipale/openinary-api
 
 jobs:
   determine-version:
@@ -181,7 +181,7 @@ jobs:
             
             # If empty, use default message
             if [ -z "$CHANGELOG_CONTENT" ]; then
-              CHANGELOG_CONTENT="See [CHANGELOG.md](https://github.com/openinary/openinary/blob/main/CHANGELOG.md) for details."
+              CHANGELOG_CONTENT="See [CHANGELOG.md](https://github.com/residenceprincipale/openinary/blob/main/CHANGELOG.md) for details."
             fi
             
             # Write to file to preserve formatting
