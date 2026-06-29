@@ -68,14 +68,14 @@ export default function QueuePage() {
     fetchStats();
     fetchJobs();
 
-    if (!isConnected) {
-      const interval = setInterval(() => {
-        fetchStats();
-        fetchJobs();
-      }, 5000);
-      return () => clearInterval(interval);
-    }
-  }, [selectedFilter, isConnected]);
+    // Refresh every 5 seconds
+    const interval = setInterval(() => {
+      fetchStats();
+      fetchJobs();
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [selectedFilter]);
 
   const handleRefresh = () => {
     fetchStats();

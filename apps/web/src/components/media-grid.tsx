@@ -282,7 +282,7 @@ export function MediaGrid({
     clearSelection()
   }, [selectedPaths, queryClient, clearSelection])
 
-  const doMove = useCallback(async (sourcePath: string, targetFolder: string) => {
+  const doMove = async (sourcePath: string, targetFolder: string) => {
     const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
     const name = sourcePath.split('/').pop()
     const targetPath = targetFolder ? `${targetFolder}/${name}` : name
@@ -297,7 +297,13 @@ export function MediaGrid({
     } catch {}
     queryClient.invalidateQueries({ queryKey: ["storage-tree"] });
     queryClient.invalidateQueries({ queryKey: ["server-config"] });
-  }, [])
+  }
+
+  const getItemPath = (name: string): string => {
+    return pathSegments.length > 0
+      ? `${pathSegments.join("/")}/${name}`
+      : name
+  }
 
   // Parse folder path from URL - must be called before any conditional returns
   const pathSegments = useMemo(() => {
@@ -305,12 +311,6 @@ export function MediaGrid({
       ? folderPath.split("/").filter(Boolean)
       : [];
   }, [folderPath]);
-
-  const getItemPath = useCallback((name: string): string => {
-    return pathSegments.length > 0
-      ? `${pathSegments.join("/")}/${name}`
-      : name
-  }, [pathSegments])
 
   // Get items in current folder - must be called before any conditional returns
   const { folders, files } = useMemo(() => {
@@ -542,6 +542,7 @@ export function MediaGrid({
     onDrop: (e: React.DragEvent) => {
       e.preventDefault()
       setGridDragOver(false)
+      // Handle file drops (direct upload)
       if (e.dataTransfer.files.length > 0) {
         uploadFiles(Array.from(e.dataTransfer.files), currentFolder)
         return

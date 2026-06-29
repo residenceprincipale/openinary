@@ -22,12 +22,12 @@ export class Compression {
     acceptHeader?: string
   ): Promise<OptimizationResult> {
     
-    const pipeline = sharp(inputPath);
-    const metadata = await pipeline.metadata();
-    const originalBuffer = await pipeline.clone().toBuffer();
+    const originalBuffer = await sharp(inputPath).toBuffer();
     const originalSize = originalBuffer.length;
     
-    const analysis = await this.analyzeImage(metadata);
+    // CONTENT ANALYSIS
+    const analysis = await this.analyzeImage(inputPath);
+    const metadata = await sharp(inputPath).metadata();
     
     // If format is explicitly specified, use it directly (no size comparison needed)
     if (params.format) {
@@ -198,7 +198,8 @@ export class Compression {
       }
     }
     
-    pipeline = pipeline.withMetadata({});
+    // Remove metadata to save space
+    pipeline = pipeline.withMetadata();
     
     return pipeline;
   }
@@ -253,7 +254,9 @@ export class Compression {
   /**
    * Analyzes image content to optimize compression (simplified for speed)
    */
-  private async analyzeImage(metadata: sharp.Metadata): Promise<ImageAnalysis> {
+  private async analyzeImage(inputPath: string): Promise<ImageAnalysis> {
+    const image = sharp(inputPath);
+    const metadata = await image.metadata();
     
     // Simplified analysis based only on metadata (no expensive stats calculation)
     const isPhotographic = metadata.channels! >= 3; // RGB or more channels

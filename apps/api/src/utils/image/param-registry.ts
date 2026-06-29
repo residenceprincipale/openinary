@@ -210,18 +210,11 @@ export const applyResizeComposite: ParamProcessor = (image, _value, allParams) =
   );
 };
 
-const paramLookupMap = new Map<string, ParamDefinition>();
-for (const def of IMAGE_PARAMS) {
-  paramLookupMap.set(def.param, def);
-  if (def.aliases) {
-    for (const alias of def.aliases) {
-      paramLookupMap.set(alias, def);
-    }
-  }
-}
-
+/**
+ * Get parameter definition by param key
+ */
 export const getParamDefinition = (param: string): ParamDefinition | undefined => {
-  return paramLookupMap.get(param);
+  return IMAGE_PARAMS.find(p => p.param === param || p.aliases?.includes(param));
 };
 
 /**

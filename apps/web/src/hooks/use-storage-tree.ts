@@ -100,7 +100,6 @@ export function useStorageTree() {
   return useQuery({
     queryKey: ["storage-tree"],
     queryFn: fetchStorageTree,
-    staleTime: 5 * 60 * 1000,
   });
 }
 
