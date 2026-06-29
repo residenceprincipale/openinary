@@ -9,33 +9,22 @@ RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 
 WORKDIR /app
 
-# Copy monorepo configuration files
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
-
-# Copy shared packages
-COPY packages/ ./packages/
-
-# Copy API
-COPY apps/api/ ./apps/api/
-
-# Copy security scripts
-COPY scripts/ ./scripts/
-
-# Install all monorepo dependencies
+# Install deps (cached unless lockfile/package.json change)
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml turbo.json ./
+COPY packages/shared/package.json ./packages/shared/package.json
+COPY apps/api/package.json ./apps/api/package.json
 RUN pnpm install --frozen-lockfile
 
-# Create necessary directories with proper ownership
+# Copy source and build (re-runs only on source changes)
+COPY packages/ ./packages/
+COPY apps/api/ ./apps/api/
+COPY scripts/ ./scripts/
 RUN mkdir -p apps/api/cache apps/api/public /app/data && \
     chown -R node:node /app
-
-# Make wrapper script executable and fix line endings (CRLF to LF)
 RUN chmod +x /app/scripts/init-env-wrapper.sh && \
     sed -i 's/\r$//' /app/scripts/init-env-wrapper.sh || true
-
-# Build shared package first (API depends on it)
-RUN pnpm --filter shared build
-# Build API using workspace filter
-RUN pnpm --filter api build
+# ponytail: single-stage, multi-stage would trim 200MB but this is simpler
+RUN pnpm --filter shared build && pnpm --filter api build
 
 # Set default environment variables (will be overridden by docker-compose or init-env.js)
 ENV BETTER_AUTH_SECRET=""

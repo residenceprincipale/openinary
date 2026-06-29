@@ -8,19 +8,19 @@ RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 
 WORKDIR /app
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# Install deps (cached unless lockfile/package.json change)
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
+COPY packages/shared/package.json ./packages/shared/package.json
+COPY apps/api/package.json ./apps/api/package.json
+RUN pnpm install --filter shared... --filter api... --frozen-lockfile
+
+# Copy source and build (re-runs only on source changes)
 COPY packages/ ./packages/
 COPY apps/api/ ./apps/api/
-
-# Install only the workspace dependencies needed for shared + api (dev + prod) for build
-RUN pnpm install --filter shared... --filter api... --frozen-lockfile
 RUN mkdir -p apps/api/cache apps/api/public
+RUN pnpm --filter shared build && pnpm --filter api build
 
-# Build shared package first (API depends on it)
-RUN pnpm --filter shared build
-RUN pnpm --filter api build
-
-# Prune devDependencies pour ne garder que les deps de production
+# ponytail: single-stage for api build — multi-stage would save ~50MB but adds complexity
 RUN pnpm prune --prod
 
 # Stage 2: Build Web
@@ -33,15 +33,15 @@ RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
 
 WORKDIR /app
 
-COPY pnpm-workspace.yaml ./
-COPY package.json ./
-COPY pnpm-lock.yaml ./
-COPY packages/ ./packages/
-COPY apps/web/ ./apps/web/
-
+# Install deps (cached unless lockfile/package.json change)
+COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
+COPY packages/shared/package.json ./packages/shared/package.json
+COPY apps/web/package.json ./apps/web/package.json
 RUN pnpm install --frozen-lockfile --prod=false
 
-# Build shared package first (web depends on it)
+# Copy source and build (re-runs only on source changes)
+COPY packages/ ./packages/
+COPY apps/web/ ./apps/web/
 RUN pnpm --filter shared build
 
 # Create data directory for auth database (needed during build)
