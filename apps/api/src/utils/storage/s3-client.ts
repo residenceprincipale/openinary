@@ -90,17 +90,8 @@ export class S3ClientWrapper {
       throw new Error("File not found");
     }
 
-    // Converts the stream to buffer
-    const chunks: Uint8Array[] = [];
-    const reader = response.Body.transformToWebStream().getReader();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-    }
-
-    return Buffer.concat(chunks);
+    const byteArray = await response.Body.transformToByteArray();
+    return Buffer.from(byteArray);
   }
 
   /**

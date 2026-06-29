@@ -34,29 +34,26 @@ function auditLog(event: string, data: Record<string, any>) {
 export async function apiKeyAuth(c: Context<AuthVariables>, next: Next) {
   const authHeader = c.req.header("Authorization");
   const cookieHeader = c.req.header("Cookie");
+  const clientIP = c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "unknown";
+  const db = auth.options.database;
 
   // Try API key authentication first
   if (authHeader) {
-    // Extract token from "Bearer <token>" format
     const token = authHeader.startsWith("Bearer ")
       ? authHeader.substring(7)
       : authHeader;
 
     if (token) {
       try {
-        // Verify the API key using Better Auth
         const result = await auth.api.verifyApiKey({
-          body: {
-            key: token,
-          },
+          body: { key: token },
         });
 
         if (result.valid && result.key) {
-          // API key is valid
           c.set("apiKey", {
             id: result.key.id,
             name: result.key.name,
-            userId: result.key.referenceId, // referenceId is the userId associated with the API key
+            userId: result.key.referenceId,
           });
 
           c.set("user", {
@@ -65,42 +62,38 @@ export async function apiKeyAuth(c: Context<AuthVariables>, next: Next) {
             name: "",
             role: '',
           });
-          // Fetch role from DB for API key auth
+
           try {
-            const { db } = await import("shared/auth");
             const user = db.prepare("SELECT role FROM user WHERE id = ?").get(result.key.referenceId) as { role: string } | undefined;
             if (user) c.set("user", { ...c.get("user")!, role: user.role });
           } catch {}
 
-          // Audit log: successful API key authentication
           auditLog("auth.api_key.success", {
-            userId: result.key.referenceId, // userId associated with the API key
+            userId: result.key.referenceId,
             apiKeyId: result.key.id,
             apiKeyName: result.key.name,
             path: c.req.path,
             method: c.req.method,
-            ip: c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "unknown",
+            ip: clientIP,
           });
 
           await next();
           return;
         } else {
-          // Audit log: invalid API key
           auditLog("auth.api_key.failed", {
             reason: "invalid_key",
             tokenPrefix: token.substring(0, 8) + "...",
             path: c.req.path,
             method: c.req.method,
-            ip: c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "unknown",
+            ip: clientIP,
           });
         }
       } catch (error) {
-        // Audit log: API key verification error
         auditLog("auth.api_key.error", {
           error: error instanceof Error ? error.message : "unknown",
           path: c.req.path,
           method: c.req.method,
-          ip: c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "unknown",
+          ip: clientIP,
         });
       }
     }
@@ -109,33 +102,22 @@ export async function apiKeyAuth(c: Context<AuthVariables>, next: Next) {
   // If no valid API key, try session cookie authentication
   try {
     if (cookieHeader) {
-      // Better Auth stores session in cookies
-      // Try to get session using Better Auth
       const sessionResult = await auth.api.getSession({
-        headers: new Headers({
-          cookie: cookieHeader,
-        }),
+        headers: new Headers({ cookie: cookieHeader }),
       });
 
       if (sessionResult && sessionResult.session && sessionResult.user) {
-        // SECURITY FIX: Verify that the user actually exists in the database
-        // Better Auth may return session data from signed cookies without DB validation
-        const { db } = await import("shared/auth");
         const userExists = db.prepare("SELECT id FROM user WHERE id = ?").get(sessionResult.user.id);
-        
+
         if (!userExists) {
-          // User was deleted from database - reject the session
           auditLog("auth.session.rejected", {
             reason: "user_not_found_in_db",
             userId: sessionResult.user.id,
             path: c.req.path,
             method: c.req.method,
-            ip: c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "unknown",
+            ip: clientIP,
           });
-          
-          // Continue to authentication failure below
         } else {
-          // Valid session found AND user exists in DB
           c.set("user", {
             id: sessionResult.user.id,
             email: sessionResult.user.email,
@@ -143,15 +125,14 @@ export async function apiKeyAuth(c: Context<AuthVariables>, next: Next) {
             role: (sessionResult.user as any).role || 'user',
           });
 
-          c.set("apiKey", null); // No API key, using session
+          c.set("apiKey", null);
 
-          // Audit log: successful session authentication
           auditLog("auth.session.success", {
             userId: sessionResult.user.id,
             userEmail: sessionResult.user.email,
             path: c.req.path,
             method: c.req.method,
-            ip: c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "unknown",
+            ip: clientIP,
           });
 
           await next();
@@ -164,12 +145,11 @@ export async function apiKeyAuth(c: Context<AuthVariables>, next: Next) {
   }
 
   // Neither API key nor session is valid
-  // Audit log: authentication failed
   auditLog("auth.failed", {
     reason: "no_valid_credentials",
     path: c.req.path,
     method: c.req.method,
-    ip: c.req.header("x-forwarded-for") || c.req.header("x-real-ip") || "unknown",
+    ip: clientIP,
     hasAuthHeader: !!authHeader,
     hasCookie: !!cookieHeader,
   });

@@ -190,11 +190,18 @@ export const applyResizeComposite = (
   return applyResize(command, context);
 };
 
-/**
- * Get parameter definition by param key
- */
+const videoParamLookupMap = new Map<string, VideoParamDefinition>();
+for (const def of VIDEO_PARAMS) {
+  videoParamLookupMap.set(def.param, def);
+  if (def.aliases) {
+    for (const alias of def.aliases) {
+      videoParamLookupMap.set(alias, def);
+    }
+  }
+}
+
 export const getVideoParamDefinition = (param: string): VideoParamDefinition | undefined => {
-  return VIDEO_PARAMS.find(p => p.param === param || p.aliases?.includes(param));
+  return videoParamLookupMap.get(param);
 };
 
 /**
