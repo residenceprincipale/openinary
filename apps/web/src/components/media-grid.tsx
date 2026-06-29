@@ -24,6 +24,7 @@ import {
 import { cn } from "@/lib/utils";
 import { preloadMedia } from "@/hooks/use-preload-media";
 import { VideoThumbnail } from "@/components/video-thumbnail";
+import { useFeatures } from "@/components/features-provider";
 import type { TreeDataItem } from "@/components/ui/tree-view";
 import UploadButtonWithDialog from "./upload-button-with-dialog";
 import { ListView } from "./list-view";
@@ -502,6 +503,7 @@ export function MediaGrid({
     );
   }
 
+  const { disableTransforms } = useFeatures();
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
   // Use dedicated transform base URL (empty in Docker, falls back to apiBaseUrl without /api)
   const transformBaseUrl =
@@ -890,8 +892,9 @@ export function MediaGrid({
       );
       })}
       {searchFiles.map((media, i) => {
-        const thumbnailUrl =
-          media.type === "image"
+        const thumbnailUrl = disableTransforms
+          ? `${transformBaseUrl}/${media.path}${bustSuffix}`
+          : media.type === "image"
             ? `${transformBaseUrl}/t/w_500,h_500,q_80/${media.path}${bustSuffix}`
             : `${transformBaseUrl}/t/so_5,f_webp,w_500,h_500,c_fill,q_80/${media.path}${bustSuffix}`;
         const isHovered = hoveredId === media.id;
@@ -1025,7 +1028,15 @@ export function MediaGrid({
                 className="w-full h-full object-cover transition-transform group-hover:scale-105"
                 loading="lazy"
               />
-            ) : media.type === "video" ? (
+            ) : media.type === "video" ? disableTransforms ? (
+              <video
+                src={thumbnailUrl}
+                className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                preload="metadata"
+                muted
+                playsInline
+              />
+            ) : (
               <VideoThumbnail
                 src={thumbnailUrl}
                 alt={media.name}
