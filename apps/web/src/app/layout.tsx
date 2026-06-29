@@ -4,6 +4,7 @@ import { NuqsAdapter } from 'nuqs/adapters/next/app'
 import { ThemeProvider } from "@/components/theme-provider";
 import { QueryProvider } from "@/components/query-provider";
 import { BrandingProvider } from "@/components/branding-provider";
+import { FeaturesProvider } from "@/components/features-provider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -29,6 +30,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const disableTransforms = process.env.DISABLE_TRANSFORMS === "true";
   return (
     <html suppressHydrationWarning lang="en">
       <body
@@ -42,7 +44,9 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <NuqsAdapter>
-              <BrandingProvider>{children}</BrandingProvider>
+              <FeaturesProvider disableTransforms={disableTransforms}>
+                <BrandingProvider>{children}</BrandingProvider>
+              </FeaturesProvider>
             </NuqsAdapter>
           </ThemeProvider>
         </QueryProvider>

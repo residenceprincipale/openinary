@@ -24,6 +24,7 @@ import type { MediaFile } from "./types"
 import type { VideoStatus } from "@/hooks/use-video-status"
 import { formatFileSize, formatDate, getFileType } from "./utils"
 import { Spinner } from "@/components/ui/spinner"
+import { useFeatures } from "@/components/features-provider"
 
 interface AssetDetailsTabProps {
   asset: MediaFile
@@ -60,11 +61,13 @@ export function AssetDetailsTab({
   onReplace,
   onDelete,
 }: AssetDetailsTabProps) {
+  const { disableTransforms } = useFeatures();
   const [copied, setCopied] = useState(false)
   const [previewSize, setPreviewSize] = useState<number | null>(null)
 
   // Fetch preview transformed size for non-video assets
   useEffect(() => {
+    if (disableTransforms) { setPreviewSize(null); return; }
     if (asset.type !== "video" && previewUrl) {
       fetch(previewUrl, { method: "HEAD", credentials: "include" })
         .then(r => { const l = r.headers.get("Content-Length"); if (l) setPreviewSize(parseInt(l, 10)) })
@@ -72,7 +75,7 @@ export function AssetDetailsTab({
     } else {
       setPreviewSize(null)
     }
-  }, [asset.type, previewUrl])
+  }, [asset.type, previewUrl, disableTransforms])
 
   const handleCopyUrl = () => {
     onCopyUrl()
@@ -101,7 +104,7 @@ export function AssetDetailsTab({
           </div>
         </div>
 
-        {asset.type === "video" ? (
+        {!disableTransforms && (asset.type === "video" ? (
           <div className="space-y-2">
             <label className="text-sm font-medium flex items-center gap-2">
               <Zap className="h-4 w-4" />
@@ -142,7 +145,7 @@ export function AssetDetailsTab({
               {previewSize ? formatFileSize(previewSize) : "—"}
             </div>
           </div>
-        )}
+        ))}
 
         <div className="space-y-2">
           <label className="text-sm font-medium flex items-center gap-2">

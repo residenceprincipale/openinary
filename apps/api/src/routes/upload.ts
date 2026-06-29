@@ -13,12 +13,12 @@ import {
   THUMBNAIL_PRIORITY,
   TRANSFORMATION_PRIORITY,
 } from "../utils/video/config";
-import { TransformService } from "../services/transform.service";
 import heicConvert from 'heic-convert';
+
+const disableTransforms = process.env.DISABLE_TRANSFORMS === "true";
 
 const upload = new Hono<AuthVariables>();
 const storage = createStorageClient();
-const transformService = new TransformService();
 
 // File size limit: configurable via MAX_FILE_SIZE_MB env var, defaults to 50MB
 const MAX_FILE_SIZE = (parseInt(process.env.MAX_FILE_SIZE_MB ?? "50", 10) || 50) * 1024 * 1024;
@@ -169,6 +169,10 @@ async function prewarmImageTransformations(
   filePath: string,
   transformations: string[],
 ): Promise<{ prewarmedUrls: string[]; prewarmErrors: string[] }> {
+  // ponytail: lazy import — sharp/libvips won't load unless prewarming is actually used
+  const { TransformService } = await import("../services/transform.service");
+  const transformService = new TransformService();
+
   const prewarmedUrls: string[] = [];
   const prewarmErrors: string[] = [];
 
@@ -419,19 +423,21 @@ upload.post("/", async (c) => {
     const files = formData.getAll("files");
     const customNames = formData.getAll("names");
     let prewarmTransformations: string[] = [];
-    try {
-      prewarmTransformations = parsePrewarmTransformations(formData);
-    } catch (error) {
-      return c.json(
-        {
-          success: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : "Invalid transformations field",
-        },
-        400,
-      );
+    if (!disableTransforms) {
+      try {
+        prewarmTransformations = parsePrewarmTransformations(formData);
+      } catch (error) {
+        return c.json(
+          {
+            success: false,
+            error:
+              error instanceof Error
+                ? error.message
+                : "Invalid transformations field",
+          },
+          400,
+        );
+      }
     }
 
     if (files.length === 0) {
@@ -542,7 +548,7 @@ upload.post("/", async (c) => {
             filename : normalizedFileName,
             path: finalPath,
             size: normalizedBuffer.length,
-            url: `/t/${finalPath}`,
+            url: disableTransforms ? `/${finalPath}` : `/t/${finalPath}`,
           };
 
           if (
@@ -573,7 +579,7 @@ upload.post("/", async (c) => {
           }
 
           // Queue thumbnail generation for videos (non-blocking, high priority)
-          if (normalizedContentType.startsWith("video/")) {
+          if (!disableTransforms && normalizedContentType.startsWith("video/")) {
             queueThumbnailGeneration(finalPath, storage).catch((error) => {
               logger.error(
                 { error: serializeError(error), finalPath },
@@ -610,7 +616,7 @@ upload.post("/", async (c) => {
             filename : normalizedFileName,
             path: finalPath,
             size: normalizedBuffer.length,
-            url: `/t/${finalPath}`,
+            url: disableTransforms ? `/${finalPath}` : `/t/${finalPath}`,
           };
 
           if (
@@ -641,7 +647,7 @@ upload.post("/", async (c) => {
           }
 
           // Queue thumbnail generation for videos (non-blocking, high priority)
-          if (normalizedContentType.startsWith("video/")) {
+          if (!disableTransforms && normalizedContentType.startsWith("video/")) {
             queueThumbnailGeneration(finalPath, storage).catch((error) => {
               logger.error(
                 { error: serializeError(error), finalPath },

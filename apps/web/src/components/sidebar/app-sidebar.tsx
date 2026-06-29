@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import { useSession } from "@/lib/auth-client";
 import { useBranding } from "@/components/branding-provider";
+import { useFeatures } from "@/components/features-provider";
 
 import { NavMain } from "@/components/sidebar/nav-main"
 import { NavProjects } from "@/components/sidebar/nav-projects"
@@ -43,13 +44,12 @@ import {cn} from "@/lib/utils";
 function useNavItems() {
   const { data: session } = useSession();
   const isAdmin = (session?.user as any)?.role === "admin";
+  const { disableTransforms } = useFeatures();
   return [
     { title: "Assets", url: "/", icon: Package, isActive: true },
     ...(isAdmin ? [{ title: "Users", url: "/users", icon: Users }] : []),
-    { title: "Cache", url: "/cache", icon: Database },
+    ...(!disableTransforms ? [{ title: "Cache", url: "/cache", icon: Database }] : []),
     { title: "Config", url: "/config", icon: Settings },
-    // { title: "Image", url: "/", icon: ImageIcon, disabled: true },
-    // { title: "Video", url: "/", icon: Video, disabled: true },
   ];
 }
 

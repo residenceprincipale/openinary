@@ -30,6 +30,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
+import { useFeatures } from "@/components/features-provider";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -41,6 +42,7 @@ type TransformConfig = {
 };
 
 function ConfigPageContent() {
+  const { disableTransforms } = useFeatures();
   const [config, setConfig] = useState<TransformConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -149,7 +151,7 @@ function ConfigPageContent() {
                   </CardContent>
                 </Card>
 
-                <Card>
+                {!disableTransforms && <Card>
                   <CardHeader>
                     <CardTitle>Image</CardTitle>
                     <CardDescription>Default image transformation parameters</CardDescription>
@@ -210,9 +212,9 @@ function ConfigPageContent() {
                       </div>
                     </div>
                   </CardContent>
-                </Card>
+                </Card>}
 
-                <Card>
+                {!disableTransforms && <Card>
                   <CardHeader>
                     <CardTitle>Video</CardTitle>
                     <CardDescription>Default video transformation parameters</CardDescription>
@@ -277,9 +279,9 @@ function ConfigPageContent() {
                       </div>
                     )}
                   </CardContent>
-                </Card>
+                </Card>}
 
-                <Card>
+                {!disableTransforms && <Card>
                   <CardHeader>
                     <CardTitle>Audio</CardTitle>
                     <CardDescription>Default audio transformation parameters</CardDescription>
@@ -337,7 +339,7 @@ function ConfigPageContent() {
                       </div>
                     </div>
                   </CardContent>
-                </Card>
+                </Card>}
               </>
             )}
           </div>

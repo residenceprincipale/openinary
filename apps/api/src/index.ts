@@ -1,16 +1,11 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import transform from "./routes/transform";
-import authenticated from "./routes/authenticated";
 import upload from "./routes/upload";
 import storageRoute from "./routes/storage";
 import download from "./routes/download";
 import apiKeys from "./routes/api-keys";
 import health from "./routes/health";
-import videoStatus from "./routes/video-status";
 import logger, { serializeError } from "./utils/logger";
-import queueEvents from "./routes/queue-events";
-import queue from "./routes/queue";
 import invalidateRoute from "./routes/invalidate";
 import cacheRoute from "./routes/cache";
 import usersRoute from "./routes/users";
@@ -18,20 +13,21 @@ import configRoute from "./routes/config";
 import { apiKeyAuth } from "./middleware/auth";
 import { publicRateLimit } from "./middleware/rate-limit";
 import { validateApiSecret } from "./utils/signature";
+import { isTransformSegment } from "./utils/parser";
 import { createStorageClient } from "./utils/storage/index";
 import { safePath } from "./utils/path-security";
 import fs from "fs";
 import path from "path";
 
+const disableTransforms = process.env.DISABLE_TRANSFORMS === "true";
+
 // Validate API_SECRET at startup if authenticated routes are enabled
-// This ensures the application fails fast if the secret is not configured properly
-try {
-  validateApiSecret(process.env.API_SECRET);
-} catch (error) {
-  logger.error({ error: serializeError(error) }, "API_SECRET validation failed at startup");
-  // For now, we only log the error to allow the app to start
-  // The authenticated route will return 500 errors if API_SECRET is missing
-  // In production, you may want to throw the error to prevent startup
+if (!disableTransforms) {
+  try {
+    validateApiSecret(process.env.API_SECRET);
+  } catch (error) {
+    logger.error({ error: serializeError(error) }, "API_SECRET validation failed at startup");
+  }
 }
 
 const app = new Hono();
@@ -72,34 +68,65 @@ app.use("/health", publicRateLimit);
 app.use("/health/*", publicRateLimit);
 app.route("/health", health);
 
-// Video status check (public - no auth required)
-app.use("/video-status", publicRateLimit);
-app.use("/video-status/*", publicRateLimit);
-app.route("/video-status", videoStatus);
-
-// Image transformation route is public for easy access to transformed images
-app.use("/t", publicRateLimit);
-app.use("/t/*", publicRateLimit);
-app.route("/t", transform);
-
 // Original file download route (public — consistent with /t/)
 app.use("/download", publicRateLimit);
 app.use("/download/*", publicRateLimit);
 app.route("/download", download);
 
-// Authenticated image transformation route (with signature verification)
-app.use("/authenticated", publicRateLimit);
-app.use("/authenticated/*", publicRateLimit);
-app.route("/authenticated", authenticated);
+// Transform routes (conditional — skip when DISABLE_TRANSFORMS=true to save ~50MB from sharp)
+// ponytail: dynamic import avoids loading sharp/libvips entirely when transforms are disabled
+if (!disableTransforms) {
+  const [
+    { default: transform },
+    { default: authenticated },
+    { default: videoStatus },
+    { default: queueEvents },
+    { default: queueModule },
+  ] = await Promise.all([
+    import("./routes/transform"),
+    import("./routes/authenticated"),
+    import("./routes/video-status"),
+    import("./routes/queue-events"),
+    import("./routes/queue"),
+  ]);
 
-// Queue events SSE endpoint (public for real-time updates)
-// This must be registered BEFORE the protected queue routes to avoid auth conflicts
-app.use("/queue/events", publicRateLimit);
-app.use("/queue/events/*", publicRateLimit);
-app.route("/queue/events", queueEvents);
+  // Video status check (public - no auth required)
+  app.use("/video-status", publicRateLimit);
+  app.use("/video-status/*", publicRateLimit);
+  app.route("/video-status", videoStatus);
+
+  // Image transformation route is public for easy access to transformed images
+  app.use("/t", publicRateLimit);
+  app.use("/t/*", publicRateLimit);
+  app.route("/t", transform);
+
+  // Authenticated image transformation route (with signature verification)
+  app.use("/authenticated", publicRateLimit);
+  app.use("/authenticated/*", publicRateLimit);
+  app.route("/authenticated", authenticated);
+
+  // Queue events SSE endpoint (public for real-time updates)
+  app.use("/queue/events", publicRateLimit);
+  app.use("/queue/events/*", publicRateLimit);
+  app.route("/queue/events", queueEvents);
+
+  // Queue management routes (protected)
+  app.use("/queue/*", apiKeyAuth);
+  app.route("/queue", queueModule);
+} else {
+  // ponytail: serve raw files at /t/* — strips transform params, 302s to the original file
+  app.get("/t/*", (c) => {
+    const segments = c.req.path.split("/").slice(2);
+    const fileSegments = segments.length > 0 && isTransformSegment(segments[0])
+      ? segments.slice(1)
+      : segments;
+    const filePath = decodeURIComponent(fileSegments.join("/"))
+      .replace(/\.\./g, "").replace(/\/+/g, "/").replace(/^\/+/, "");
+    return filePath ? c.redirect(`/${filePath}`, 302) : c.text("File not found", 404);
+  });
+}
 
 // Protected routes - require API key authentication
-// Apply middleware before routing
 app.use("/upload/*", apiKeyAuth);
 app.route("/upload", upload);
 
@@ -112,11 +139,6 @@ app.route("/invalidate", invalidateRoute);
 
 app.use("/cache/*", apiKeyAuth);
 app.route("/cache", cacheRoute);
-
-// Queue management routes (protected)
-// Note: /queue/events is public (registered above), but other /queue/* routes require auth
-app.use("/queue/*", apiKeyAuth);
-app.route("/queue", queue);
 
 // API key management routes (also protected)
 app.route("/api-keys", apiKeys);

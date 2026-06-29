@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Trash2, RefreshCw, Cloud, XCircle, X } from "lucide-react";
+import { useFeatures } from "@/components/features-provider";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
@@ -354,6 +355,14 @@ function CachePageContent() {
 }
 
 export default function CachePage() {
+  const { disableTransforms } = useFeatures();
+  if (disableTransforms) {
+    return (
+      <div className="flex h-screen items-center justify-center text-muted-foreground">
+        <p>Cache management is disabled.</p>
+      </div>
+    );
+  }
   return (
     <Suspense fallback={<div className="flex h-screen items-center justify-center">Loading...</div>}>
       <CachePageContent />

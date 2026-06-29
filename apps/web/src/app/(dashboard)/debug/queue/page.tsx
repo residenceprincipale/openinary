@@ -7,8 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RefreshCw } from "lucide-react";
 import { useQueueEvents } from "@/hooks/use-queue-events";
+import { useFeatures } from "@/components/features-provider";
 
 export default function QueuePage() {
+  const { disableTransforms } = useFeatures();
   const [jobs, setJobs] = useState<QueueJob[]>([]);
   const [stats, setStats] = useState({
     total: 0,
@@ -80,6 +82,13 @@ export default function QueuePage() {
     fetchJobs();
   };
 
+  if (disableTransforms) {
+    return (
+      <div className="flex h-screen items-center justify-center text-muted-foreground">
+        <p>Video processing queue is disabled.</p>
+      </div>
+    );
+  }
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">

@@ -42,7 +42,10 @@ dirs.forEach((dir) => {
 
 // Initialize video job queue with storage client
 const storageClient = createStorageClient();
-videoJobQueue.initialize(storageClient);
+const disableTransforms = process.env.DISABLE_TRANSFORMS === "true";
+if (!disableTransforms) {
+  videoJobQueue.initialize(storageClient);
+}
 
 // Initialize authentication and generate API key if needed (only in standalone mode)
 async function initializeAuth() {

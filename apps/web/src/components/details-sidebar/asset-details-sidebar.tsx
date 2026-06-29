@@ -14,6 +14,7 @@ import { AssetPreview } from "./asset-preview"
 import { AssetDetailsTab } from "./asset-details-tab"
 import { AssetTransformationsTab } from "./asset-transformations-tab"
 import { AssetMetadataTab } from "./asset-metadata-tab"
+import { useFeatures } from "@/components/features-provider";
 import { RenameDialog } from "@/components/rename-dialog"
 import { ReplaceFileDialog } from "@/components/replace-file-dialog"
 
@@ -32,6 +33,7 @@ export function AssetDetailsSidebar({
   open?: boolean
   onOpenChange?: (open: boolean) => void
 } & React.ComponentProps<typeof Sidebar>) {
+  const { disableTransforms } = useFeatures();
   const {
     asset,
     treeLoading,
@@ -101,9 +103,9 @@ export function AssetDetailsSidebar({
             <Separator />
 
             <Tabs defaultValue="details" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className={`grid w-full ${disableTransforms ? 'grid-cols-2' : 'grid-cols-3'}`}>
                 <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="transformations">Transformations</TabsTrigger>
+                {!disableTransforms && <TabsTrigger value="transformations">Transformations</TabsTrigger>}
                 <TabsTrigger value="metadata">Metadata</TabsTrigger>
               </TabsList>
 
@@ -127,9 +129,11 @@ export function AssetDetailsSidebar({
                 />
               </TabsContent>
 
-              <TabsContent value="transformations" className="space-y-4 mt-4">
-                <AssetTransformationsTab asset={asset} apiBaseUrl={transformBaseUrl} rawUrl={rawUrl} />
-              </TabsContent>
+              {!disableTransforms && (
+                <TabsContent value="transformations" className="space-y-4 mt-4">
+                  <AssetTransformationsTab asset={asset} apiBaseUrl={transformBaseUrl} rawUrl={rawUrl} />
+                </TabsContent>
+              )}
 
               <TabsContent value="metadata" className="space-y-4 mt-4">
                 <AssetMetadataTab asset={asset} />

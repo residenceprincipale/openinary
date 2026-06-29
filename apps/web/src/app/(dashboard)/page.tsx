@@ -82,6 +82,7 @@ function HomePageContent() {
                 sidebarOpen={assetSidebarOpen}
               />
             </div>
+            <StatusBar />
           </ResizablePanel>
           {assetSidebarOpen && (
             <>
@@ -103,7 +104,6 @@ function HomePageContent() {
             </>
           )}
         </ResizablePanelGroup>
-        <StatusBar />
       </SidebarInset>
     </>
   );
