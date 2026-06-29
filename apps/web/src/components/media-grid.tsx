@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useQueryState } from "nuqs";
 import { useStorageTree } from "@/hooks/use-storage-tree";
-import { buildOriginalFileUrl, toAbsolutePublicUrl } from "@/components/details-sidebar/utils";
+import { buildDownloadUrl, buildViewUrl, toAbsolutePublicUrl, downloadOriginalFile } from "@/components/details-sidebar/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
@@ -988,19 +988,17 @@ export function MediaGrid({
                   <Upload className="mr-2 h-4 w-4" /> Replace
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigator.clipboard.writeText(toAbsolutePublicUrl(buildOriginalFileUrl(transformBaseUrl, media.path)))}>
+                <DropdownMenuItem onClick={() => navigator.clipboard.writeText(toAbsolutePublicUrl(buildDownloadUrl(apiBaseUrl, transformBaseUrl, media.path)))}>
                   <Link className="mr-2 h-4 w-4" /> Copy URL
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => window.open(toAbsolutePublicUrl(buildOriginalFileUrl(transformBaseUrl, media.path)), "_blank", "noopener,noreferrer")}>
+                <DropdownMenuItem onClick={() => window.open(toAbsolutePublicUrl(buildViewUrl(transformBaseUrl, media.path)), "_blank", "noopener,noreferrer")}>
                   <ExternalLink className="mr-2 h-4 w-4" /> Open
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
-                  const a = document.createElement("a");
-                  a.href = toAbsolutePublicUrl(buildOriginalFileUrl(transformBaseUrl, media.path));
-                  a.download = media.name;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
+                  void downloadOriginalFile(buildDownloadUrl(apiBaseUrl, transformBaseUrl, media.path), media.name).catch((error) => {
+                    console.error("Failed to download file:", error)
+                    alert(error instanceof Error ? error.message : "Failed to download file")
+                  })
                 }}>
                   <Download className="mr-2 h-4 w-4" /> Download
                 </DropdownMenuItem>
@@ -1095,19 +1093,17 @@ export function MediaGrid({
               <Upload className="mr-2 h-4 w-4" /> Replace
             </ContextMenuItem>
             <ContextMenuSeparator />
-            <ContextMenuItem onClick={() => navigator.clipboard.writeText(toAbsolutePublicUrl(buildOriginalFileUrl(transformBaseUrl, media.path)))}>
+            <ContextMenuItem onClick={() => navigator.clipboard.writeText(toAbsolutePublicUrl(buildDownloadUrl(apiBaseUrl, transformBaseUrl, media.path)))}>
               <Link className="mr-2 h-4 w-4" /> Copy URL
             </ContextMenuItem>
-            <ContextMenuItem onClick={() => window.open(toAbsolutePublicUrl(buildOriginalFileUrl(transformBaseUrl, media.path)), "_blank", "noopener,noreferrer")}>
+            <ContextMenuItem onClick={() => window.open(toAbsolutePublicUrl(buildViewUrl(transformBaseUrl, media.path)), "_blank", "noopener,noreferrer")}>
               <ExternalLink className="mr-2 h-4 w-4" /> Open
             </ContextMenuItem>
             <ContextMenuItem onClick={() => {
-              const a = document.createElement("a");
-              a.href = toAbsolutePublicUrl(buildOriginalFileUrl(transformBaseUrl, media.path));
-              a.download = media.name;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
+              void downloadOriginalFile(buildDownloadUrl(apiBaseUrl, transformBaseUrl, media.path), media.name).catch((error) => {
+                console.error("Failed to download file:", error)
+                alert(error instanceof Error ? error.message : "Failed to download file")
+              })
             }}>
               <Download className="mr-2 h-4 w-4" /> Download
             </ContextMenuItem>

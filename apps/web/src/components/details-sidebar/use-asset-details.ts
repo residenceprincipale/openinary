@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useStorageTree } from "@/hooks/use-storage-tree"
 import { usePreloadMedia } from "@/hooks/use-preload-media"
 import { useVideoStatus } from "@/hooks/use-video-status"
-import { findAssetInTree, toAbsolutePublicUrl, buildOriginalFileUrl } from "./utils"
+import { findAssetInTree, toAbsolutePublicUrl, buildDownloadUrl, buildViewUrl, downloadOriginalFile } from "./utils"
 import type { MediaFile } from "./types"
 
 export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
@@ -180,7 +180,9 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
 
   const bustSuffix = bustKey > 0 ? `?n=${bustKey}` : ""
   const mediaUrl = asset ? `${transformBaseUrl}/t/${asset.path}${bustSuffix}` : ""
-  const rawUrl = asset ? buildOriginalFileUrl(transformBaseUrl, asset.path, bustSuffix) : ""
+  const downloadUrl = asset ? buildDownloadUrl(apiBaseUrl, transformBaseUrl, asset.path, bustSuffix) : ""
+  const viewUrl = asset ? buildViewUrl(transformBaseUrl, asset.path) : ""
+  const rawUrl = downloadUrl
   const previewUrl = asset
     ? asset.type === "image"
       ? `${transformBaseUrl}/t/w_500,h_500,q_80/${asset.path}${bustSuffix}`
@@ -230,19 +232,19 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
     }
   }
 
-  const handleDownload = () => {
-    if (!asset || !rawUrl) return
-    const a = document.createElement("a")
-    a.href = toAbsolutePublicUrl(rawUrl)
-    a.download = asset.name
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
+  const handleDownload = async () => {
+    if (!asset || !downloadUrl) return
+    try {
+      await downloadOriginalFile(downloadUrl, asset.name)
+    } catch (error) {
+      console.error("Failed to download file:", error)
+      alert(error instanceof Error ? error.message : "Failed to download file")
+    }
   }
 
   const handleOpenInNewTab = () => {
-    if (!rawUrl) return
-    window.open(toAbsolutePublicUrl(rawUrl), "_blank", "noopener,noreferrer")
+    if (!viewUrl) return
+    window.open(toAbsolutePublicUrl(viewUrl), "_blank", "noopener,noreferrer")
   }
 
   const renameItem = asset ? { id: asset.id, name: asset.name, path: asset.path } : null

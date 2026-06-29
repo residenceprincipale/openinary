@@ -81,8 +81,42 @@ export function toAbsolutePublicUrl(url: string): string {
   return `${window.location.origin}${url.startsWith("/") ? url : `/${url}`}`
 }
 
-/** Public URL for the original file (served at GET /download/{path}). */
-export function buildOriginalFileUrl(baseUrl: string, path: string, suffix = ""): string {
-  return `${baseUrl}/download/${encodeAssetPath(path)}${suffix}`
+/** Public URL for the original file (GET /download/{path} on API, or /api/download/{path} via nginx). */
+export function buildDownloadUrl(
+  apiBaseUrl: string,
+  transformBaseUrl: string,
+  path: string,
+  suffix = "",
+): string {
+  const encoded = encodeAssetPath(path)
+  // Docker full-stack: dashboard uses /api prefix, nginx proxies /api/download → API
+  if (apiBaseUrl.endsWith("/api")) {
+    return `${apiBaseUrl}/download/${encoded}${suffix}`
+  }
+  const base = transformBaseUrl || apiBaseUrl.replace(/\/api$/, "")
+  return `${base}/download/${encoded}${suffix}`
+}
+
+/** Inline view URL via the transform endpoint (GET /t/{path}). */
+export function buildViewUrl(transformBaseUrl: string, path: string, suffix = ""): string {
+  return `${transformBaseUrl}/t/${path}${suffix}`
+}
+
+/** Fetch original file and trigger a browser download (works reliably same-origin). */
+export async function downloadOriginalFile(url: string, filename: string): Promise<void> {
+  const absoluteUrl = toAbsolutePublicUrl(url)
+  const response = await fetch(absoluteUrl, { credentials: "include" })
+  if (!response.ok) {
+    throw new Error(`Download failed (${response.status})`)
+  }
+  const blob = await response.blob()
+  const blobUrl = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = blobUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(blobUrl)
 }
 
