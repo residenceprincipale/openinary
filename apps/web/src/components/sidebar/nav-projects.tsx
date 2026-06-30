@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/sidebar"
 import { RenameDialog } from "@/components/rename-dialog"
 import { MoveDialog } from "@/components/move-dialog"
+import { ShareDialog } from "@/components/share-dialog"
 import type { TreeDataItem } from "@/components/ui/tree-view"
 
 type MediaFile = {
@@ -63,6 +64,7 @@ export function NavProjects({ onMediaSelect }: NavProjectsProps) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [renameItem, setRenameItem] = useState<ContextMenuState | null>(null)
   const [moveItem, setMoveItem] = useState<ContextMenuState | null>(null)
+  const [shareItem, setShareItem] = useState<ContextMenuState | null>(null)
 
   useEffect(() => {
     if (!contextMenu) return
@@ -130,6 +132,15 @@ export function NavProjects({ onMediaSelect }: NavProjectsProps) {
             >
               Move to...
             </button>
+            {contextMenu.isFolder && (
+              <button
+                className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                onClick={() => { document.body.style.pointerEvents = ""; setShareItem(contextMenu); setContextMenu(null) }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" x2="12" y1="2" y2="15"/></svg>
+                Share
+              </button>
+            )}
             <div className="border-t my-1" />
             <button
               className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent text-destructive"
@@ -165,6 +176,11 @@ export function NavProjects({ onMediaSelect }: NavProjectsProps) {
         item={moveItem ? { id: moveItem.item.id, name: moveItem.item.name, path: moveItem.item.id } : null}
         treeData={data}
         onClose={() => setMoveItem(null)}
+      />
+      <ShareDialog
+        isOpen={!!shareItem}
+        folderPath={shareItem?.item.id ?? ""}
+        onClose={() => setShareItem(null)}
       />
     </SidebarGroup>
   )

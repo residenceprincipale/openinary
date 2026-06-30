@@ -52,6 +52,7 @@ import { RenameDialog } from "@/components/rename-dialog";
 import { ReplaceFileDialog } from "@/components/replace-file-dialog";
 import { MoveDialog } from "@/components/move-dialog";
 import { BatchRenameDialog } from "@/components/batch-rename-dialog";
+import { ShareDialog } from "@/components/share-dialog";
 import { CreateFolderSection } from "@/components/create-folder-section";
 import DefaultDialog from "@/components/default-dialog";
 
@@ -231,6 +232,7 @@ export function MediaGrid({
   })
   const [uploadStatus, setUploadStatus] = useState<{type: 'uploading' | 'done'; count: number; error?: string} | null>(null);
   const [showCreateFolder, setShowCreateFolder] = useState(false);
+  const [shareFolder, setShareFolder] = useState<string | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [sortBy, setSortBy] = useQueryState("sort");
   const [filterType, setFilterType] = useQueryState("filter");
@@ -872,6 +874,14 @@ export function MediaGrid({
             >
               <Folder className="mr-2 h-4 w-4" /> Move to...
             </ContextMenuItem>
+            <ContextMenuItem
+              onClick={() => {
+                document.body.style.pointerEvents = ""
+                setShareFolder(folder.path)
+              }}
+            >
+              <Folder className="mr-2 h-4 w-4" /> Share
+            </ContextMenuItem>
             <ContextMenuSeparator />
             <ContextMenuItem
               variant="destructive"
@@ -1193,6 +1203,11 @@ export function MediaGrid({
         isOpen={!!batchRenameItems}
         items={batchRenameItems}
         onClose={() => setBatchRenameItems(null)}
+      />
+      <ShareDialog
+        isOpen={!!shareFolder}
+        folderPath={shareFolder ?? ""}
+        onClose={() => setShareFolder(null)}
       />
 
       {selectionBox && (

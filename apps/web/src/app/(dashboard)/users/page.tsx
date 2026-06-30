@@ -17,6 +17,8 @@ import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Spinner } from "@/components/ui/spinner";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { X } from "lucide-react";
 import { useSession } from "@/lib/auth-client";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
@@ -35,6 +37,7 @@ function UsersPageContent() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
   const [users, setUsers] = useState<User[]>([]);
+  const [userFolders, setUserFolders] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -48,6 +51,7 @@ function UsersPageContent() {
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editRole, setEditRole] = useState<"user" | "admin">("user");
+  const [folderDialogUser, setFolderDialogUser] = useState<User | null>(null);
 
   const isAdmin =
     !isPending && (session?.user as any)?.role === "admin";
@@ -69,8 +73,18 @@ function UsersPageContent() {
   const fetchUsers = async () => {
     try {
       const res = await fetch(`${apiBaseUrl}/users`, { credentials: "include" });
-      if (res.ok) setUsers(await res.json());
-      else setError("Failed to load users");
+      if (res.ok) {
+        const userList: User[] = await res.json();
+        setUsers(userList);
+        const folderMap: Record<string, string[]> = {};
+        await Promise.all(userList.map(async (u) => {
+          try {
+            const f = await fetch(`${apiBaseUrl}/users/${u.id}/folders`, { credentials: "include" });
+            if (f.ok) folderMap[u.id] = await f.json();
+          } catch {}
+        }));
+        setUserFolders(folderMap);
+      } else setError("Failed to load users");
     } catch {
       setError("Failed to load users");
     } finally {
@@ -144,6 +158,21 @@ function UsersPageContent() {
     } catch {
       setError("Failed to delete user");
     }
+  };
+
+  const revokeFolder = async (userId: string, folderPath: string) => {
+    try {
+      await fetch(`${apiBaseUrl}/storage/permissions`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderPath, userId }),
+        credentials: "include",
+      });
+      setUserFolders(prev => ({
+        ...prev,
+        [userId]: (prev[userId] || []).filter(f => f !== folderPath),
+      }));
+    } catch {}
   };
 
   if (isPending || loading) {
@@ -240,6 +269,7 @@ function UsersPageContent() {
                     <th className="text-left p-4 font-medium">Name</th>
                     <th className="text-left p-4 font-medium">Email</th>
                     <th className="text-left p-4 font-medium">Role</th>
+                    <th className="text-left p-4 font-medium">Folders</th>
                     <th className="text-left p-4 font-medium">Created</th>
                     <th className="text-right p-4 font-medium">Actions</th>
                   </tr>
@@ -262,6 +292,7 @@ function UsersPageContent() {
                               <option value="admin">Admin</option>
                             </select>
                           </td>
+                          <td className="p-4 text-muted-foreground text-sm">—</td>
                           <td className="p-4 text-muted-foreground text-sm">{new Date(u.createdAt).toLocaleDateString()}</td>
                           <td className="p-4 text-right space-x-2">
                             <Button variant="default" size="sm" onClick={handleEdit}>Save</Button>
@@ -275,6 +306,14 @@ function UsersPageContent() {
                           <td className="p-4 text-muted-foreground">{u.email}</td>
                           <td className="p-4">
                             <Badge variant={u.role === "admin" ? "default" : "secondary"}>{u.role}</Badge>
+                          </td>
+                          <td className="p-4">
+                            <button
+                              className="text-sm text-primary hover:underline"
+                              onClick={() => setFolderDialogUser(u)}
+                            >
+                              {(userFolders[u.id] || []).length} folder{(userFolders[u.id] || []).length !== 1 ? "s" : ""}
+                            </button>
                           </td>
                           <td className="p-4 text-muted-foreground text-sm">{new Date(u.createdAt).toLocaleDateString()}</td>
                           <td className="p-4 text-right">
@@ -292,6 +331,32 @@ function UsersPageContent() {
             </div>
           </div>
         </div>
+
+        <Dialog open={!!folderDialogUser} onOpenChange={(open) => { if (!open) setFolderDialogUser(null) }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Folders — {folderDialogUser?.name}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 max-h-64 overflow-auto">
+              {folderDialogUser && (userFolders[folderDialogUser.id] || []).length === 0 && (
+                <p className="text-sm text-muted-foreground">No folder access.</p>
+              )}
+              {folderDialogUser && (userFolders[folderDialogUser.id] || []).map((f) => (
+                <div key={f} className="flex items-center justify-between gap-2 py-1">
+                  <span className="text-sm font-mono truncate">{f || "/"}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0"
+                    onClick={() => revokeFolder(folderDialogUser.id, f)}
+                  >
+                    <X className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
       </SidebarInset>
     </>
   );

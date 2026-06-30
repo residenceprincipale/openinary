@@ -97,7 +97,7 @@ function initializeTables() {
     }
   };
 
-  const requiredTables = ["user", "session", "account", "verification", "apiKey", "video_jobs"];
+  const requiredTables = ["user", "session", "account", "verification", "apiKey", "video_jobs", "folder_permissions"];
   const missingTables = requiredTables.filter((table) => !tableExists(table));
 
   if (missingTables.length === 0) {
@@ -293,6 +293,23 @@ function initializeTables() {
       
       CREATE INDEX IF NOT EXISTS idx_video_jobs_status_priority ON video_jobs(status, priority, created_at);
       CREATE INDEX IF NOT EXISTS idx_video_jobs_file_params ON video_jobs(file_path, params_json);
+    `);
+  }
+
+  // Folder permissions table (per-user folder sharing)
+  if (!tableExists("folder_permissions")) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS folder_permissions (
+        id TEXT PRIMARY KEY,
+        folder_path TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        permission TEXT NOT NULL CHECK(permission IN ('view', 'edit', 'admin')),
+        created_by TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        UNIQUE(folder_path, user_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_folder_permissions_user ON folder_permissions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_folder_permissions_path ON folder_permissions(folder_path);
     `);
   }
 

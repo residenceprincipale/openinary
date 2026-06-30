@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import type { Context } from "hono";
 import { createStorageClient } from "../utils/storage";
 import fs from "fs";
 import path from "path";
@@ -8,6 +7,15 @@ import { deleteAssetCompletely } from "../utils/asset-deletion";
 import { deleteCachedFiles } from "../utils/cache";
 import { safePath } from "../utils/path-security";
 import type { AuthVariables } from "../middleware/auth";
+import { db } from "shared";
+import {
+  grantPermission,
+  revokePermission,
+  listPermissions,
+  hasPermission,
+  getUserAccessiblePaths,
+  isPathAccessible,
+} from "../utils/permissions";
 
 type StorageNode = {
   name: string;
@@ -168,8 +176,18 @@ function storageTreeToTreeData(root: StorageNode): TreeDataItem[] {
 storageRoute.get("/", async (c) => {
   try {
     const user = c.get("user");
-    const userPrefix = user?.id ? `${user.id}/` : "";
     const isAdmin = user?.role === "admin";
+
+    // Determine accessible paths for non-admin users
+    const accessiblePaths = !isAdmin && user?.id
+      ? getUserAccessiblePaths(user.id)
+      : null;
+
+    const isAccessible = (key: string): boolean => {
+      if (isAdmin) return true;
+      if (!accessiblePaths) return false;
+      return isPathAccessible(key, accessiblePaths);
+    };
 
     let root: StorageNode;
 
@@ -180,43 +198,39 @@ storageRoute.get("/", async (c) => {
         .map((obj) => ({
           ...obj,
           key: obj.key.substring(7),
-        }));
+        }))
+        .filter((obj) => isAccessible(obj.key));
 
-      // Per-user isolation: filter by user prefix, admin sees all
-      const filtered = isAdmin
-        ? publicObjects
-        : publicObjects.filter((obj) => obj.key.startsWith(userPrefix));
-
-      root = buildTreeFromKeys(filtered);
-
-      // For non-admin, extract the user's subtree (skip the UUID folder level)
-      // Paths keep the user prefix so transform URLs resolve correctly
-      if (!isAdmin && userPrefix) {
-        const prefixName = userPrefix.replace(/\/$/, "");
-        const userNode = root.children?.find((c) => c.name === prefixName);
-        root = {
-          ...root,
-          children: userNode?.children ?? [],
-        };
-      }
+      root = buildTreeFromKeys(publicObjects);
     } else {
       const publicDir = path.join(".", "public");
-      if (!isAdmin && userPrefix) {
-        const userDir = path.join(publicDir, userPrefix);
-        if (fs.existsSync(userDir)) {
-          const userTree = buildLocalTree(userDir);
-          const prefix = userPrefix.replace(/\/$/, "");
-          const prependPrefix = (node: StorageNode): StorageNode => ({
-            ...node,
-            path: node.path ? `${prefix}/${node.path}` : prefix,
-            children: node.children?.map(prependPrefix),
-          });
-          root = prependPrefix(userTree);
-        } else {
-          root = { name: "storage", path: "", type: "directory", children: [] };
-        }
-      } else {
+
+      if (isAdmin) {
         root = buildLocalTree(publicDir);
+      } else if (accessiblePaths) {
+        // Build tree from accessible subdirectories
+        const allFiles: { key: string; size?: number; lastModified?: Date }[] = [];
+        const walkLocal = (dir: string, prefix: string) => {
+          if (!fs.existsSync(dir)) return;
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const relPath = prefix ? `${prefix}/${entry.name}` : entry.name;
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+              // Add folder marker so empty dirs under shared folders appear in tree
+              if (isAccessible(relPath + "/")) {
+                allFiles.push({ key: relPath + "/" });
+              }
+              walkLocal(fullPath, relPath);
+            } else if (entry.isFile()) {
+              const stat = fs.statSync(fullPath);
+              allFiles.push({ key: relPath, size: stat.size, lastModified: stat.birthtime });
+            }
+          }
+        };
+        walkLocal(publicDir, "");
+        root = buildTreeFromKeys(allFiles.filter((f) => isAccessible(f.key)));
+      } else {
+        root = { name: "storage", path: "", type: "directory", children: [] };
       }
     }
 
@@ -225,6 +239,118 @@ storageRoute.get("/", async (c) => {
   } catch (error) {
     logger.error({ error: serializeError(error) }, "Failed to list storage contents");
     return c.json({ error: "Failed to list storage contents" }, 500);
+  }
+});
+
+/**
+ * GET /storage/permissions?path=... -- list permissions for a folder
+ */
+storageRoute.get("/permissions", async (c) => {
+  const folderPath = c.req.query("path") || "";
+
+  try {
+    const user = c.get("user");
+    if (!user) {
+      return c.json({ error: "Authentication required" }, 401);
+    }
+
+    if (user.role !== "admin" && !hasPermission(folderPath, user.id)) {
+      return c.json({ error: "Insufficient permissions" }, 403);
+    }
+
+    const perms = listPermissions(folderPath);
+    return c.json({ success: true, data: perms });
+  } catch (error) {
+    logger.error({ error: serializeError(error), folderPath }, "Failed to list permissions");
+    return c.json({ error: "Failed to list permissions" }, 500);
+  }
+});
+
+/**
+ * POST /storage/permissions -- grant a user permission on a folder
+ */
+storageRoute.post("/permissions", async (c) => {
+  try {
+    const user = c.get("user");
+    if (!user) {
+      return c.json({ error: "Authentication required" }, 401);
+    }
+
+    const body = await c.req.json() as { folderPath?: string; userId?: string; email?: string };
+    const { folderPath } = body;
+    let userId = body.userId;
+
+    if (!folderPath) {
+      return c.json({ error: "folderPath is required" }, 400);
+    }
+
+    if (!userId && body.email) {
+      const found = db.prepare("SELECT id FROM user WHERE email = ?").get(body.email) as { id: string } | undefined;
+      if (!found) return c.json({ error: "User not found with that email" }, 404);
+      userId = found.id;
+    }
+
+    if (!userId) {
+      return c.json({ error: "userId or email is required" }, 400);
+    }
+
+    if (user.role !== "admin" && !hasPermission(folderPath, user.id)) {
+      return c.json({ error: "Insufficient permissions" }, 403);
+    }
+
+    grantPermission(folderPath, userId, user.id);
+    logger.info(
+      { folderPath, userId, grantedBy: user.id },
+      "Permission granted",
+    );
+    return c.json({ success: true });
+  } catch (error) {
+    logger.error({ error: serializeError(error) }, "Failed to grant permission");
+    return c.json({ error: "Failed to grant permission" }, 500);
+  }
+});
+
+/**
+ * DELETE /storage/permissions -- revoke a user's permission on a folder
+ */
+storageRoute.delete("/permissions", async (c) => {
+  try {
+    const user = c.get("user");
+    if (!user) {
+      return c.json({ error: "Authentication required" }, 401);
+    }
+
+    const body = await c.req.json() as { folderPath?: string; userId?: string; email?: string };
+    const { folderPath } = body;
+    let userId = body.userId;
+
+    if (!folderPath) {
+      return c.json({ error: "folderPath is required" }, 400);
+    }
+
+    if (!userId && body.email) {
+      const found = db.prepare("SELECT id FROM user WHERE email = ?").get(body.email) as { id: string } | undefined;
+      if (!found) return c.json({ error: "User not found with that email" }, 404);
+      userId = found.id;
+    }
+
+    if (!userId) {
+      return c.json({ error: "userId or email is required" }, 400);
+    }
+
+    if (user.role !== "admin" && !hasPermission(folderPath, user.id)) {
+      return c.json({ error: "Insufficient permissions" }, 403);
+    }
+
+    revokePermission(folderPath, userId);
+    logger.info(
+      { folderPath, userId, revokedBy: user.id },
+      "Permission revoked",
+    );
+    return c.json({ success: true });
+  } catch (error) {
+    logger.error({ error: serializeError(error) }, "Failed to revoke permission");
+    return c.json({ error: "Failed to revoke permission" }, 500);
   }
 });
 
@@ -238,7 +364,6 @@ storageRoute.get("/*", async (c) => {
 
   // Only handle requests that end with /metadata
   if (!requestPath.endsWith("/metadata")) {
-    // Let other routes handle this request
     return c.notFound();
   }
 
@@ -263,8 +388,19 @@ storageRoute.get("/*", async (c) => {
 
   try {
     filePath = decodeURIComponent(filePath);
-  } catch (error) {
+  } catch {
     // If decoding fails, use the original path
+  }
+
+  // Permission check: user needs view access on the file's folder
+  const user = c.get("user");
+  if (user && user.role !== "admin") {
+    const folderPath = filePath.includes("/")
+      ? filePath.substring(0, filePath.lastIndexOf("/"))
+      : "";
+    if (!hasPermission(folderPath, user.id)) {
+      return c.json({ error: "Not found" }, 404);
+    }
   }
 
   try {
@@ -356,6 +492,23 @@ storageRoute.put("/move", async (c) => {
       return c.json({ error: "source and target are the same" }, 400);
     }
 
+    // Permission check: user needs edit on both source and target parent folders
+    const moveUser = c.get("user");
+    if (moveUser && moveUser.role !== "admin") {
+      const srcParent = decodedSource.includes("/")
+        ? decodedSource.substring(0, decodedSource.lastIndexOf("/"))
+        : "";
+      const tgtParent = decodedTarget.includes("/")
+        ? decodedTarget.substring(0, decodedTarget.lastIndexOf("/"))
+        : "";
+      if (
+        !hasPermission(srcParent, moveUser.id) ||
+        !hasPermission(tgtParent, moveUser.id)
+      ) {
+        return c.json({ error: "Insufficient permissions" }, 403);
+      }
+    }
+
     if (storageClient) {
       await storageClient.move(decodedSource, decodedTarget);
       storageClient.invalidateAllCacheEntries(decodedSource);
@@ -407,6 +560,17 @@ storageRoute.put("/replace/*", async (c) => {
 
   let filePath = pathWithoutPrefix.replace(/^\/+/, "").replace(/\/+$/, "");
   try { filePath = decodeURIComponent(filePath); } catch {}
+
+  // Permission check: user needs edit on the file's parent folder
+  const replaceUser = c.get("user");
+  if (replaceUser && replaceUser.role !== "admin") {
+    const folderPath = filePath.includes("/")
+      ? filePath.substring(0, filePath.lastIndexOf("/"))
+      : "";
+    if (!hasPermission(folderPath, replaceUser.id)) {
+      return c.json({ success: false, error: "Insufficient permissions" }, 403);
+    }
+  }
 
   try {
     const formData = await c.req.formData();
@@ -487,8 +651,19 @@ storageRoute.delete("/*", async (c) => {
 
   try {
     filePath = decodeURIComponent(filePath);
-  } catch (error) {
+  } catch {
     // If decoding fails, use the original path
+  }
+
+  // Permission check: user needs edit on the file's parent folder
+  const deleteUser = c.get("user");
+  if (deleteUser && deleteUser.role !== "admin") {
+    const folderPath = filePath.includes("/")
+      ? filePath.substring(0, filePath.lastIndexOf("/"))
+      : "";
+    if (!hasPermission(folderPath, deleteUser.id)) {
+      return c.json({ error: "Insufficient permissions" }, 403);
+    }
   }
 
   try {

@@ -14,6 +14,7 @@ import {
   TRANSFORMATION_PRIORITY,
 } from "../utils/video/config";
 import heicConvert from 'heic-convert';
+import { hasPermission } from "../utils/permissions";
 
 const disableTransforms = process.env.DISABLE_TRANSFORMS === "true";
 
@@ -511,22 +512,30 @@ upload.post("/", async (c) => {
           fileName: normalizedFileName
         } = await normalizeUploadFormat(buffer, mimeType, rawSanitizedPath)
 
-        // Prefix path with user ID for per-user asset isolation (non-admin only)
-        const user = c.get("user");
-        const isAdmin = user?.role === "admin";
-        const userPrefix = !isAdmin ? (user?.id || "unknown") : undefined;
-        const userPrefixedPath = userPrefix ? `${userPrefix}/${normalizedPath}` : normalizedPath;
+        // Permission check: user needs edit on the target folder
+        const uploadUser = c.get("user");
+        const isAdmin = uploadUser?.role === "admin";
+        const targetFolder = uploadFolder || (uploadUser?.id || "unknown");
+        if (!isAdmin && uploadUser) {
+          if (!hasPermission(targetFolder, uploadUser.id)) {
+            throw new Error("Insufficient permissions to upload to this folder");
+          }
+        }
+        // Default to home folder when no target folder specified
+        const effectivePath = !isAdmin && !uploadFolder
+          ? `${uploadUser?.id || "unknown"}/${normalizedPath}`
+          : normalizedPath;
 
         // Compute a unique file path to avoid overwriting existing files
-        let finalPath = userPrefixedPath;
+        let finalPath = effectivePath;
 
         if (storage) {
-          finalPath = await getUniqueFilePath(userPrefixedPath, async (p) =>
+          finalPath = await getUniqueFilePath(effectivePath, async (p) =>
             storage.existsOriginalPath(p),
           );
         } else {
           finalPath = await getUniqueFilePath(
-            userPrefixedPath,
+            effectivePath,
             localFileExists,
           );
         }
@@ -763,16 +772,31 @@ upload.post("/createfolder", async (c) => {
 
     const user = c.get("user");
     const isAdmin = user?.role === "admin";
-    const userPrefix = !isAdmin ? (user?.id || "unknown") : undefined;
-    const prefixedPath = userPrefix
-      ? `${userPrefix}/${rawSanitizedPath}`
+
+    // Default to home folder for plain folder names (no parent path)
+    const hasParent = rawSanitizedPath.includes("/");
+    const targetFolderPath = !isAdmin && !hasParent
+      ? `${user?.id || "unknown"}/${rawSanitizedPath}`
       : rawSanitizedPath;
 
+    // Permission check: user needs edit on the parent folder
+    if (!isAdmin && user) {
+      const parentFolder = targetFolderPath.includes("/")
+        ? targetFolderPath.substring(0, targetFolderPath.lastIndexOf("/"))
+        : "";
+      if (!hasPermission(parentFolder, user.id)) {
+        return c.json(
+          { success: false, error: "Insufficient permissions" },
+          403,
+        );
+      }
+    }
+
     if (storage) {
-      const alreadyExists = await storage.folderExists(prefixedPath);
+      const alreadyExists = await storage.folderExists(targetFolderPath);
 
       if (alreadyExists) {
-        logger.warn({ folder: prefixedPath }, "Folder already exists");
+        logger.warn({ folder: targetFolderPath }, "Folder already exists");
         return c.json(
           {
             success: false,
@@ -783,8 +807,8 @@ upload.post("/createfolder", async (c) => {
         );
       }
 
-      await storage.createFolder(prefixedPath);
-      logger.info({ folder: prefixedPath }, "Folder marker created");
+      await storage.createFolder(targetFolderPath);
+      logger.info({ folder: targetFolderPath }, "Folder marker created");
 
       return c.json(
         {
@@ -797,7 +821,7 @@ upload.post("/createfolder", async (c) => {
     }
 
     const localBasePath = path.resolve(".", "public");
-    const localPath = safePath("./public", prefixedPath);
+    const localPath = safePath("./public", targetFolderPath);
 
     if (!fs.existsSync(localBasePath)) {
       logger.error({ folder }, "Local storage path does not exist");

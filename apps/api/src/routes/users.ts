@@ -69,6 +69,42 @@ usersRoute.patch("/:id", requireAdmin, async (c) => {
   }
 });
 
+/**
+ * GET /users/list — id/name/email for all users (for share dialog dropdown)
+ * Any authenticated user can call this.
+ */
+usersRoute.get("/list", async (c) => {
+  try {
+    const user = c.get("user");
+    if (!user) {
+      return c.json({ error: "Authentication required" }, 401);
+    }
+    // ponytail: excludes admins — they already have access to everything
+    const users = db.prepare("SELECT id, name, email FROM user WHERE role != 'admin' ORDER BY name ASC").all();
+    return c.json(users);
+  } catch (error) {
+    logger.error({ error: serializeError(error) }, "Failed to list users");
+    return c.json({ error: "Failed to list users" }, 500);
+  }
+});
+
+/**
+ * GET /users/:id/folders — list folder paths a user has access to
+ * Admin only.
+ */
+usersRoute.get("/:id/folders", requireAdmin, async (c) => {
+  try {
+    const { id } = c.req.param();
+    const folders = db
+      .prepare("SELECT folder_path FROM folder_permissions WHERE user_id = ? ORDER BY folder_path ASC")
+      .all(id) as { folder_path: string }[];
+    return c.json(folders.map(f => f.folder_path));
+  } catch (error) {
+    logger.error({ error: serializeError(error) }, "Failed to list user folders");
+    return c.json({ error: "Failed to list user folders" }, 500);
+  }
+});
+
 usersRoute.delete("/:id", requireAdmin, async (c) => {
   try {
     const { id } = c.req.param();
