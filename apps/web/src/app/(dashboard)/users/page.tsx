@@ -294,7 +294,7 @@ function UsersPageContent() {
                           </td>
                           <td className="p-4 text-muted-foreground text-sm">—</td>
                           <td className="p-4 text-muted-foreground text-sm">{new Date(u.createdAt).toLocaleDateString()}</td>
-                          <td className="p-4 text-right space-x-2">
+                          <td className="p-4 text-right space-x-2 flex">
                             <Button variant="default" size="sm" onClick={handleEdit}>Save</Button>
                             <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>Cancel</Button>
                           </td>
