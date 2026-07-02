@@ -314,10 +314,10 @@ export class CloudStorage {
     const sourcePrefix = `public/${sourcePath}`;
     const targetPrefix = `public/${targetPath}`;
 
-    const objects = await this.s3Client.listObjects(sourcePrefix);
-
-    if (objects.length === 0) {
-      // single file or empty prefix
+    // Check if it's a single file first — listObjects with a file's own key as prefix
+    // returns the file itself, which the old code misreads as "this is a folder."
+    const isFile = await this.s3Client.objectExists(sourcePrefix);
+    if (isFile) {
       await this.s3Client.copyObject(sourcePrefix, targetPrefix);
       await this.s3Client.deleteObject(sourcePrefix);
       this.cache.delete(`original:${sourcePath}`);
@@ -327,6 +327,12 @@ export class CloudStorage {
     // folder: copy all then bulk delete
     const sourcePrefixSlash = sourcePrefix.endsWith("/") ? sourcePrefix : `${sourcePrefix}/`;
     const targetPrefixSlash = targetPrefix.endsWith("/") ? targetPrefix : `${targetPrefix}/`;
+
+    const objects = await this.s3Client.listObjects(sourcePrefix);
+    if (objects.length === 0) {
+      this.cache.delete(`original:${sourcePath}`);
+      return;
+    }
 
     for (const obj of objects) {
       const relativePath = obj.key.startsWith(sourcePrefixSlash)
