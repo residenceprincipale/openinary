@@ -26,7 +26,8 @@
     "docker:down": "docker-compose down",
     "docker:push": "docker buildx build --platform linux/amd64 -t residenceprincipale/openinary:latest -f docker/full.Dockerfile . && docker push residenceprincipale/openinary:latest",
     "init-env": "node scripts/init-env.js",
-    "secure-db": "node scripts/secure-db.js"
+    "secure-db": "node scripts/secure-db.js",
+    "add-user": "pnpm --filter api exec node scripts/add-user.mjs"
   },
   "devDependencies": {
     "@better-auth/cli": "^1.4.21",
