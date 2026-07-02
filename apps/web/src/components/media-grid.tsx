@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useQueryState } from "nuqs";
 import { useStorageTree } from "@/hooks/use-storage-tree";
-import { buildDownloadUrl, buildViewUrl, toAbsolutePublicUrl, downloadOriginalFile } from "@/components/details-sidebar/utils";
+import { buildDownloadUrl, buildViewUrl, buildRawUrl, toAbsolutePublicUrl, downloadOriginalFile } from "@/components/details-sidebar/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
@@ -998,10 +998,10 @@ export function MediaGrid({
                   <Upload className="mr-2 h-4 w-4" /> Replace
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigator.clipboard.writeText(toAbsolutePublicUrl(buildDownloadUrl(apiBaseUrl, transformBaseUrl, media.path)))}>
+                <DropdownMenuItem onClick={() => navigator.clipboard.writeText(toAbsolutePublicUrl(buildRawUrl(transformBaseUrl, media.path)))}>
                   <Link className="mr-2 h-4 w-4" /> Copy URL
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => window.open(toAbsolutePublicUrl(buildViewUrl(transformBaseUrl, media.path)), "_blank", "noopener,noreferrer")}>
+                <DropdownMenuItem onClick={() => window.open(toAbsolutePublicUrl(buildRawUrl(transformBaseUrl, media.path)), "_blank", "noopener,noreferrer")}>
                   <ExternalLink className="mr-2 h-4 w-4" /> Open
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => {
@@ -1103,10 +1103,10 @@ export function MediaGrid({
               <Upload className="mr-2 h-4 w-4" /> Replace
             </ContextMenuItem>
             <ContextMenuSeparator />
-            <ContextMenuItem onClick={() => navigator.clipboard.writeText(toAbsolutePublicUrl(buildDownloadUrl(apiBaseUrl, transformBaseUrl, media.path)))}>
+            <ContextMenuItem onClick={() => navigator.clipboard.writeText(toAbsolutePublicUrl(buildRawUrl(transformBaseUrl, media.path)))}>
               <Link className="mr-2 h-4 w-4" /> Copy URL
             </ContextMenuItem>
-            <ContextMenuItem onClick={() => window.open(toAbsolutePublicUrl(buildViewUrl(transformBaseUrl, media.path)), "_blank", "noopener,noreferrer")}>
+            <ContextMenuItem onClick={() => window.open(toAbsolutePublicUrl(buildRawUrl(transformBaseUrl, media.path)), "_blank", "noopener,noreferrer")}>
               <ExternalLink className="mr-2 h-4 w-4" /> Open
             </ContextMenuItem>
             <ContextMenuItem onClick={() => {

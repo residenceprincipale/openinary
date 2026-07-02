@@ -102,6 +102,11 @@ export function buildViewUrl(transformBaseUrl: string, path: string, suffix = ""
   return `${transformBaseUrl}/t/${path}${suffix}`
 }
 
+/** Raw asset URL served at root path (e.g. /image.jpg). */
+export function buildRawUrl(baseUrl: string, path: string, suffix = ""): string {
+  return `${baseUrl}/${path}${suffix}`
+}
+
 /** Fetch original file and trigger a browser download (works reliably same-origin). */
 export async function downloadOriginalFile(url: string, filename: string): Promise<void> {
   const absoluteUrl = toAbsolutePublicUrl(url)
