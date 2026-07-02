@@ -115,7 +115,7 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE_FULL }}:${{ needs.determine-version.outputs.version }}
-            ${{ needs.determine-version.outputs.is_release == 'true' && format('{0}:latest', env.IMAGE_FULL) || '' }}
+            ${{ env.IMAGE_FULL }}:latest
             ${{ needs.determine-version.outputs.is_release == 'true' && format('{0}:{1}', env.IMAGE_FULL, needs.determine-version.outputs.major_minor) || '' }}
             ${{ needs.determine-version.outputs.is_release == 'true' && format('{0}:{1}', env.IMAGE_FULL, needs.determine-version.outputs.major) || '' }}
           cache-from: type=registry,ref=${{ env.IMAGE_FULL }}:buildcache
@@ -150,7 +150,7 @@ jobs:
           push: true
           tags: |
             ${{ env.IMAGE_API }}:${{ needs.determine-version.outputs.version }}
-            ${{ needs.determine-version.outputs.is_release == 'true' && format('{0}:latest', env.IMAGE_API) || '' }}
+            ${{ env.IMAGE_API }}:latest
             ${{ needs.determine-version.outputs.is_release == 'true' && format('{0}:{1}', env.IMAGE_API, needs.determine-version.outputs.major_minor) || '' }}
             ${{ needs.determine-version.outputs.is_release == 'true' && format('{0}:{1}', env.IMAGE_API, needs.determine-version.outputs.major) || '' }}
           cache-from: type=registry,ref=${{ env.IMAGE_API }}:buildcache
