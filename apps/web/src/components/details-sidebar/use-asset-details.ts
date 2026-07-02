@@ -31,7 +31,6 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
   }) // ponytail: incrementing counter, use Date.now() if browser cache persists
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
-  // Use dedicated transform base URL (empty in Docker, falls back to apiBaseUrl without /api)
   const transformBaseUrl = process.env.NEXT_PUBLIC_TRANSFORM_BASE_URL !== undefined
     ? process.env.NEXT_PUBLIC_TRANSFORM_BASE_URL
     : apiBaseUrl.replace(/\/api$/, "")

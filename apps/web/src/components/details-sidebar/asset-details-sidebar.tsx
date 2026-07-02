@@ -66,7 +66,7 @@ export function AssetDetailsSidebar({
 
   return (
     <div
-      className="h-full flex flex-col border-l bg-sidebar text-sidebar-foreground min-w-[320px]"
+      className="h-screen flex flex-col border-l bg-sidebar text-sidebar-foreground min-w-[320px]"
       {...props}
     >
       <div className="border-b px-4 py-3 flex items-center justify-between shrink-0">

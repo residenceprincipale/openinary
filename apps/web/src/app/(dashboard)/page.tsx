@@ -73,7 +73,7 @@ function HomePageContent() {
             defaultSize={assetSidebarOpen ? 70 : 100}
             minSize={30}
             id="main-panel"
-            className="flex flex-col"
+            className="flex flex-col h-screen"
           >
             <HeaderBar />
             <div className="flex-1 overflow-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
