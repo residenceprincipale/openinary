@@ -122,7 +122,6 @@ export function AssetTransformationsTab({
     return parts.join(",")
   }, [crop, gravity, width, height, aspectRatio, rotation, roundCorners, background, quality, format, startOffset, endOffset, sampleRate, volume, channels])
 
-  console.log("apiBaseUrl",apiBaseUrl)
   const builderUrl = builderParams
     ? `${apiBaseUrl}/t/${builderParams}/${asset.path}`
     : ""
