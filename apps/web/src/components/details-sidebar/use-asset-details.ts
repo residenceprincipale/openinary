@@ -31,9 +31,7 @@ export function useAssetDetails(onOpenChange?: (open: boolean) => void) {
   }) // ponytail: incrementing counter, use Date.now() if browser cache persists
 
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ""
-  const transformBaseUrl = process.env.NEXT_PUBLIC_TRANSFORM_BASE_URL !== undefined
-    ? process.env.NEXT_PUBLIC_TRANSFORM_BASE_URL
-    : apiBaseUrl.replace(/\/api$/, "")
+  const transformBaseUrl = apiBaseUrl.replace(/\/api$/, "")
 
   const fetchFileMetadata = async (path: string) => {
     try {

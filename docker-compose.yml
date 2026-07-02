@@ -59,9 +59,6 @@ services:
         # NEXT_PUBLIC_API_BASE_URL is needed at build time
         # CORS is handled at runtime in Next.js middleware
         NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api}
-        # NEXT_PUBLIC_TRANSFORM_BASE_URL — set to deployed origin e.g. https://example.com
-        # Empty = URLs are relative paths (works via nginx proxy)
-        NEXT_PUBLIC_TRANSFORM_BASE_URL: ${NEXT_PUBLIC_TRANSFORM_BASE_URL:-}
         # IMAGE_TAG is baked into the image at build time (written to /app/version.txt)
         IMAGE_TAG: ${IMAGE_TAG:-latest}
     ports:

@@ -508,10 +508,7 @@ export function MediaGrid({
   const { disableTransforms } = useFeatures();
   const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
   // Use dedicated transform base URL (empty in Docker, falls back to apiBaseUrl without /api)
-  const transformBaseUrl =
-    process.env.NEXT_PUBLIC_TRANSFORM_BASE_URL !== undefined
-      ? process.env.NEXT_PUBLIC_TRANSFORM_BASE_URL
-      : apiBaseUrl.replace(/\/api$/, "");
+  const transformBaseUrl = apiBaseUrl.replace(/\/api$/, "");
 
   const bustSuffix = bustNonce > 0 ? `?n=${bustNonce}` : ""
 
