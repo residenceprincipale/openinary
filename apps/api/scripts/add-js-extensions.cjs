@@ -9,6 +9,8 @@ function addJsExtensionsInFile(filePath) {
   // Regex to find relative imports/exports without extension
   const importRegex = /(import\s+.*?\s+from\s+['"])(\.[^'"]*?)(?<!\.js)(['"])/g;
   const exportRegex = /(export\s+.*?\s+from\s+['"])(\.[^'"]*?)(?<!\.js)(['"])/g;
+  // Dynamic import() — no `from` keyword
+  const dynamicImportRegex = /(import\(\s*['"])(\.[^'"]*?)(?<!\.js)(['"]\s*\))/g;
   
   let hasChanges = false;
   let newContent = content.replace(importRegex, (match, prefix, importPath, suffix) => {
@@ -49,6 +51,23 @@ function addJsExtensionsInFile(filePath) {
     return match;
   });
   
+  newContent = newContent.replace(dynamicImportRegex, (match, prefix, importPath, suffix) => {
+    const dirPath = path.resolve(path.dirname(filePath), importPath);
+    const indexPath = path.join(dirPath, 'index.js');
+    
+    if (fs.existsSync(indexPath) && fs.statSync(dirPath).isDirectory()) {
+      hasChanges = true;
+      return prefix + importPath + '/index.js' + suffix;
+    }
+    
+    const fullPath = path.resolve(path.dirname(filePath), importPath + '.js');
+    if (fs.existsSync(fullPath)) {
+      hasChanges = true;
+      return prefix + importPath + '.js' + suffix;
+    }
+    return match;
+  });
+
   if (hasChanges) {
     fs.writeFileSync(filePath, newContent);
     console.log(`Added .js extensions in: ${path.relative(process.cwd(), filePath)}`);

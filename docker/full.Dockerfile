@@ -37,7 +37,7 @@ WORKDIR /app
 COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
 COPY packages/shared/package.json ./packages/shared/package.json
 COPY apps/web/package.json ./apps/web/package.json
-RUN pnpm install --filter shared... --filter web... --frozen-lockfile --prod=false
+RUN pnpm install --frozen-lockfile --prod=false
 
 # Copy source and build (re-runs only on source changes)
 COPY packages/ ./packages/
