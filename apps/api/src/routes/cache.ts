@@ -72,6 +72,19 @@ cacheRoute.delete("/", async (c) => {
   return c.json({ success: true, data: { localDeleted, cloudDeleted } })
 })
 
+cacheRoute.delete("/cloud/*", async (c) => {
+  const key = c.req.param("*")
+  if (!key) return c.json({ success: false, error: "Key required" }, 400)
+  const storage = createStorageClient()
+  if (!storage) return c.json({ success: false, error: "Cloud storage not configured" }, 400)
+  try {
+    await storage.deleteCachedTransformation(key)
+    return c.json({ success: true, data: { deleted: key } })
+  } catch (err) {
+    return c.json({ success: false, error: (err as Error).message }, 500)
+  }
+})
+
 cacheRoute.delete("/:name", async (c) => {
   const name = c.req.param("name")
   if (!name) return c.json({ success: false, error: "File name required" }, 400)

@@ -412,6 +412,14 @@ export class CloudStorage {
   }
 
   /**
+   * Deletes a single cached transformation by key
+   */
+  async deleteCachedTransformation(key: string): Promise<void> {
+    await this.s3Client.deleteObject(key)
+    this.cache.delete(`exists:${key}`)
+  }
+
+  /**
    * Lists all cached transformations in cloud storage
    */
   async listAllCachedTransformations(): Promise<{ key: string; size: number; lastModified: Date }[]> {

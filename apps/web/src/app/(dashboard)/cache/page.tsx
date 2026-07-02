@@ -41,8 +41,8 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function formatDate(ms: number): string {
-  return new Date(ms).toLocaleString();
+function formatDate(date: number | string): string {
+  return new Date(date).toLocaleString();
 }
 
 function CachePageContent() {
@@ -112,6 +112,7 @@ function CachePageContent() {
 
   const local = data?.local
   const cloud = data?.cloud
+  const isCloud = cloud?.enabled ?? false
   const localUsage = local?.maxSize ? Math.round((local.totalSize / local.maxSize) * 100) : 0
 
   return (
@@ -142,7 +143,7 @@ function CachePageContent() {
               <div className="space-y-1">
                 <h1 className="text-3xl font-semibold lg:text-4xl">Cache</h1>
                 <p className="text-muted-foreground leading-relaxed">
-                  Manage local and cloud transformation cache
+                  {isCloud ? "Manage cloud transformation cache" : "Manage local transformation cache"}
                 </p>
               </div>
               <Button variant="outline" size="icon" onClick={fetchStats} title="Refresh">
@@ -162,191 +163,223 @@ function CachePageContent() {
               </div>
             )}
 
-            {local && (
-              <>
-                <Card>
-                  <CardHeader><CardTitle>Local Cache</CardTitle></CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 sm:grid-cols-3 mb-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Files</p>
-                        <p className="text-2xl font-bold">{local.totalFiles}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Size</p>
-                        <p className="text-2xl font-bold">{formatBytes(local.totalSize)}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Usage</p>
-                        <p className="text-2xl font-bold">{localUsage}%</p>
-                        <p className="text-xs text-muted-foreground">of {formatBytes(local.maxSize)}</p>
-                      </div>
+            {isCloud ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Cloud className="size-4" /> Cloud Cache
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 sm:grid-cols-2 mb-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Files</p>
+                      <p className="text-2xl font-bold">{cloud?.totalFiles ?? 0}</p>
                     </div>
-                    <div className="flex flex-wrap gap-4 items-end">
-                      <div className="flex items-end gap-2">
-                        <div className="space-y-1">
-                          <Label htmlFor="clearDays">Clear local older than (days)</Label>
-                          <Input id="clearDays" type="number" min={1} className="w-20" value={clearDays} onChange={(e) => setClearDays(Math.max(1, +e.target.value))} />
-                        </div>
-                        <Button variant="outline" onClick={clearOld} disabled={local.totalFiles === 0}>Clear Old</Button>
-                      </div>
-                      <Button variant="destructive" onClick={clearAll} disabled={local.totalFiles === 0 && (!cloud?.enabled || (cloud.totalFiles ?? 0) === 0)}>
-                        <Trash2 className="size-4" />
-                        Clear All Cache
-                      </Button>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Size</p>
+                      <p className="text-2xl font-bold">{formatBytes(cloud?.totalSize ?? 0)}</p>
                     </div>
-                  </CardContent>
-                </Card>
-
-                  {local.files.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Local Cached Files</CardTitle>
-                      <CardDescription>{local.files.length} files on disk</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="max-h-64 overflow-auto">
-                        <table className="w-full text-sm">
-                          <thead>
-                            <tr className="border-b text-left text-muted-foreground">
-                              <th className="pb-2 font-medium">Name</th>
-                              <th className="pb-2 font-medium text-right">Size</th>
-                              <th className="pb-2 font-medium text-right">Last Modified</th>
-                              <th className="pb-2 w-8"></th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {local.files.map((f) => (
-                              <tr key={f.name} className="border-b last:border-0">
-                                <td className="py-1.5 pr-4 font-mono text-xs truncate max-w-[300px]">{f.name}</td>
-                                <td className="py-1.5 text-right text-muted-foreground whitespace-nowrap">{formatBytes(f.size)}</td>
-                                <td className="py-1.5 text-right text-muted-foreground whitespace-nowrap">{formatDate(f.lastModified)}</td>
-                                <td className="py-1.5 text-right">
-                                  <button
-                                    className="text-muted-foreground hover:text-destructive transition-colors"
-                                    title="Delete this cache file"
-                                    onClick={async () => {
-                                      if (!confirm(`Delete cache file "${f.name}"?`)) return
-                                      try {
-                                        const r = await fetch(`${apiBaseUrl}/cache/${encodeURIComponent(f.name)}`, { method: "DELETE", credentials: "include" })
-                                        const d = await r.json()
-                                        setMessage(d.success ? `Deleted ${f.name}` : "Failed to delete")
-                                        fetchStats()
-                                      } catch { setMessage("Failed to delete") }
-                                    }}
-                                  >
-                                    <X className="size-3.5" />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                  </div>
+                  <div className="flex flex-wrap gap-4 items-end">
+                    <Button variant="destructive" onClick={clearAll} disabled={(cloud?.totalFiles ?? 0) === 0}>
+                      <Trash2 className="size-4" />
+                      Clear All Cache
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : local && (
+              <Card>
+                <CardHeader><CardTitle>Local Cache</CardTitle></CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 sm:grid-cols-3 mb-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Files</p>
+                      <p className="text-2xl font-bold">{local.totalFiles}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Size</p>
+                      <p className="text-2xl font-bold">{formatBytes(local.totalSize)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Usage</p>
+                      <p className="text-2xl font-bold">{localUsage}%</p>
+                      <p className="text-xs text-muted-foreground">of {formatBytes(local.maxSize)}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-4 items-end">
+                    <div className="flex items-end gap-2">
+                      <div className="space-y-1">
+                        <Label htmlFor="clearDays">Clear local older than (days)</Label>
+                        <Input id="clearDays" type="number" min={1} className="w-20" value={clearDays} onChange={(e) => setClearDays(Math.max(1, +e.target.value))} />
                       </div>
-                    </CardContent>
-                  </Card>
-                )}
+                      <Button variant="outline" onClick={clearOld} disabled={local.totalFiles === 0}>Clear Old</Button>
+                    </div>
+                    <Button variant="destructive" onClick={clearAll} disabled={local.totalFiles === 0}>
+                      <Trash2 className="size-4" />
+                      Clear All Cache
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <XCircle className="size-4" /> Invalidate Asset Cache
-                    </CardTitle>
-                    <CardDescription>Delete all cached transformations for a specific asset</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form onSubmit={async (e) => {
-                      e.preventDefault()
-                      const fd = new FormData(e.currentTarget)
-                      const path = fd.get("assetPath") as string
-                      if (!path) return
-                      if (!confirm(`Delete cached variants of "${path}"?`)) return
-                      try {
-                        const encoded = path.split("/").map(encodeURIComponent).join("/")
-                        const r = await fetch(`${apiBaseUrl}/invalidate/${encoded}`, { method: "DELETE", credentials: "include" })
-                        const d = await r.json()
-                        setMessage(d.success ? `Invalidated: ${d.data?.localCacheFilesDeleted || d.localCacheFilesDeleted || 0} local, ${d.data?.cloudCacheFilesDeleted || d.cloudCacheFilesDeleted || 0} cloud` : "Failed to invalidate")
-                        fetchStats()
-                      } catch {
-                        setMessage("Failed to invalidate")
-                      }
-                    }} className="flex items-end gap-2">
-                      <div className="flex-1 space-y-1">
-                        <Label htmlFor="assetPath">Asset path</Label>
-                        <Input id="assetPath" name="assetPath" list="cached-files" placeholder="folder/my-image.jpg" className="w-full" />
+            {isCloud ? (cloud?.files?.length ?? 0) > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Cloud Cached Files</CardTitle>
+                  <CardDescription>{cloud!.files!.length} files in S3-compatible storage</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="max-h-64 overflow-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-muted-foreground">
+                          <th className="pb-2 font-medium">Key</th>
+                          <th className="pb-2 font-medium text-right">Size</th>
+                          <th className="pb-2 font-medium text-right">Last Modified</th>
+                          <th className="pb-2 w-8"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cloud!.files!.map((f) => (
+                          <tr key={f.key} className="border-b last:border-0">
+                            <td className="py-1.5 pr-4 font-mono text-xs truncate max-w-[300px]">{f.key}</td>
+                            <td className="py-1.5 text-right text-muted-foreground whitespace-nowrap">{formatBytes(f.size)}</td>
+                            <td className="py-1.5 text-right text-muted-foreground whitespace-nowrap">{formatDate(f.lastModified)}</td>
+                            <td className="py-1.5 text-right">
+                              <button
+                                className="text-muted-foreground hover:text-destructive transition-colors"
+                                title="Delete this cache file"
+                                onClick={async () => {
+                                  if (!confirm(`Delete cache file "${f.key}"?`)) return
+                                  try {
+                                    const r = await fetch(`${apiBaseUrl}/cache/cloud/${encodeURIComponent(f.key)}`, { method: "DELETE", credentials: "include" })
+                                    const d = await r.json()
+                                    setMessage(d.success ? `Deleted ${f.key}` : "Failed to delete")
+                                    fetchStats()
+                                  } catch { setMessage("Failed to delete") }
+                                }}
+                              >
+                                <X className="size-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : local?.files?.length ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Local Cached Files</CardTitle>
+                  <CardDescription>{local.files.length} files on disk</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="max-h-64 overflow-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-muted-foreground">
+                          <th className="pb-2 font-medium">Name</th>
+                          <th className="pb-2 font-medium text-right">Size</th>
+                          <th className="pb-2 font-medium text-right">Last Modified</th>
+                          <th className="pb-2 w-8"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {local.files.map((f) => (
+                          <tr key={f.name} className="border-b last:border-0">
+                            <td className="py-1.5 pr-4 font-mono text-xs truncate max-w-[300px]">{f.name}</td>
+                            <td className="py-1.5 text-right text-muted-foreground whitespace-nowrap">{formatBytes(f.size)}</td>
+                            <td className="py-1.5 text-right text-muted-foreground whitespace-nowrap">{formatDate(f.lastModified)}</td>
+                            <td className="py-1.5 text-right">
+                              <button
+                                className="text-muted-foreground hover:text-destructive transition-colors"
+                                title="Delete this cache file"
+                                onClick={async () => {
+                                  if (!confirm(`Delete cache file "${f.name}"?`)) return
+                                  try {
+                                    const r = await fetch(`${apiBaseUrl}/cache/${encodeURIComponent(f.name)}`, { method: "DELETE", credentials: "include" })
+                                    const d = await r.json()
+                                    setMessage(d.success ? `Deleted ${f.name}` : "Failed to delete")
+                                    fetchStats()
+                                  } catch { setMessage("Failed to delete") }
+                                }}
+                              >
+                                <X className="size-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <XCircle className="size-4" /> Invalidate Asset Cache
+                </CardTitle>
+                <CardDescription>Delete all cached transformations for a specific asset</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={async (e) => {
+                  e.preventDefault()
+                  const fd = new FormData(e.currentTarget)
+                  const path = fd.get("assetPath") as string
+                  if (!path) return
+                  if (!confirm(`Delete cached variants of "${path}"?`)) return
+                  try {
+                    const encoded = path.split("/").map(encodeURIComponent).join("/")
+                    const r = await fetch(`${apiBaseUrl}/invalidate/${encoded}`, { method: "DELETE", credentials: "include" })
+                    const d = await r.json()
+                    setMessage(d.success ? `Invalidated: ${d.data?.localCacheFilesDeleted || d.localCacheFilesDeleted || 0} local, ${d.data?.cloudCacheFilesDeleted || d.cloudCacheFilesDeleted || 0} cloud` : "Failed to invalidate")
+                    fetchStats()
+                  } catch {
+                    setMessage("Failed to invalidate")
+                  }
+                }} className="flex items-end gap-2">
+                  <div className="flex-1 space-y-1">
+                    <Label htmlFor="assetPath">Asset path</Label>
+                    <Input id="assetPath" name="assetPath" placeholder="folder/my-image.jpg" className="w-full" />
+                    {!isCloud && local?.files && (
+                      <>
                         <datalist id="cached-files">
-                          {local?.files.map(f => (
+                          {local.files.map(f => (
                             <option key={f.name} value={f.name.split('_').pop() ?? f.name} />
                           ))}
                         </datalist>
-                      </div>
-                      <Button type="submit" variant="destructive" size="sm">Invalidate</Button>
-                    </form>
-                    {local && local.files.length > 0 && (
-                      <details className="mt-3">
-                        <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Suggestions ({Math.min(local.files.length, 20)} shown)</summary>
-                        <div className="mt-2 flex flex-wrap gap-1 max-h-32 overflow-y-auto">
-                          {local.files.slice(0, 20).map(f => {
-                            const orig = f.name.split('_').pop() ?? f.name
-                            return (
-                              <button key={f.name} type="button" onClick={() => {
-                                const input = document.getElementById('assetPath') as HTMLInputElement
-                                if (input) input.value = orig
-                              }} className="text-xs px-2 py-0.5 rounded bg-muted hover:bg-accent text-muted-foreground hover:text-foreground transition-colors truncate max-w-48">
-                                {orig}
-                              </button>
-                            )
-                          })}
-                        </div>
-                      </details>
+                        {local.files.length > 0 && (
+                          <details className="mt-3">
+                            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">Suggestions ({Math.min(local.files.length, 20)} shown)</summary>
+                            <div className="mt-2 flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+                              {local.files.slice(0, 20).map(f => {
+                                const orig = f.name.split('_').pop() ?? f.name
+                                return (
+                                  <button key={f.name} type="button" onClick={() => {
+                                    const input = document.getElementById('assetPath') as HTMLInputElement
+                                    if (input) input.value = orig
+                                  }} className="text-xs px-2 py-0.5 rounded bg-muted hover:bg-accent text-muted-foreground hover:text-foreground transition-colors truncate max-w-48">
+                                    {orig}
+                                  </button>
+                                )
+                              })}
+                            </div>
+                          </details>
+                        )}
+                      </>
                     )}
-                  </CardContent>
-                </Card>
-
-                {cloud?.enabled && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Cloud className="size-4" /> Cloud Cache
-                      </CardTitle>
-                      <CardDescription>{cloud.totalFiles ?? 0} files in S3-compatible storage</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid gap-4 sm:grid-cols-2 mb-4">
-                        <div>
-                          <p className="text-sm text-muted-foreground">Files</p>
-                          <p className="text-2xl font-bold">{cloud.totalFiles}</p>
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">Size</p>
-                          <p className="text-2xl font-bold">{formatBytes(cloud.totalSize ?? 0)}</p>
-                        </div>
-                      </div>
-                      {(cloud.files?.length ?? 0) > 0 && (
-                        <div className="max-h-64 overflow-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="border-b text-left text-muted-foreground">
-                                <th className="pb-2 font-medium">Key</th>
-                                <th className="pb-2 font-medium text-right">Size</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {cloud.files?.map((f) => (
-                                <tr key={f.key} className="border-b last:border-0">
-                                  <td className="py-1.5 pr-4 font-mono text-xs truncate max-w-[400px]">{f.key}</td>
-                                  <td className="py-1.5 text-right text-muted-foreground whitespace-nowrap">{formatBytes(f.size)}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
-              </>
-            )}
+                  </div>
+                  <Button type="submit" variant="destructive" size="sm">Invalidate</Button>
+                </form>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </SidebarInset>
