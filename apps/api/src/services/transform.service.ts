@@ -442,11 +442,11 @@ export class TransformService {
       };
     }
 
-    // ponytail: lightweight video transforms (volume-only) process synchronously
-    // Heavy transforms (resize, crop, trim, quality) still go through the job queue
+    // ponytail: lightweight video transforms (quality/format/volume only) process synchronously
+    // Heavy transforms (resize, crop, trim) still go through the job queue
     const hasHeavyParams = !!(params.resize || params.width || params.height ||
       params.crop || params.startOffset || params.endOffset);
-    if (params.volume && !hasHeavyParams) {
+    if (!hasHeavyParams) {
       const result = await processVideo(sourcePath, params);
 
       await saveToCaches(

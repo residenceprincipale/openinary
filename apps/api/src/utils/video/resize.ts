@@ -28,21 +28,20 @@ export const applyResize: TransformFunction = (
     h = typeof height === 'string' ? parseInt(height, 10) : height;
   }
 
-  // Skip if no valid dimensions
-  if (!w || !h || isNaN(w) || isNaN(h) || w <= 0 || h <= 0) {
+  // Skip if neither dimension is valid
+  if ((!w || w <= 0) && (!h || h <= 0)) {
     return command;
   }
 
+  const wStr = w && w > 0 ? String(w) : '-2';
+  const hStr = h && h > 0 ? String(h) : '-2';
+
   // Apply resize based on crop mode
   if (crop === 'fill' || crop === 'crop') {
-    // Cover behavior (no stretching):
-    // 1) scale until the smallest side reaches the target, preserving aspect ratio
-    // 2) crop to exact WxH from the center
-    const filter = `scale=${w}:${h}:force_original_aspect_ratio=increase,crop=${w}:${h}`;
+    const filter =
+      `scale=${wStr}:${hStr}:force_original_aspect_ratio=increase,crop=${wStr}:${hStr}`;
     return command.videoFilters(filter);
   } else {
-    // Backwards-compatible behavior: simple resize to exact dimensions,
-    // which may stretch to fit
-    return command.size(`${w}x${h}`);
+    return command.videoFilters(`scale=${wStr}:${hStr}`);
   }
 };
