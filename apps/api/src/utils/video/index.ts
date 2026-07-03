@@ -83,7 +83,7 @@ export const transformVideo = async (
   // Merge config defaults for params not in the URL
   const vCfg = getDefaults().video || {};
   // ponytail: null = no default, only fills URL-absent params
-  for (const k of ['volume', 'crop', 'gravity', 'width', 'height', 'resize', 'startOffset', 'endOffset'] as const) {
+  for (const k of ['format', 'volume', 'crop', 'gravity', 'width', 'height', 'resize', 'startOffset', 'endOffset'] as const) {
     if (vCfg[k] != null && (params as any)[k] == null) (params as any)[k] = vCfg[k];
   }
 

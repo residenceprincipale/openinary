@@ -4,7 +4,9 @@ import { CloudStorage } from "../utils/storage/index";
 import { parseParams } from "../utils/parser";
 import { transformImage } from "../utils/image/index";
 import { transformVideo } from "../utils/video/index";
+import { contentTypeForFormat } from "../utils/video/format";
 import { transformAudio } from "../utils/audio/index";
+import { getDefaults } from "../utils/transform-defaults";
 import { Compression } from "../utils/image/compression";
 import { getVideoInfo, getResolutionLabel } from "../utils/video/video-info";
 import logger, { serializeError } from "../utils/logger";
@@ -356,7 +358,6 @@ export async function processVideo(
   }
   
   const buffer = await transformVideo(originalPath, params);
-  const ext = originalPath.split(".").pop()?.toLowerCase();
 
   const requestedFormat = params.format?.toLowerCase();
   const imageFormats = new Set(["jpg", "jpeg", "png", "webp", "avif", "gif"]);
@@ -379,12 +380,8 @@ export async function processVideo(
     return { buffer, contentType: imageContentType };
   }
 
-  let contentType = "video/mp4"; // default
-  if (ext?.match(/mov/)) {
-    contentType = "video/quicktime";
-  } else if (ext?.match(/webm/)) {
-    contentType = "video/webm";
-  }
+  const resolvedFormat = params.format?.toLowerCase() || getDefaults().video?.format || 'mp4';
+  const contentType = contentTypeForFormat(resolvedFormat);
 
   return { buffer, contentType };
 }

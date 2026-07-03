@@ -7,6 +7,8 @@ import logger, { serializeError } from '../utils/logger';
 import { videoJobQueue } from '../utils/video-job-queue';
 import { updateJobStatus } from '../utils/video/queue-db';
 import { readFile } from 'fs/promises';
+import { getDefaults } from '../utils/transform-defaults';
+import { contentTypeForFormat } from '../utils/video/format';
 import {
   checkCloudCache,
   checkLocalCache,
@@ -157,20 +159,33 @@ export class TransformService {
     let cachePath = getCachePath(path);
 
     // Determine optimal format if not explicitly specified
-    if (!params.format && ext?.match(/jpe?g|png|webp|avif|gif|psd/)) {
-      const optimalFormat = this.compression.determineOptimalFormatForCache(
-        userAgent,
-        acceptHeader,
-        ext
-      );
-      effectiveParams = { ...params, format: optimalFormat };
+    if (!params.format) {
+      if (ext?.match(/jpe?g|png|webp|avif|gif|psd/)) {
+        const optimalFormat = this.compression.determineOptimalFormatForCache(
+          userAgent,
+          acceptHeader,
+          ext
+        );
+        effectiveParams = { ...params, format: optimalFormat };
 
-      // Update cache path to include the optimal format
-      const pathWithFormat = path.replace(
-        /\/t\/(.*)$/,
-        `/t/format:${optimalFormat}/$1`
-      );
-      cachePath = getCachePath(pathWithFormat);
+        // Update cache path to include the optimal format
+        const pathWithFormat = path.replace(
+          /\/t\/(.*)$/,
+          `/t/format:${optimalFormat}/$1`
+        );
+        cachePath = getCachePath(pathWithFormat);
+      } else if (ext?.match(/mp4|mov|webm/)) {
+        const defaultFormat = getDefaults().video?.format;
+        if (defaultFormat && defaultFormat !== ext) {
+          effectiveParams = { ...params, format: defaultFormat };
+
+          const pathWithFormat = path.replace(
+            /\/t\/(.*)$/,
+            `/t/format:${defaultFormat}/$1`
+          );
+          cachePath = getCachePath(pathWithFormat);
+        }
+      }
     }
 
     return { effectiveParams, cachePath };
@@ -522,9 +537,10 @@ export class TransformService {
               await cleanupTempFile(sourcePath);
             }
 
+            const cacheFmt = params.format || filePath.split('.').pop() || 'mp4';
             return {
               buffer: cachedBuffer,
-              contentType: `video/${filePath.split('.').pop()}`,
+              contentType: contentTypeForFormat(cacheFmt),
               headers: {
                 'X-Video-Status': 'ready',
                 'Content-Length': cachedBuffer.length.toString(),
