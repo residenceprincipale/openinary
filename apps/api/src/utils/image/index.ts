@@ -8,6 +8,7 @@ import { applyRotation } from './rotation';
 import { applyQuality } from './quality';
 import { applyResizeComposite } from './param-registry';
 import { applyRoundCorners } from './round-corners';
+import { getDefaults } from '../transform-defaults';
 
 /**
  * Decode a PSD file into a Sharp instance via raw RGBA pixel data.
@@ -38,6 +39,13 @@ export const transformImage = async (inputPath: string, params: TransformParams)
   let image = inputPath.toLowerCase().endsWith('.psd')
     ? await decodePsd(inputPath)
     : sharp(inputPath);
+
+  // Merge config defaults for params not in the URL
+  const cfg = getDefaults().image || {};
+  // ponytail: null = no default, only fills URL-absent params
+  for (const k of ['background', 'radius', 'aspect', 'rotate', 'width', 'height'] as const) {
+    if (cfg[k] != null && params[k] == null) (params as any)[k] = cfg[k];
+  }
 
   // Convert TransformParams to a record for easier access
   const paramsRecord: Record<string, string> = {

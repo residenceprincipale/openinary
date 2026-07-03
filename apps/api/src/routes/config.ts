@@ -8,8 +8,15 @@ import logger, { serializeError } from "../utils/logger";
 const CONFIG_PATH = join(process.cwd(), "data", "transforms.json");
 
 const defaults = {
-  image: { quality: 80, format: "auto", crop: "fill", gravity: "center" },
-  video: { quality: 60, format: "mp4", autoDownscale: true, autoDownscaleResolution: 720 },
+  image: {
+    quality: 80, format: "auto", crop: "fill", gravity: "center",
+    background: null, radius: null, aspect: null, rotate: null, width: null, height: null,
+  },
+  video: {
+    quality: 60, format: "mp4", autoDownscale: true, autoDownscaleResolution: 720,
+    volume: null, crop: null, gravity: null, resize: null,
+    width: null, height: null, startOffset: null, endOffset: null,
+  },
   audio: { quality: 192, format: "mp3", sampleRate: "44100", channels: "stereo" },
   branding: { title: "Openinary", logoUrl: "" },
 };

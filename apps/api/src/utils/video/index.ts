@@ -13,6 +13,7 @@ import { applyVolume } from './volume';
 import { VideoCommandBuilder } from './command-builder';
 import { getVideoInfo } from './video-info';
 import type { VideoContext } from './types';
+import { getDefaults } from '../transform-defaults';
 
 // Re-export types for backward compatibility
 export * from './types';
@@ -78,6 +79,13 @@ export const transformVideo = async (
 ): Promise<Buffer> => {
   // Create temporary directory for output
   const tmpDir = await mkdtemp(join(tmpdir(), 'video-'));
+
+  // Merge config defaults for params not in the URL
+  const vCfg = getDefaults().video || {};
+  // ponytail: null = no default, only fills URL-absent params
+  for (const k of ['volume', 'crop', 'gravity', 'width', 'height', 'resize', 'startOffset', 'endOffset'] as const) {
+    if (vCfg[k] != null && (params as any)[k] == null) (params as any)[k] = vCfg[k];
+  }
 
   // Get source file extension
   const sourceExt = inputPath.split('.').pop()?.toLowerCase();

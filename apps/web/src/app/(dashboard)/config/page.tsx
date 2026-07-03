@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,12 +34,122 @@ import { useFeatures } from "@/components/features-provider";
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "";
 
+type ImageDefaults = {
+  quality: number; format: string; crop: string; gravity: string;
+  background: string | null; radius: number | null; aspect: string | null;
+  rotate: number | null; width: number | null; height: number | null;
+};
+
+type VideoDefaults = {
+  quality: number; format: string; autoDownscale: boolean; autoDownscaleResolution: number;
+  volume: number | null; crop: string | null; gravity: string | null; resize: string | null;
+  width: number | null; height: number | null; startOffset: number | null; endOffset: number | null;
+};
+
 type TransformConfig = {
-  image: { quality: number; format: string; crop: string; gravity: string };
-  video: { quality: number; format: string; autoDownscale: boolean; autoDownscaleResolution: number };
+  image: ImageDefaults;
+  video: VideoDefaults;
   audio: { quality: number; format: string; sampleRate: string; channels: string };
   branding: { title: string; logoUrl: string };
 };
+
+type ParamDef = {
+  key: string; label: string; type: "number" | "text" | "select";
+  min?: number; max?: number; step?: number; placeholder?: string;
+  options?: { value: string; label: string }[];
+};
+
+function ParamField({
+  def, value, onChange,
+}: {
+  def: ParamDef; value: unknown; onChange: (v: unknown) => void;
+}) {
+  const displayVal = value === null || value === undefined ? "" : String(value);
+  if (def.type === "select" && def.options) {
+    return (
+      <div className="space-y-2">
+        <Label>{def.label}</Label>
+        <select
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          value={displayVal}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {def.options.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-2">
+      <Label>{def.label}</Label>
+      <Input
+        type={def.type}
+        min={def.min} max={def.max} step={def.step}
+        placeholder={def.placeholder}
+        value={displayVal}
+        onChange={(e) => {
+          const raw = e.target.value;
+          if (def.type === "number") {
+            onChange(raw === "" ? null : Number(raw));
+          } else {
+            onChange(raw);
+          }
+        }}
+      />
+    </div>
+  );
+}
+
+const IMAGE_PARAMS: ParamDef[] = [
+  { key: "quality", label: "Quality (1-100)", type: "number", min: 1, max: 100, placeholder: "e.g. 80" },
+  { key: "format", label: "Format", type: "select", options: [
+    { value: "auto", label: "Auto" }, { value: "avif", label: "AVIF" },
+    { value: "webp", label: "WebP" }, { value: "jpeg", label: "JPEG" },
+    { value: "png", label: "PNG" },
+  ]},
+  { key: "crop", label: "Crop Mode", type: "select", options: [
+    { value: "fill", label: "Fill" }, { value: "fit", label: "Fit" },
+    { value: "scale", label: "Scale" }, { value: "crop", label: "Crop" },
+    { value: "pad", label: "Pad" },
+  ]},
+  { key: "gravity", label: "Gravity", type: "select", options: [
+    { value: "center", label: "Center" }, { value: "north", label: "North" },
+    { value: "south", label: "South" }, { value: "east", label: "East" },
+    { value: "west", label: "West" }, { value: "face", label: "Face" },
+    { value: "auto", label: "Auto" },
+  ]},
+  { key: "background", label: "Background", type: "text", placeholder: "e.g. transparent, #ffffff" },
+  { key: "radius", label: "Radius (px)", type: "number", min: 0, placeholder: "e.g. 10" },
+  { key: "aspect", label: "Aspect Ratio", type: "text", placeholder: "e.g. 16:9" },
+  { key: "rotate", label: "Rotation Angle (deg)", type: "number", placeholder: "e.g. 90" },
+  { key: "width", label: "Width (px)", type: "number", min: 1, placeholder: "e.g. 800" },
+  { key: "height", label: "Height (px)", type: "number", min: 1, placeholder: "e.g. 600" },
+];
+
+const VIDEO_PARAMS: ParamDef[] = [
+  { key: "quality", label: "Quality (1-100)", type: "number", min: 1, max: 100 },
+  { key: "format", label: "Format", type: "select", options: [
+    { value: "mp4", label: "MP4" }, { value: "webm", label: "WebM" },
+    { value: "mov", label: "MOV" },
+  ]},
+  { key: "crop", label: "Crop Mode", type: "select", options: [
+    { value: "fill", label: "Fill" }, { value: "fit", label: "Fit" },
+    { value: "scale", label: "Scale" }, { value: "crop", label: "Crop" },
+    { value: "pad", label: "Pad" },
+  ]},
+  { key: "gravity", label: "Gravity", type: "select", options: [
+    { value: "center", label: "Center" }, { value: "north", label: "North" },
+    { value: "south", label: "South" }, { value: "east", label: "East" },
+    { value: "west", label: "West" }, { value: "auto", label: "Auto" },
+  ]},
+  { key: "volume", label: "Volume (0-100)", type: "number", min: 0, max: 100, placeholder: "e.g. 80" },
+  { key: "width", label: "Width (px)", type: "number", min: 1 ,placeholder: "e.g. 1280"},
+  { key: "height", label: "Height (px)", type: "number", min: 1, placeholder: "e.g. 720"},
+  { key: "startOffset", label: "Start Offset (sec)", type: "number", min: 0, placeholder: "e.g. 5" },
+  { key: "endOffset", label: "End Offset (sec)", type: "number", min: 0 , placeholder: "e.g. 10" },
+];
 
 function ConfigPageContent() {
   const { disableTransforms } = useFeatures();
@@ -80,6 +190,13 @@ function ConfigPageContent() {
       setSaving(false);
     }
   };
+
+  const updateSection = useCallback(<T,>(section: keyof TransformConfig, key: string, value: T) => {
+    setConfig((prev) => {
+      if (!prev) return prev;
+      return { ...prev, [section]: { ...prev[section], [key]: value } };
+    });
+  }, []);
 
   if (loading) {
     return (
@@ -137,7 +254,7 @@ function ConfigPageContent() {
                       <Label>Title</Label>
                       <Input
                         value={config.branding.title}
-                        onChange={(e) => setConfig({ ...config, branding: { ...config.branding, title: e.target.value } })}
+                        onChange={(e) => updateSection("branding", "title", e.target.value)}
                       />
                     </div>
                     <div className="space-y-2">
@@ -145,7 +262,7 @@ function ConfigPageContent() {
                       <Input
                         placeholder="/openinary.svg"
                         value={config.branding.logoUrl}
-                        onChange={(e) => setConfig({ ...config, branding: { ...config.branding, logoUrl: e.target.value } })}
+                        onChange={(e) => updateSection("branding", "logoUrl", e.target.value)}
                       />
                     </div>
                   </CardContent>
@@ -156,60 +273,16 @@ function ConfigPageContent() {
                     <CardTitle>Image</CardTitle>
                     <CardDescription>Default image transformation parameters</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Quality (1-100)</Label>
-                        <Input
-                          type="number" min={1} max={100}
-                          value={config.image.quality}
-                          onChange={(e) => setConfig({ ...config, image: { ...config.image, quality: +e.target.value } })}
+                      {IMAGE_PARAMS.map((def) => (
+                        <ParamField
+                          key={def.key}
+                          def={def}
+                          value={(config.image as Record<string, unknown>)[def.key]}
+                          onChange={(v) => updateSection("image", def.key, v)}
                         />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Format</Label>
-                        <select
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                          value={config.image.format}
-                          onChange={(e) => setConfig({ ...config, image: { ...config.image, format: e.target.value } })}
-                        >
-                          <option value="auto">Auto</option>
-                          <option value="avif">AVIF</option>
-                          <option value="webp">WebP</option>
-                          <option value="jpeg">JPEG</option>
-                          <option value="png">PNG</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Crop Mode</Label>
-                        <select
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                          value={config.image.crop}
-                          onChange={(e) => setConfig({ ...config, image: { ...config.image, crop: e.target.value } })}
-                        >
-                          <option value="fill">Fill</option>
-                          <option value="fit">Fit</option>
-                          <option value="scale">Scale</option>
-                          <option value="crop">Crop</option>
-                          <option value="pad">Pad</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Gravity</Label>
-                        <select
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                          value={config.image.gravity}
-                          onChange={(e) => setConfig({ ...config, image: { ...config.image, gravity: e.target.value } })}
-                        >
-                          <option value="center">Center</option>
-                          <option value="north">North</option>
-                          <option value="south">South</option>
-                          <option value="east">East</option>
-                          <option value="west">West</option>
-                          <option value="face">Face</option>
-                          <option value="auto">Auto</option>
-                        </select>
-                      </div>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>}
@@ -221,26 +294,14 @@ function ConfigPageContent() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Quality (1-100)</Label>
-                        <Input
-                          type="number" min={1} max={100}
-                          value={config.video.quality}
-                          onChange={(e) => setConfig({ ...config, video: { ...config.video, quality: +e.target.value } })}
+                      {VIDEO_PARAMS.map((def) => (
+                        <ParamField
+                          key={def.key}
+                          def={def}
+                          value={(config.video as Record<string, unknown>)[def.key]}
+                          onChange={(v) => updateSection("video", def.key, v)}
                         />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Format</Label>
-                        <select
-                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                          value={config.video.format}
-                          onChange={(e) => setConfig({ ...config, video: { ...config.video, format: e.target.value } })}
-                        >
-                          <option value="mp4">MP4</option>
-                          <option value="webm">WebM</option>
-                          <option value="mov">MOV</option>
-                        </select>
-                      </div>
+                      ))}
                     </div>
                     <div className="flex items-center gap-2">
                       <input
@@ -248,7 +309,7 @@ function ConfigPageContent() {
                         id="autoDownscale"
                         className="h-4 w-4"
                         checked={config.video.autoDownscale}
-                        onChange={(e) => setConfig({ ...config, video: { ...config.video, autoDownscale: e.target.checked } })}
+                        onChange={(e) => updateSection("video", "autoDownscale", e.target.checked)}
                       />
                       <Label htmlFor="autoDownscale" className="flex items-center gap-1">
                         Auto-downscale
@@ -261,7 +322,8 @@ function ConfigPageContent() {
                             Automatically downscale videos to reduce processing load. This prevents high-resolution videos (4K, 5K, 8K) from overwhelming the system. Only applies if no explicit resize parameters are provided<br/><br/>
                             Uses 720p instead of 1080p for faster processing of very large videos (8K, 5K)<br/>
                             - 8K (7680x4320) {"->"} 720p = 98% pixel reduction (vs 94% to 1080p)<br/>
-                            - Processing time reduced by ~50% compared to 1080p output                          </TooltipContent>
+                            - Processing time reduced by ~50% compared to 1080p output
+                          </TooltipContent>
                         </Tooltip>
                         </TooltipProvider>
                       </Label>
@@ -274,7 +336,7 @@ function ConfigPageContent() {
                           type="number" min={240} max={2160} step={10}
                           className="w-24 h-8"
                           value={config.video.autoDownscaleResolution}
-                          onChange={(e) => setConfig({ ...config, video: { ...config.video, autoDownscaleResolution: +e.target.value } })}
+                          onChange={(e) => updateSection("video", "autoDownscaleResolution", +e.target.value)}
                         />
                       </div>
                     )}
@@ -293,7 +355,7 @@ function ConfigPageContent() {
                         <Input
                           type="number" min={32} max={320} step={32}
                           value={config.audio.quality}
-                          onChange={(e) => setConfig({ ...config, audio: { ...config.audio, quality: +e.target.value } })}
+                          onChange={(e) => updateSection("audio", "quality", +e.target.value)}
                         />
                       </div>
                       <div className="space-y-2">
@@ -301,7 +363,7 @@ function ConfigPageContent() {
                         <select
                           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                           value={config.audio.format}
-                          onChange={(e) => setConfig({ ...config, audio: { ...config.audio, format: e.target.value } })}
+                          onChange={(e) => updateSection("audio", "format", e.target.value)}
                         >
                           <option value="mp3">MP3</option>
                           <option value="aac">AAC</option>
@@ -316,7 +378,7 @@ function ConfigPageContent() {
                         <select
                           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                           value={config.audio.sampleRate}
-                          onChange={(e) => setConfig({ ...config, audio: { ...config.audio, sampleRate: e.target.value } })}
+                          onChange={(e) => updateSection("audio", "sampleRate", e.target.value)}
                         >
                           <option value="8000">8000</option>
                           <option value="11025">11025</option>
@@ -331,7 +393,7 @@ function ConfigPageContent() {
                         <select
                           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                           value={config.audio.channels}
-                          onChange={(e) => setConfig({ ...config, audio: { ...config.audio, channels: e.target.value } })}
+                          onChange={(e) => updateSection("audio", "channels", e.target.value)}
                         >
                           <option value="stereo">Stereo</option>
                           <option value="mono">Mono</option>
