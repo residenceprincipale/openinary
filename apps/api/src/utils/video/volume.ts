@@ -9,5 +9,7 @@ export const applyVolume: TransformFunction = (command, context) => {
   const volValue = Math.min(Math.max(Number(volume), 0), 100) / 100;
   if (isNaN(volValue)) return command;
 
+  if (volValue === 0) return command.addOption('-an');
+
   return command.addOption('-filter:a', `volume=${volValue}`);
 };
