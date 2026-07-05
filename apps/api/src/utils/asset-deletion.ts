@@ -1,7 +1,7 @@
 import fs, { Dirent } from "fs";
 import path from "path";
 import logger, { serializeError } from "./logger";
-import { CloudStorage } from "./storage/cloud-storage";
+import type { CloudStorage } from "./storage/cloud-storage";
 import { deleteCachedFiles } from "./cache";
 import { deleteJobsByFilePath } from "./video/queue-db";
 import { safePath } from "./path-security";

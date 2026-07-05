@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import { parseParams } from './parser';
-import { CloudStorage } from './storage/index';
+import type { CloudStorage } from './storage/index';
 import logger from './logger';
 import { VideoWorker } from './video/video-worker';
 import {

@@ -1,10 +1,9 @@
-import { StorageConfig } from 'shared';
-import { CloudStorage } from './cloud-storage';
+import type { StorageConfig } from 'shared';
+import type { CloudStorage } from './cloud-storage';
 import logger from '../logger';
+import { createRequire } from 'module';
+const req = createRequire(import.meta.url);
 
-/**
- * Consolidated factory function
- */
 export function createStorageClient(): CloudStorage | null {
   const config: StorageConfig = {
     region: process.env.STORAGE_REGION || 'auto',
@@ -20,8 +19,8 @@ export function createStorageClient(): CloudStorage | null {
     return null;
   }
 
-  return new CloudStorage(config);
+  const { CloudStorage: CloudStorageClass } = req('./cloud-storage');
+  return new CloudStorageClass(config);
 }
 
-// Alias for compatibility
 export const createOptimizedStorageClient = createStorageClient;

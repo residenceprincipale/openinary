@@ -13,7 +13,6 @@ import {
   THUMBNAIL_PRIORITY,
   TRANSFORMATION_PRIORITY,
 } from "../utils/video/config";
-import heicConvert from 'heic-convert';
 import { hasPermission } from "../utils/permissions";
 
 const disableTransforms = process.env.DISABLE_TRANSFORMS === "true";
@@ -389,6 +388,7 @@ async function normalizeUploadFormat(
   let normalizedPath;
   if (mimeType === "image/heic" || mimeType === "image/heif"){
     try{
+      const { default: heicConvert } = await import('heic-convert');
       normalizedBuffer = await heicConvert({
                 buffer: buffer as any,
                 format: 'JPEG',

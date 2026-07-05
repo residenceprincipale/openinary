@@ -1,6 +1,6 @@
 import { Context } from "hono";
 import { existsSync } from "fs";
-import { CloudStorage } from "../utils/storage/index";
+import type { CloudStorage } from "../utils/storage/index";
 import { parseParams } from "../utils/parser";
 import { transformImage } from "../utils/image/index";
 import { transformVideo } from "../utils/video/index";
