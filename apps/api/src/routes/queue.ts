@@ -10,6 +10,7 @@ import {
   type JobStatus,
 } from "../utils/video/queue-db";
 import logger, { serializeError } from "../utils/logger";
+import { JOB_RETRY_MAX, JOB_CLEANUP_HOURS } from "../utils/video/config";
 
 const queue = new Hono();
 
@@ -140,7 +141,7 @@ queue.get("/worker/stats", (c) => {
   try {
     const worker = videoJobQueue.getWorker();
     const stats = worker.getStats();
-    return c.json(stats);
+    return c.json({ ...stats, maxRetries: JOB_RETRY_MAX, cleanupHours: JOB_CLEANUP_HOURS });
   } catch (error) {
     logger.error({ error: serializeError(error) }, "Failed to get worker stats");
     return c.json({ error: "Failed to get worker stats" }, 500);

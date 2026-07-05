@@ -14,6 +14,7 @@ import { JobActions } from "./job-actions";
 export interface QueueJob {
   id: string;
   file_path: string;
+  params_json: string;
   status: "pending" | "processing" | "completed" | "error" | "cancelled";
   priority: number;
   progress: number;
@@ -26,6 +27,18 @@ export interface QueueJob {
 interface QueueTableProps {
   jobs: QueueJob[];
   onActionComplete?: () => void;
+}
+
+function formatParams(paramsJson: string): string {
+  try {
+    const p = JSON.parse(paramsJson);
+    return Object.entries(p)
+      .filter(([, v]) => v !== null && v !== undefined && v !== "" && v !== "auto" && !(typeof v === "boolean" && !v))
+      .map(([k, v]) => `${k[0]}_${v}`)
+      .join(",");
+  } catch {
+    return "";
+  }
 }
 
 function formatDuration(startTime: number | null, endTime: number | null): string {
@@ -88,6 +101,11 @@ export function QueueTable({ jobs, onActionComplete }: QueueTableProps) {
             <TableRow key={job.id}>
               <TableCell className="font-medium max-w-xs truncate">
                 {job.file_path}
+                {job.params_json && (
+                  <div className="text-xs text-muted-foreground font-mono mt-0.5 truncate">
+                    {formatParams(job.params_json)}
+                  </div>
+                )}
                 {job.error && (
                   <div className="text-xs text-red-500 mt-1" title={job.error}>{job.error}</div>
                 )}

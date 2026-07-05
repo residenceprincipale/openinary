@@ -15,8 +15,9 @@ import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { QueueStatsCards } from "@/components/queue/queue-stats-cards";
 import { QueueTable, type QueueJob } from "@/components/queue/queue-table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Cog } from "lucide-react";
 import { useQueueEvents } from "@/hooks/use-queue-events";
 import { useFeatures } from "@/components/features-provider";
 
@@ -28,14 +29,19 @@ function QueuePageContent() {
   const [stats, setStats] = useState({
     total: 0, pending: 0, processing: 0, completed: 0, error: 0,
   });
+  const [workerStats, setWorkerStats] = useState<Record<string, unknown> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState("all");
   const { jobStatuses, isConnected } = useQueueEvents(true);
 
   const fetchStats = useCallback(async () => {
     try {
-      const r = await fetch(`${apiBaseUrl}/queue/stats`, { credentials: "include" });
-      if (r.ok) setStats(await r.json());
+      const [statsR, workerR] = await Promise.all([
+        fetch(`${apiBaseUrl}/queue/stats`, { credentials: "include" }),
+        fetch(`${apiBaseUrl}/queue/worker/stats`, { credentials: "include" }),
+      ]);
+      if (statsR.ok) setStats(await statsR.json());
+      if (workerR.ok) setWorkerStats(await workerR.json());
     } catch {}
   }, []);
 
@@ -119,6 +125,36 @@ function QueuePageContent() {
             </div>
 
             <QueueStatsCards stats={stats} />
+
+            {workerStats && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Cog className="size-4" /> Queue Parameters
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Max concurrent jobs</p>
+                      <p className="font-medium">{workerStats.maxConcurrent as number}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Poll interval</p>
+                      <p className="font-medium">{workerStats.pollInterval as number}ms</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Max retries</p>
+                      <p className="font-medium">{workerStats.maxRetries as number}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Cleanup after</p>
+                      <p className="font-medium">{workerStats.cleanupHours as number}h</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <Tabs value={selectedFilter} onValueChange={setSelectedFilter}>
               <TabsList>

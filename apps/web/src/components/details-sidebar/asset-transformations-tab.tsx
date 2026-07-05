@@ -302,7 +302,7 @@ export function AssetTransformationsTab({
 
           {builderUrl && (
             <div className="space-y-2">
-              <CopyInput label="Built URL" value={builderUrl} />
+              <CopyInput label="Built URL" value={builderUrl} href={builderUrl} />
               {isImage(asset.type) && (
                 <div className="flex items-center gap-2">
                   <Button size="sm" variant="outline" onClick={handleEstimate} disabled={isEstimating} className="h-7 gap-1 text-xs">
