@@ -49,6 +49,7 @@ function useNavItems() {
     { title: "Assets", url: "/", icon: Package, isActive: true },
     ...(isAdmin ? [{ title: "Users", url: "/users", icon: Users }] : []),
     ...(!disableTransforms ? [{ title: "Cache", url: "/cache", icon: Database }] : []),
+    ...(!disableTransforms ? [{ title: "Queue", url: "/queue", icon: Video }] : []),
     { title: "Config", url: "/config", icon: Settings },
   ];
 }
