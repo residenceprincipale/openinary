@@ -89,7 +89,7 @@ export function QueueTable({ jobs, onActionComplete }: QueueTableProps) {
               <TableCell className="font-medium max-w-xs truncate">
                 {job.file_path}
                 {job.error && (
-                  <div className="text-xs text-red-500 mt-1">{job.error}</div>
+                  <div className="text-xs text-red-500 mt-1" title={job.error}>{job.error}</div>
                 )}
               </TableCell>
               <TableCell>

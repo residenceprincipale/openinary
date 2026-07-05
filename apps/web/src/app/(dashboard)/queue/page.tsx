@@ -58,8 +58,6 @@ function QueuePageContent() {
   useEffect(() => {
     fetchStats();
     fetchJobs();
-    const interval = setInterval(() => { fetchStats(); fetchJobs(); }, 5000);
-    return () => clearInterval(interval);
   }, [fetchStats, fetchJobs]);
 
   if (disableTransforms) {
