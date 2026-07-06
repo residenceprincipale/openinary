@@ -34,7 +34,5 @@ export const applyQuality: TransformFunction = (
     .addOption('-preset', 'ultrafast')
     .addOption('-crf', crfValue.toString())
     .addOption('-tune', 'fastdecode')
-    .addOption('-profile:v', 'baseline')
-    .addOption('-level', '3.0')
     .audioCodec(volume !== undefined ? 'aac' : 'copy');
 };
