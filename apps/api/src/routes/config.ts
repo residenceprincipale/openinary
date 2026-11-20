@@ -28,6 +28,9 @@ function localStorageUsed(dir: string): number {
 config.get("/transforms", (c) => c.json({ success: true, data: readConfig() }));
 
 config.put("/transforms", async (c) => {
+  if (c.get("user")?.role !== "admin") {
+    return c.json({ success: false, error: "Admin access required" }, 403);
+  }
   try {
     const body = await c.req.json();
     const current = readConfig();

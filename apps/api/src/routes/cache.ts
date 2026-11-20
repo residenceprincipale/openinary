@@ -14,6 +14,13 @@ import { enginePaths } from "../config/queue";
 
 const cacheRoute = new Hono<AuthVariables>();
 cacheRoute.use("/*", apiKeyAuth);
+// Clearing the cache slows the next requests for everyone: admins only.
+cacheRoute.use("/*", async (c, next) => {
+  if (c.req.method === "DELETE" && c.get("user")?.role !== "admin") {
+    return c.json({ success: false, error: "Admin access required" }, 403);
+  }
+  await next();
+});
 
 cacheRoute.get("/stats", async (c) => {
   const localFiles = await listCachedFiles(enginePaths.cache);
