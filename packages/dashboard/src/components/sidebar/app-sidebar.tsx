@@ -42,6 +42,18 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   account: React.ReactNode;
   /** The "Uploader" tool: a demo route, or the docs page. */
   uploaderHref: string;
+  /** The name beside the logo. Hosts that brand the instance override it. */
+  brandName?: string;
+  /** Where the logo links. */
+  homeHref?: string;
+  /** Lead the sidebar with Home ("/get-started"). */
+  showHome?: boolean;
+  /** The Build section: Integrate / Images / Videos / Uploader. Pass [] to hide. */
+  buildItems?: NavItem[];
+  /** The onboarding checklist above the account row. */
+  showSetupGuide?: boolean;
+  /** The Documentation entry in the command palette. */
+  showDocsLink?: boolean;
 }
 
 const ICON_BUTTON =
@@ -55,21 +67,31 @@ export function AppSidebar({
   notices,
   account,
   uploaderHref,
+  brandName = "Openinary",
+  homeHref = "/get-started",
+  showHome = true,
+  buildItems: buildItemsProp,
+  showSetupGuide = true,
+  showDocsLink = true,
   ...props
 }: AppSidebarProps) {
   const { Link, useRouter, docsUrl } = useDashboard();
   const router = useRouter();
 
   const startItems: NavItem[] = [
-    { title: "Home", icon: SolarHome, url: "/get-started" },
+    ...(showHome
+      ? [{ title: "Home", icon: SolarHome, url: "/get-started" }]
+      : []),
     ...mainItems,
   ];
-  const buildItems: NavItem[] = [
-    { title: "Integrate", icon: SolarIntegrate, url: "/get-started/integrate" },
-    { title: "Images", icon: SolarImages, url: "/get-started/images" },
-    { title: "Videos", icon: SolarVideos, url: "/get-started/videos" },
-    { title: "Uploader", icon: SolarUploader, url: uploaderHref },
-  ];
+  const buildItems: NavItem[] =
+    buildItemsProp ??
+    [
+      { title: "Integrate", icon: SolarIntegrate, url: "/get-started/integrate" },
+      { title: "Images", icon: SolarImages, url: "/get-started/images" },
+      { title: "Videos", icon: SolarVideos, url: "/get-started/videos" },
+      { title: "Uploader", icon: SolarUploader, url: uploaderHref },
+    ];
   const workspaceItems: NavItem[] = [
     {
       title: "Settings",
@@ -104,12 +126,16 @@ export function AppSidebar({
     ...startItems.map(toAction("Pages")),
     ...buildItems.map(toAction("Build")),
     ...settingsActions,
-    {
-      label: "Documentation",
-      group: "Help",
-      icon: BookOpen,
-      onSelect: () => window.open(docsUrl, "_blank", "noreferrer"),
-    },
+    ...(showDocsLink
+      ? [
+          {
+            label: "Documentation",
+            group: "Help",
+            icon: BookOpen,
+            onSelect: () => window.open(docsUrl, "_blank", "noreferrer"),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -117,11 +143,11 @@ export function AppSidebar({
       <SidebarHeader>
         <div className="flex h-8 items-center gap-1 pr-0.5 pl-2.5 group-data-[collapsible=icon]:hidden">
           <Link
-            href="/get-started"
+            href={homeHref}
             className="flex min-w-0 flex-1 items-center gap-2 rounded-[6px] font-semibold text-[15px]/5 text-ds-text tracking-[-0.02em] outline-none focus-visible:outline-2 focus-visible:outline-ds-ring"
           >
             {brand}
-            <span className="truncate">Openinary</span>
+            <span className="truncate">{brandName}</span>
           </Link>
           <button
             type="button"
@@ -138,15 +164,19 @@ export function AppSidebar({
       <QuickActions bare actions={quickActions} />
       <SidebarContent className="pt-1">
         <NavMain items={startItems} />
-        <div
-          aria-hidden
-          className="mx-3 my-1.5 h-px bg-ds-divider group-data-[collapsible=icon]:mx-2"
-        />
-        <NavMain label="Build" items={buildItems} />
+        {buildItems.length > 0 && (
+          <>
+            <div
+              aria-hidden
+              className="mx-3 my-1.5 h-px bg-ds-divider group-data-[collapsible=icon]:mx-2"
+            />
+            <NavMain label="Build" items={buildItems} />
+          </>
+        )}
         <NavMain label="Workspace" items={workspaceItems} />
       </SidebarContent>
       <SidebarFooter>
-        <SetupGuide />
+        {showSetupGuide && <SetupGuide />}
         {notices}
         {account}
       </SidebarFooter>

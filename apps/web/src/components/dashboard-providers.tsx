@@ -11,7 +11,7 @@ import Link from "next/link";
 import { notFound, usePathname, useRouter } from "next/navigation";
 import { useQueryState } from "nuqs";
 
-import { aiPrompt } from "@/components/get-started/integration-snippets";
+import { aiPrompt } from "@/lib/ai-prompt";
 import { authClient } from "@/lib/auth-client";
 import { toAbsoluteUrl } from "@/lib/utils";
 

@@ -55,9 +55,15 @@ function getStoredView(): "grid" | "list" {
 export function AssetsView({
   beforeGrid,
   busy = false,
+  emptyActions,
+  emptyFooter,
 }: {
   beforeGrid?: (folderPath: string | null) => React.ReactNode;
   busy?: boolean;
+  /** Replace the default "Get started" row in the empty library. */
+  emptyActions?: React.ReactNode;
+  /** Replace the docs footer; pass false to render none. */
+  emptyFooter?: React.ReactNode;
 }) {
   const { Link, docsUrl, useSearchParam } = useDashboard();
   const [assetId, setAssetId] = useSearchParam("asset");
@@ -221,6 +227,7 @@ export function AssetsView({
                 onFolderPathChange={setFolderPath}
                 // The beam pushes onboarding, not upload.
                 emptyActions={
+                  emptyActions ?? (
                   <div className="flex gap-2">
                     <BorderBeam
                       size="pulse-outside"
@@ -239,22 +246,25 @@ export function AssetsView({
                     </BorderBeam>
                     <UploadButtonWithDialog />
                   </div>
+                  )
                 }
                 emptyFooter={
-                  <Button
-                    variant="link"
-                    asChild
-                    className="text-muted-foreground"
-                    size="sm"
-                  >
-                    <a
-                      href={docsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                  emptyFooter ?? (
+                    <Button
+                      variant="link"
+                      asChild
+                      className="text-muted-foreground"
+                      size="sm"
                     >
-                      Documentation <ArrowUpRight className="ml-1 h-4 w-4" />
-                    </a>
-                  </Button>
+                      <a
+                        href={docsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Documentation <ArrowUpRight className="ml-1 h-4 w-4" />
+                      </a>
+                    </Button>
+                  )
                 }
               />
             </div>

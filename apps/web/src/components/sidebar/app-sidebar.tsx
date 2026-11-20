@@ -6,10 +6,13 @@ import {
   SidebarAccount,
   SolarAccount,
   SolarAssets,
+  SolarImages,
   SolarKey,
   SolarLogs,
   SolarPalette,
+  SolarSettings,
   SolarStorage,
+  SolarVideos,
   WorkspaceTile,
 } from "@openinary/dashboard";
 import {
@@ -18,75 +21,77 @@ import {
   DropdownMenuSeparator,
 } from "@openinary/dashboard/ui/dropdown-menu";
 import { useOpeninary } from "@openinary/ui";
-import { Archive, ArrowUpRight, ListVideo, LogOut, Settings } from "lucide-react";
+import { Archive, ListVideo, LogOut, Settings, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { useBranding } from "@/components/branding-provider";
-import { useOnboardingState } from "@/components/onboarding-gate";
 import { useVersion } from "@/components/sidebar/version-display";
 import { signOut, useSession } from "@/lib/auth-client";
 
-const GITHUB_URL = "https://github.com/openinary/openinary";
-
 const mainItems = [
   { title: "Assets", icon: SolarAssets, url: "/" },
+  { title: "Images", icon: SolarImages, url: "/images" },
+  { title: "Videos", icon: SolarVideos, url: "/videos" },
   { title: "Logs", icon: SolarLogs, url: "/settings/logs" },
-  { title: "Queue", icon: ListVideo, url: "/settings/queue" },
-  { title: "Cache", icon: Archive, url: "/settings/cache" },
   { title: "Storage", icon: SolarStorage, url: "/settings/storage" },
-  { title: "API keys", icon: SolarKey, url: "/settings/api-keys" },
 ];
 
-// The settings pages the sidebar does not already list above.
 const settingsPages = [
   { title: "Account", url: "/settings/account" },
   { title: "Appearance", url: "/settings/appearance" },
+  { title: "API keys", url: "/settings/api-keys" },
+  { title: "Storage", url: "/settings/storage" },
+  { title: "Logs", url: "/settings/logs" },
+  { title: "Queue", url: "/settings/queue" },
+  { title: "Cache", url: "/settings/cache" },
   { title: "Transforms", url: "/settings/transforms" },
   { title: "Users", url: "/settings/users" },
 ];
+
+const settingsIcons: Record<string, React.ComponentType<{ className?: string }>> = {
+  Account: SolarAccount,
+  Appearance: SolarPalette,
+  "API keys": SolarKey,
+  Storage: SolarStorage,
+  Logs: SolarLogs,
+  Queue: ListVideo,
+  Cache: Archive,
+  Transforms: SolarSettings,
+  Users,
+};
 
 /** The workspace (this instance) and the signed-in account, at the bottom. */
 function Account() {
   const router = useRouter();
   const user = useSession().data?.user;
-  const workspace = useOnboardingState().data?.workspace;
   const version = useVersion();
-  const name = workspace?.name ?? "Openinary";
+  const branding = useBranding();
+  const name = branding.title || "Openinary";
   const userName = user?.name || user?.email?.split("@")[0] || "You";
 
   return (
     <SidebarAccount
-      tile={<WorkspaceTile name={name} logo={workspace?.logo} />}
+      tile={
+        <WorkspaceTile name={name} logo={branding.logoUrl || null} />
+      }
       name={name}
       detail={version ? `Self-hosted · ${version}` : "Self-hosted"}
       workspaceMenu={
-        <>
-          <DropdownMenuLabel>{name}</DropdownMenuLabel>
-          <DropdownMenuItem asChild>
-            <Link href="/settings/storage">
-              <Settings />
-              Workspace settings
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-            <a href={`${GITHUB_URL}/releases`} target="_blank" rel="noreferrer">
-              <ArrowUpRight />
-              What's new
-            </a>
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild>
-            <a href={GITHUB_URL} target="_blank" rel="noreferrer">
-              <ArrowUpRight />
-              Star on GitHub
-            </a>
-          </DropdownMenuItem>
-        </>
+        <DropdownMenuItem asChild>
+          <Link href="/settings/storage">
+            <Settings />
+            Workspace settings
+          </Link>
+        </DropdownMenuItem>
       }
       avatar={
         user?.image ? (
-          <img src={user.image} alt="" className="size-full object-cover" />
+          <img
+            src={user.image}
+            alt=""
+            className="size-full object-cover"
+          />
         ) : (
           initials(userName)
         )
@@ -135,7 +140,11 @@ export function AppSidebar() {
 
   // Without transforms there is no queue, and thumbnails read originals, so
   // the cache page has nothing to manage either.
-  const hiddenWhenDisabled = ["/settings/queue", "/settings/cache", "/settings/transforms"];
+  const hiddenWhenDisabled = [
+    "/settings/queue",
+    "/settings/cache",
+    "/settings/transforms",
+  ];
   const visibleMain = transformsDisabled
     ? mainItems.filter((item) => !hiddenWhenDisabled.includes(item.url))
     : mainItems;
@@ -152,16 +161,22 @@ export function AppSidebar() {
           className="size-[18px] dark:invert"
         />
       }
+      brandName={branding.title || "Openinary"}
+      homeHref="/"
+      showHome={false}
+      buildItems={[]}
+      showSetupGuide={false}
+      showDocsLink={false}
       mainItems={visibleMain}
       settingsPages={visibleSettings}
       settingsActions={visibleSettings.map((page) => ({
         label: page.title,
         group: "Settings",
-        icon: page.title === "Account" ? SolarAccount : SolarPalette,
+        icon: settingsIcons[page.title] ?? SolarSettings,
         onSelect: () => router.push(page.url),
       }))}
       account={<Account />}
-      uploaderHref="/uploader-demo"
+      uploaderHref="/"
     />
   );
 }
