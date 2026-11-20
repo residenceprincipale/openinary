@@ -7,7 +7,7 @@ import {
   type JobStats,
   type JobStatus,
   type VideoJobStore,
-} from "@openinary/core";
+} from "@openinary/core/light";
 
 type VideoTransformParams = Parameters<VideoJobStore["createJob"]>[1];
 

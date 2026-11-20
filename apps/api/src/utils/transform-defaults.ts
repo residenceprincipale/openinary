@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
-import type { TransformDefaults } from "@openinary/core";
+import type { TransformDefaults } from "@openinary/core/light";
 
 /**
  * Where the config page persists its settings. Sits beside the auth database

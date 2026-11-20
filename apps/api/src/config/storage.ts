@@ -2,7 +2,7 @@ import {
   createStorageClient,
   type StorageClientOptions,
   type StorageConfig,
-} from "@openinary/core";
+} from "@openinary/core/light";
 
 /** The one place the self-hosted app reads STORAGE_* variables. */
 export function getStorageConfigFromEnv(): {

@@ -1,10 +1,10 @@
 import { Hono } from "hono";
 import { existsSync, readdirSync, statSync } from "fs";
 import { join } from "path";
-import { getBucketStats, logger, serializeError } from "@openinary/core";
+import { getBucketStats, logger, serializeError } from "@openinary/core/light";
 import { apiKeyAuth, type AuthVariables } from "../middleware/auth";
 import { getSharedStorage } from "../config/storage";
-import { enginePaths } from "../config/queue";
+import { enginePaths } from "../config/paths";
 import { readConfig, writeConfig } from "../utils/transform-defaults";
 
 const config = new Hono<AuthVariables>();
@@ -61,6 +61,7 @@ config.get("/server", async (c) => {
       maxFileSizeMB: parseInt(process.env.MAX_FILE_SIZE_MB ?? "50", 10) || 50,
       storageLimitMB: parseInt(process.env.STORAGE_LIMIT_MB ?? "0", 10) || 0,
       storageUsedMB: Math.round((usedBytes / (1024 * 1024)) * 100) / 100,
+      transformsDisabled: process.env.DISABLE_TRANSFORMS === "true",
     },
   });
 });

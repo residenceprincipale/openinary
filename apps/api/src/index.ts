@@ -3,22 +3,19 @@ import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { allowedOrigins } from "shared";
 import {
-  createTransformRoute,
-  createAuthenticatedRoute,
   createStorageRoute,
   createDownloadRoute,
   createDownloadFolderRoute,
   createDownloadZipRoute,
-  createVideoStatusRoute,
-  createQueueEventsRoute,
-  createQueueRoute,
   createInvalidateRoute,
+  createRawRoute,
   validateApiSecret,
   logger,
   serializeError,
   type RouteDeps,
   type StorageAccess,
-} from "@openinary/core";
+  type VideoJobQueue,
+} from "@openinary/core/light";
 import { createUploadRoute } from "./routes/upload";
 import apiKeys from "./routes/api-keys";
 import activity from "./routes/activity";
@@ -28,24 +25,48 @@ import cache from "./routes/cache";
 import config from "./routes/config";
 import users from "./routes/users";
 import { createStorageExtras } from "./routes/storage-extras";
-import { logDelivery, noteApiUpload } from "./middleware/activity";
+import { noteApiUpload } from "./middleware/activity";
 import { apiKeyAuth, type AuthVariables } from "./middleware/auth";
 import { publicRateLimit } from "./middleware/rate-limit";
 import { getSharedStorage } from "./config/storage";
-import { enginePaths, videoJobQueue } from "./config/queue";
+import { enginePaths } from "./config/paths";
 import { getTransformDefaults } from "./utils/transform-defaults";
 import { getUserAccessiblePaths, hasPermission } from "./utils/permissions";
 
+/**
+ * DISABLE_TRANSFORMS=true turns this into a delivery-only server: no /t, no
+ * video queue, and sharp/ffmpeg are never imported, which keeps the process'
+ * memory flat. Uploads still work; prewarm requests are ignored.
+ */
+export const transformsDisabled = process.env.DISABLE_TRANSFORMS === "true";
+
 // Logged, not fatal: only /authenticated and presigned uploads need the
 // secret, and they answer 500 without it.
-try {
-  validateApiSecret(process.env.API_SECRET);
-} catch (error) {
-  logger.error(
-    { error: serializeError(error) },
-    "API_SECRET validation failed at startup",
-  );
+if (!transformsDisabled) {
+  try {
+    validateApiSecret(process.env.API_SECRET);
+  } catch (error) {
+    logger.error(
+      { error: serializeError(error) },
+      "API_SECRET validation failed at startup",
+    );
+  }
 }
+
+type TransformRuntime = typeof import("./transform-runtime");
+
+let transformRuntime: TransformRuntime | null = null;
+if (!transformsDisabled) {
+  transformRuntime = await import("./transform-runtime");
+}
+
+// The storage route only needs the job store to delete related jobs. With
+// transforms off there are none, and importing VideoJobQueue would pull sharp.
+const disabledQueue = {
+  store: { deleteJobsByFilePath: () => 0 },
+} as unknown as VideoJobQueue;
+
+const queue = transformRuntime?.videoJobQueue ?? disabledQueue;
 
 const access: StorageAccess = {
   visiblePaths(c) {
@@ -63,7 +84,7 @@ const access: StorageAccess = {
 
 const deps: RouteDeps = {
   storage: getSharedStorage(),
-  queue: videoJobQueue,
+  queue,
   paths: enginePaths,
   apiSecret: process.env.API_SECRET,
   allowRemoteSource: process.env.ALLOW_REMOTE_SOURCE === "true",
@@ -72,17 +93,16 @@ const deps: RouteDeps = {
   access,
 };
 
-const transform = createTransformRoute(deps);
-const authenticated = createAuthenticatedRoute(deps);
-const upload = createUploadRoute(deps);
+const upload = createUploadRoute(deps, {
+  transformsEnabled: !transformsDisabled,
+  transformService: transformRuntime?.createUploadTransformService(deps),
+});
 const storageRoute = createStorageRoute(deps);
 const download = createDownloadRoute(deps);
 const downloadFolder = createDownloadFolderRoute(deps);
 const downloadZip = createDownloadZipRoute(deps);
-const videoStatus = createVideoStatusRoute(deps);
-const queueEvents = createQueueEventsRoute(deps);
-const queue = createQueueRoute(deps);
 const invalidateRoute = createInvalidateRoute(deps);
+const raw = createRawRoute(deps);
 
 const app = new Hono();
 
@@ -117,14 +137,9 @@ app.use("/health", publicRateLimit);
 app.use("/health/*", publicRateLimit);
 app.route("/health", health);
 
-app.use("/video-status", publicRateLimit);
-app.use("/video-status/*", publicRateLimit);
-app.route("/video-status", videoStatus);
-
-app.use("/t", publicRateLimit);
-app.use("/t/*", publicRateLimit);
-app.use("/t/*", logDelivery("/t"));
-app.route("/t", transform);
+// /t, /authenticated, /video-status and /queue are only mounted when
+// transforms are on.
+transformRuntime?.registerTransformRoutes(app, deps);
 
 app.use("/download", publicRateLimit);
 app.use("/download/*", publicRateLimit);
@@ -133,17 +148,6 @@ app.route("/download", download);
 app.use("/download-folder", publicRateLimit);
 app.use("/download-folder/*", publicRateLimit);
 app.route("/download-folder", downloadFolder);
-
-// Public too: the URL's signature is the authorization.
-app.use("/authenticated", publicRateLimit);
-app.use("/authenticated/*", publicRateLimit);
-app.use("/authenticated/*", logDelivery("/authenticated"));
-app.route("/authenticated", authenticated);
-
-// Registered before the protected /queue/* so it stays public.
-app.use("/queue/events", publicRateLimit);
-app.use("/queue/events/*", publicRateLimit);
-app.route("/queue/events", queueEvents);
 
 // POST /upload accepts either a real API key/session, or a short-lived
 // presigned signature minted by POST /upload/sign, so it gets its own
@@ -171,9 +175,6 @@ app.route("/download-zip", downloadZip);
 app.use("/invalidate/*", apiKeyAuth);
 app.route("/invalidate", invalidateRoute);
 
-app.use("/queue/*", apiKeyAuth);
-app.route("/queue", queue);
-
 app.use("/activity", apiKeyAuth);
 app.use("/activity/*", apiKeyAuth);
 app.route("/activity", activity);
@@ -195,5 +196,18 @@ app.route("/users", users);
 
 // Applies apiKeyAuth itself.
 app.route("/api-keys", apiKeys);
+
+// Originals at their root path (/photos/a.jpg), inline and Range-capable.
+// Last: every API route above wins.
+app.route("/", raw);
+
+/** Starts the video worker; a no-op when transforms are off. */
+export function startBackgroundJobs(): void {
+  transformRuntime?.startVideoQueue();
+}
+
+export function stopBackgroundJobs(): void {
+  transformRuntime?.stopVideoQueue();
+}
 
 export default app;

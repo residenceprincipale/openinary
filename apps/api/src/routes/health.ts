@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import fs from "fs";
 import { getDb, resolveDbPath } from "shared";
 import { apiKeyAuth, AuthVariables } from "../middleware/auth";
-import { logger, serializeError } from "@openinary/core";
+import { logger, serializeError } from "@openinary/core/light";
 
 const health = new Hono<AuthVariables>();
 

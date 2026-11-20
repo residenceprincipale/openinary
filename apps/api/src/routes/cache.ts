@@ -7,10 +7,10 @@ import {
   listCachedFiles,
   logger,
   serializeError,
-} from "@openinary/core";
+} from "@openinary/core/light";
 import { apiKeyAuth, type AuthVariables } from "../middleware/auth";
 import { getSharedStorage } from "../config/storage";
-import { enginePaths } from "../config/queue";
+import { enginePaths } from "../config/paths";
 
 const cacheRoute = new Hono<AuthVariables>();
 cacheRoute.use("/*", apiKeyAuth);

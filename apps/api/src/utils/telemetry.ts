@@ -7,7 +7,7 @@ import {
   readVersion,
   type TelemetryEvent,
 } from "shared";
-import { logger } from "@openinary/core";
+import { logger } from "@openinary/core/light";
 import { getStorageConfigFromEnv } from "../config/storage";
 import { deploymentMode } from "../config/mode";
 import { canDeriveFrom, deriveInstanceId } from "./telemetry-id";

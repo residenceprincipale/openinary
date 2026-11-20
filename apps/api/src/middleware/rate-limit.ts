@@ -1,5 +1,5 @@
 import { Context, Next } from "hono";
-import { logger } from "@openinary/core";
+import { logger } from "@openinary/core/light";
 import { clientIp } from "../utils/client-ip";
 
 interface RateLimitEntry {

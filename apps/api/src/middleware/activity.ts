@@ -1,5 +1,5 @@
 import type { Context, Next } from "hono";
-import { logger, serializeError } from "@openinary/core";
+import { logger, serializeError } from "@openinary/core/light";
 
 import { activityLog } from "../config/activity";
 import { isDashboardTraffic, isOpeningRange } from "../utils/activity-log";

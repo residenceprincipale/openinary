@@ -30,7 +30,8 @@ const OPTIONS: Record<TransformableType, { c: string[]; g: string[]; f: string[]
   video: {
     c: ["fill", "fit", "scale", "crop", "pad"],
     g: ["center", "north", "south", "east", "west", "auto"],
-    f: ["mp4", "webm", "mov"],
+    // Audio formats extract the soundtrack instead of encoding a video.
+    f: ["mp4", "webm", "mov", "mp3", "m4a", "wav"],
   },
 };
 
@@ -76,6 +77,10 @@ export function AssetTransformationsTab({
     setParams((current) => ({ ...current, [key]: value }));
 
   const options = OPTIONS[type];
+  const audioOutput =
+    type === "video" &&
+    !!params.f &&
+    ["mp3", "m4a", "aac", "ogg", "wav", "flac"].includes(params.f);
   const segment = serialize(params);
   const path = encodePath(asset.path);
   const url =
@@ -154,12 +159,12 @@ export function AssetTransformationsTab({
               placeholder={options.f[0]}
             />
           </Field>
-          <Field label="Quality">
+          <Field label={audioOutput ? "Bitrate (kbps)" : "Quality"}>
             <Input
               type="number"
               min={1}
-              max={100}
-              placeholder={type === "image" ? "80" : "Auto"}
+              max={audioOutput ? 320 : 100}
+              placeholder={audioOutput ? "128" : type === "image" ? "80" : "Auto"}
               className="h-8"
               value={params.q ?? ""}
               onChange={(event) => set("q")(event.target.value)}
@@ -167,7 +172,12 @@ export function AssetTransformationsTab({
           </Field>
         </div>
 
-        <PreviewFrame asset={asset} src={original} params={params} />
+        <PreviewFrame
+          asset={asset}
+          src={audioOutput ? url : original}
+          audio={audioOutput}
+          params={params}
+        />
 
         <DeliveryUrl url={url} path={path} params={segment || undefined} />
 
@@ -245,10 +255,13 @@ const FRAME_HEIGHT = 176; // h-44
 function PreviewFrame({
   asset,
   src,
+  audio,
   params,
 }: {
   asset: MediaFile;
   src: string;
+  /** The URL returns an audio track extracted from a video. */
+  audio?: boolean;
   params: Params;
 }) {
   const width = Number(params.w) || 0;
@@ -266,8 +279,11 @@ function PreviewFrame({
     objectFit: ratio ? (FIT[params.c ?? "fill"] ?? "cover") : "contain",
     objectPosition: POSITION[params.g ?? ""] ?? "center",
   };
-  const media =
-    asset.type === "image" ? (
+  const media = audio ? (
+    <div className="flex size-full items-center bg-ds-field px-4">
+      <audio src={src} controls className="w-full" />
+    </div>
+  ) : asset.type === "image" ? (
       // biome-ignore lint/performance/noImgElement: a plain preview of the original
       <img src={src} alt={`${asset.name}, transformed`} className="size-full" style={style} />
     ) : (

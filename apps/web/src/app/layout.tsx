@@ -45,6 +45,7 @@ export default function RootLayout({
             <OpeninaryProvider
               apiBaseUrl={process.env.NEXT_PUBLIC_API_BASE_URL || ""}
               transformBaseUrl={process.env.NEXT_PUBLIC_TRANSFORM_BASE_URL}
+              transformsDisabled={process.env.DISABLE_TRANSFORMS === "true"}
             >
               <BrandingProvider>
                 <NuqsAdapter>{children}</NuqsAdapter>

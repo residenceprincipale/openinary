@@ -18,6 +18,7 @@ export type ImageFormat =
   | "gif"
   | "auto";
 export type VideoFormat = "mp4" | "mov" | "webm";
+export type AudioFormat = "mp3" | "wav" | "ogg" | "flac" | "aac" | "m4a";
 export enum FullGravityMode {
   NORTH = "north",
   NORTHEAST = "northeast",
@@ -77,7 +78,7 @@ export interface ImageTransformParams
 }
 
 export interface VideoTransformParams extends OverlayTransformParams {
-  format?: VideoFormat | ImageFormat;
+  format?: VideoFormat | ImageFormat | AudioFormat;
   startOffset?: number;
   endOffset?: number;
   width?: number;

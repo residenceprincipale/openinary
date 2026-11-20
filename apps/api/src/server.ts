@@ -1,19 +1,19 @@
 import "dotenv/config";
 import { serve } from "@hono/node-server";
-import app from "./index";
+import app, { startBackgroundJobs, stopBackgroundJobs } from "./index";
 import { getSharedStorage } from "./config/storage";
 import { getDb, hasAdmin } from "shared";
 import { getAuth } from "shared/auth";
 import { randomUUID } from "crypto";
-import { clearAllCache, logger } from "@openinary/core";
-import { enginePaths, videoJobQueue } from "./config/queue";
+import { clearAllCache, logger } from "@openinary/core/light";
+import { enginePaths } from "./config/paths";
 import { initTelemetry } from "./utils/telemetry";
 import { deploymentMode } from "./config/mode";
 
 // In cloud mode the bucket is the cache: local files from a previous run go.
 if (getSharedStorage()) await clearAllCache(enginePaths.cache);
 
-videoJobQueue.start();
+startBackgroundJobs();
 
 /**
  * First boot only: creates the admin from OPENINARY_ADMIN_* and, in API mode
@@ -124,12 +124,12 @@ initializeAuth();
 // Graceful shutdown
 process.on("SIGTERM", () => {
   logger.info("SIGTERM received, shutting down gracefully...");
-  videoJobQueue.stop();
+  stopBackgroundJobs();
   process.exit(0);
 });
 
 process.on("SIGINT", () => {
   logger.info("SIGINT received, shutting down gracefully...");
-  videoJobQueue.stop();
+  stopBackgroundJobs();
   process.exit(0);
 });

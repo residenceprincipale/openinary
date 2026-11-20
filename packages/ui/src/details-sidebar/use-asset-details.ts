@@ -16,7 +16,7 @@ export function useAssetDetails(
   onAssetIdChange: (assetId: string | null) => void,
   onOpenChange?: (open: boolean) => void,
 ) {
-  const { apiBaseUrl, transformBaseUrl, fetch } = useOpeninary();
+  const { apiBaseUrl, transformBaseUrl, fetch, transformsDisabled } = useOpeninary();
   const queryClient = useQueryClient();
   const [asset, setAsset] = useState<MediaFile | null>(null);
   const [fileSize, setFileSize] = useState<number | null>(null);
@@ -93,12 +93,23 @@ export function useAssetDetails(
   // produce a shareable link even when transformBaseUrl is empty (same-origin
   // Docker deployments where the bundle was built with NEXT_PUBLIC_API_BASE_URL=/api).
   const ready = asset && transformBaseUrl !== null;
-  const mediaUrl = ready ? toAbsoluteUrl(`${transformBaseUrl}/t/${encodePath(asset.path)}`) : "";
+  const rawPath = ready ? `${transformBaseUrl}/${encodePath(asset.path)}` : "";
+  // No transforms: originals are served at the root; video has no poster.
+  const mediaUrl = ready
+    ? transformsDisabled
+      ? toAbsoluteUrl(rawPath)
+      : toAbsoluteUrl(`${transformBaseUrl}/t/${encodePath(asset.path)}`)
+    : "";
   // Audio and documents have no thumbnail; the preview uses the media URL.
-  const previewUrl =
-    ready && (asset.type === "image" || asset.type === "video")
-      ? `${transformBaseUrl}/t/${dashboardThumbSegment(asset.type, "preview")}/${encodePath(asset.path)}`
-      : "";
+  const previewUrl = ready
+    ? asset.type === "image"
+      ? transformsDisabled
+        ? rawPath
+        : `${transformBaseUrl}/t/${dashboardThumbSegment("image", "preview")}/${encodePath(asset.path)}`
+      : asset.type === "video" && !transformsDisabled
+        ? `${transformBaseUrl}/t/${dashboardThumbSegment("video", "preview")}/${encodePath(asset.path)}`
+        : ""
+    : "";
 
   // Preload preview media when asset changes
   // Note: Even videos are preloaded as "image" since we extract thumbnails

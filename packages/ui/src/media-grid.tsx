@@ -154,15 +154,32 @@ function getFolderThumbnailUrl(
   transformBaseUrl: string | null,
   item: { path: string; type: "image" | "video" },
   size: "square" | "tall" | "large",
+  transformsDisabled: boolean,
 ): string {
   if (transformBaseUrl === null) return "";
+  if (transformsDisabled) {
+    return item.type === "image"
+      ? `${transformBaseUrl}/${encodePath(item.path)}`
+      : "";
+  }
   return `${transformBaseUrl}/t/${dashboardThumbSegment(item.type, size)}/${encodePath(item.path)}`;
 }
 
 /** "" while the base is unknown or the type has no thumbnail. */
-function gridThumbnailUrl(transformBaseUrl: string | null, media: MediaFile) {
+function gridThumbnailUrl(
+  transformBaseUrl: string | null,
+  media: MediaFile,
+  transformsDisabled: boolean,
+) {
   if (transformBaseUrl === null) return "";
   if (media.type !== "image" && media.type !== "video") return "";
+  // Without transforms, images come from the raw root route; a video has no
+  // poster without ffmpeg, so the tile shows its icon instead.
+  if (transformsDisabled) {
+    return media.type === "image"
+      ? `${transformBaseUrl}/${encodePath(media.path)}`
+      : "";
+  }
   return `${transformBaseUrl}/t/${dashboardThumbSegment(media.type, "preview")}/${encodePath(media.path)}`;
 }
 
@@ -388,7 +405,7 @@ function MediaGridBody({
   emptyFooter,
   selectionSlot,
 }: MediaGridProps) {
-  const { apiBaseUrl, transformBaseUrl, fetch } = useOpeninary();
+  const { apiBaseUrl, transformBaseUrl, fetch, transformsDisabled } = useOpeninary();
   const [hideThumbnails] = useHideThumbnails();
   const queryClient = useQueryClient();
   const [hoveredId, setHoveredId] = useState<string | null>(null);
@@ -758,7 +775,7 @@ function MediaGridBody({
   // the untouched file, which would pull hundreds of MB on a hover.
   const handleMediaHover = (media: MediaFile) => {
     if (!hasThumbnail(media.type)) return;
-    const previewUrl = gridThumbnailUrl(transformBaseUrl, media);
+    const previewUrl = gridThumbnailUrl(transformBaseUrl, media, transformsDisabled);
     if (previewUrl) preloadMedia(previewUrl, "image");
   };
 
@@ -1438,7 +1455,11 @@ function MediaGridBody({
                         const previewItems =
                           hideThumbnails || !summary
                             ? []
-                            : summary.previewItems;
+                            : transformsDisabled
+                              ? summary.previewItems.filter(
+                                  (item) => item.type === "image",
+                                )
+                              : summary.previewItems;
                         const renderPreview = (
                           item: { path: string; type: "image" | "video" },
                           size: "square" | "tall" | "large",
@@ -1448,6 +1469,7 @@ function MediaGridBody({
                               transformBaseUrl,
                               item,
                               size,
+                              transformsDisabled,
                             )}
                             alt=""
                             className="w-full h-full object-cover"
@@ -1923,6 +1945,7 @@ function MediaGridBody({
                           const thumbnailUrl = gridThumbnailUrl(
                             transformBaseUrl,
                             media,
+                            transformsDisabled,
                           );
                           const isHovered = hoveredId === media.id;
 
@@ -1969,7 +1992,9 @@ function MediaGridBody({
                                       }
                                     />
                                   </div>
-                                  {hideThumbnails || !hasThumbnail(media.type) ? (
+                                  {hideThumbnails ||
+                                  !hasThumbnail(media.type) ||
+                                  (transformsDisabled && media.type === "video") ? (
                                     <FileTypeIcon type={media.type} />
                                   ) : (
                                     <VideoThumbnail
@@ -2126,6 +2151,7 @@ function MediaGridBody({
                   const thumbnailUrl = gridThumbnailUrl(
                     transformBaseUrl,
                     media,
+                    transformsDisabled,
                   );
 
                   return (
@@ -2169,7 +2195,9 @@ function MediaGridBody({
                                 });
                               }}
                             >
-                              {hideThumbnails || !hasThumbnail(media.type) ? (
+                              {hideThumbnails ||
+                              !hasThumbnail(media.type) ||
+                              (transformsDisabled && media.type === "video") ? (
                                 <FileTypeIcon type={media.type} />
                               ) : (
                                 <VideoThumbnail

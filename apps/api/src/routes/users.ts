@@ -1,7 +1,7 @@
 import { Hono, type Context, type Next } from "hono";
 import { getDb } from "shared";
 import { getAuth } from "shared/auth";
-import { logger, serializeError } from "@openinary/core";
+import { logger, serializeError } from "@openinary/core/light";
 import { apiKeyAuth, type AuthVariables } from "../middleware/auth";
 
 const usersRoute = new Hono<AuthVariables>();

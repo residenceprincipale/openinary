@@ -57,12 +57,16 @@ Type-check and tests both depend on `^build`; run them before pushing.
   overlay → quality → volume).
 - Video transcodes run in the SQLite-backed job queue. A request returns 202
   with an ETA; `/video-status/<transform>/<path>` reports progress.
-- Audio and 3D files are stored and delivered as originals, not transcoded.
+- Audio runs inline: `f_mp3` on a video extracts its track, and audio sources
+  accept `f_`, `q_` (kbps), `v_`, `so_` and `eo_`. 3D files stay opaque.
+- Originals are also served at the root (`/photos/a.jpg`), inline and
+  Range-capable. That route is mounted last, so every API route wins.
 
 ## Self-hosted API routes
 | Route | Auth | Purpose |
 |-------|------|---------|
-| `GET /t/*` | public | Transform / thumbnail / deliver |
+| `GET /t/*` | public | Transform / thumbnail / deliver (image, video, audio) |
+| `GET /*` | public | Original at its root path, inline + Range |
 | `GET /download/*`, `/download-folder/*`, `/download-zip` | public/key | Originals |
 | `GET /video-status/*`, `/queue/events` | public | Job status and SSE |
 | `POST /upload`, `/upload/sign`, `/upload/createfolder` | key/signature | Uploads |
@@ -97,5 +101,8 @@ created becomes `admin`; later accounts default to `user`.
 `BETTER_AUTH_SECRET` (required in production), `BETTER_AUTH_URL`, `API_SECRET`
 (signed URLs), `DB_PATH`, `MODE` (`fullstack` or `api`), `MAX_FILE_SIZE_MB`,
 `STORAGE_LIMIT_MB` (0 = unlimited), `STORAGE_*` for S3, `CORS_ORIGIN`.
+`DISABLE_TRANSFORMS=true` runs delivery-only: no `/t`, no video queue, and
+`@openinary/core/light` (no sharp) is used. Set the same variable for the web
+app so the dashboard hides transform/queue/cache and uses the raw originals.
 Runtime transform defaults are saved by the Transforms page to
 `data/transforms.json` (next to `DB_PATH`).

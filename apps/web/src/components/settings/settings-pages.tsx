@@ -1,7 +1,7 @@
 "use client";
 
 import { SettingsPage, type SettingsPageEntry } from "@openinary/dashboard";
-import { AppearanceTab, StorageTab } from "@openinary/ui";
+import { AppearanceTab, StorageTab, useOpeninary } from "@openinary/ui";
 import {
   Archive,
   HardDrive,
@@ -113,5 +113,14 @@ export const SETTINGS_PAGES: SettingsPageEntry[] = [
 ];
 
 export function Settings({ tab }: { tab: string }) {
-  return <SettingsPage tab={tab} pages={SETTINGS_PAGES} />;
+  const { transformsDisabled } = useOpeninary();
+  const pages = transformsDisabled
+    ? SETTINGS_PAGES.filter(
+        (page) =>
+          page.value !== "queue" &&
+          page.value !== "cache" &&
+          page.value !== "transforms",
+      )
+    : SETTINGS_PAGES;
+  return <SettingsPage tab={tab} pages={pages} />;
 }

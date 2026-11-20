@@ -7,11 +7,11 @@ import {
   deleteCachedFiles,
   logger,
   serializeError,
-} from "@openinary/core";
+} from "@openinary/core/light";
 import { getDb } from "shared";
 import { apiKeyAuth, type AuthVariables } from "../middleware/auth";
 import { getSharedStorage } from "../config/storage";
-import { enginePaths } from "../config/queue";
+import { enginePaths } from "../config/paths";
 import {
   grantPermission,
   hasPermission,

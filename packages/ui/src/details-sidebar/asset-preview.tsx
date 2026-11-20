@@ -55,6 +55,14 @@ export function AssetPreview({
           <div className="flex h-full items-center px-4">
             <audio src={mediaUrl} controls className="w-full" />
           </div>
+        ) : asset.type === "video" && !previewUrl ? (
+          <video
+            src={mediaUrl}
+            controls
+            muted
+            playsInline
+            className="size-full object-contain"
+          />
         ) : asset.type === "other" ? (
           <div className="flex h-full flex-col items-center justify-center gap-2 text-ds-muted">
             <FileText className="size-8" />

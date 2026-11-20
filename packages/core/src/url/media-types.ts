@@ -5,9 +5,9 @@
  * they cannot drift.
  *
  * Consumed by the OSS API and the Cloud Worker so their whitelists cannot
- * diverge. Deliberately excludes svg (stored-XSS vector when served inline). Images and
- * videos go through the transform pipeline; audio and 3D are stored and served
- * as opaque originals (no transform pipeline).
+ * diverge. Deliberately excludes svg (stored-XSS vector when served inline).
+ * Images and videos go through the transform pipeline; audio can be
+ * transcoded or extracted from a video; 3D is stored and served untouched.
  */
 interface MediaType {
   /** canonical extension, no dot, lowercase */
@@ -92,7 +92,8 @@ const MEDIA_TYPES: readonly MediaType[] = [
   { ext: "webm", contentType: "video/webm", uploadMimes: ["video/webm"],
     // EBML header, shared with mkv
     matches: (h) => h[0] === 0x1a && h[1] === 0x45 && h[2] === 0xdf && h[3] === 0xa3 },
-  // Audio (stored + delivered as originals, not transformed)
+  // Audio: stored and delivered as originals, plus the audio transform
+  // pipeline (f_mp3 on a video extracts its track; audio sources transcode).
   { ext: "wav", contentType: "audio/wav", uploadMimes: ["audio/wav", "audio/x-wav"],
     matches: (h) => riff(h, "WAVE") },
   { ext: "mp3", contentType: "audio/mpeg", uploadMimes: ["audio/mpeg"],
@@ -101,6 +102,13 @@ const MEDIA_TYPES: readonly MediaType[] = [
       marker(h, 0, "ID3") || (h[0] === 0xff && (h[1] & 0xe0) === 0xe0) },
   { ext: "ogg", contentType: "audio/ogg", uploadMimes: ["audio/ogg", "application/ogg"],
     matches: (h) => marker(h, 0, "OggS") },
+  { ext: "flac", contentType: "audio/flac", uploadMimes: ["audio/flac", "audio/x-flac"],
+    matches: (h) => marker(h, 0, "fLaC") },
+  { ext: "aac", contentType: "audio/aac", uploadMimes: ["audio/aac", "audio/aacp"],
+    // ADTS frame sync: 12 set bits, layer bits 00
+    matches: (h) => h[0] === 0xff && (h[1] & 0xf6) === 0xf0 },
+  { ext: "m4a", contentType: "audio/mp4", uploadMimes: ["audio/mp4", "audio/x-m4a"],
+    matches: isoBmff },
   // 3D models (stored + delivered as originals). Browsers usually send .glb as
   // application/octet-stream, the same as .psd - the content check below is what
   // keeps that generic MIME from being a way in for arbitrary binaries.
@@ -242,6 +250,7 @@ export function stripUrlHostile(value: string): string {
 export const IMAGE_FORMATS = new Set(["jpg", "jpeg", "png", "webp", "avif", "gif"]);
 
 export const VIDEO_FORMATS = new Set(["mp4", "mov", "webm"]);
+export const AUDIO_FORMATS = new Set(["mp3", "wav", "ogg", "flac", "aac", "m4a"]);
 
 /** Image sources the transform pipeline can decode (psd is decoded to png). */
 const TRANSFORMABLE_IMAGE_EXTS = new Set([...IMAGE_FORMATS, "psd"]);
@@ -251,6 +260,9 @@ export const isTransformableImageExt = (ext: string | undefined): boolean =>
 
 export const isVideoExt = (ext: string | undefined): ext is string =>
   !!ext && VIDEO_FORMATS.has(ext.toLowerCase());
+
+export const isAudioExt = (ext: string | undefined): ext is string =>
+  !!ext && AUDIO_FORMATS.has(ext.toLowerCase());
 
 export const normalizeFormat = (format: string): string =>
   format === "jpeg" ? "jpg" : format;
@@ -269,9 +281,11 @@ export const determineOutputFormat = (
   const isThumbnail = isVideoExt(sourceExt) && isImageOutput;
   const format = isThumbnail
     ? normalizeFormat(requested!)
-    : requested && VIDEO_FORMATS.has(requested)
+    : requested && (VIDEO_FORMATS.has(requested) || AUDIO_FORMATS.has(requested))
       ? requested
-      : "mp4";
+      : isAudioExt(sourceExt)
+        ? sourceExt
+        : "mp4";
   return { format, isImageOutput, isThumbnail };
 };
 

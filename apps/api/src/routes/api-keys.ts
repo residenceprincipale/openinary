@@ -2,7 +2,7 @@ import { Hono, type Context } from "hono";
 import { getDb } from "shared";
 import { getAuth } from "shared/auth";
 import { apiKeyAuth, AuthVariables } from "../middleware/auth";
-import { logger, serializeError } from "@openinary/core";
+import { logger, serializeError } from "@openinary/core/light";
 
 /**
  * /api-keys, documented in apps/docs/api-reference/api-keys. Better Auth's own

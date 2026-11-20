@@ -17,6 +17,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@openinary/dashboard/ui/dropdown-menu";
+import { useOpeninary } from "@openinary/ui";
 import { Archive, ArrowUpRight, ListVideo, LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -130,6 +131,17 @@ function Account() {
 export function AppSidebar() {
   const router = useRouter();
   const branding = useBranding();
+  const { transformsDisabled } = useOpeninary();
+
+  // Without transforms there is no queue, and thumbnails read originals, so
+  // the cache page has nothing to manage either.
+  const hiddenWhenDisabled = ["/settings/queue", "/settings/cache", "/settings/transforms"];
+  const visibleMain = transformsDisabled
+    ? mainItems.filter((item) => !hiddenWhenDisabled.includes(item.url))
+    : mainItems;
+  const visibleSettings = transformsDisabled
+    ? settingsPages.filter((page) => !hiddenWhenDisabled.includes(page.url))
+    : settingsPages;
 
   return (
     <DashboardSidebar
@@ -140,9 +152,9 @@ export function AppSidebar() {
           className="size-[18px] dark:invert"
         />
       }
-      mainItems={mainItems}
-      settingsPages={settingsPages}
-      settingsActions={settingsPages.map((page) => ({
+      mainItems={visibleMain}
+      settingsPages={visibleSettings}
+      settingsActions={visibleSettings.map((page) => ({
         label: page.title,
         group: "Settings",
         icon: page.title === "Account" ? SolarAccount : SolarPalette,

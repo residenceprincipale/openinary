@@ -78,6 +78,7 @@ export { useAssetDetails } from "./details-sidebar/use-asset-details";
 // Storage/upload components
 export { MoveToNavigator } from "./components/move-to-navigator";
 export { BulkActionBarContent } from "./components/bulk-action-bar";
+export { StatusBar } from "./components/status-bar";
 export {
   BatchRenameDialog,
   type BatchRenameItem,

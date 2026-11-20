@@ -15,6 +15,8 @@ export interface OpeninaryConfig {
   transformBaseUrl: string | null;
   /** Every request the package makes goes through this. */
   fetch: OpeninaryFetch;
+  /** The API runs with DISABLE_TRANSFORMS: no /t, no video queue. */
+  transformsDisabled: boolean;
 }
 
 export interface OpeninaryProviderProps {
@@ -28,6 +30,7 @@ export interface OpeninaryProviderProps {
    *  Cannot be passed as a prop from a Server Component — functions aren't
    *  serializable across the RSC boundary. */
   fetch?: OpeninaryFetch;
+  transformsDisabled?: boolean;
   children: React.ReactNode;
 }
 
@@ -39,6 +42,7 @@ export function OpeninaryProvider({
   apiBaseUrl,
   transformBaseUrl,
   fetch: fetchImpl,
+  transformsDisabled = false,
   children,
 }: OpeninaryProviderProps) {
   const value = React.useMemo<OpeninaryConfig>(
@@ -52,8 +56,9 @@ export function OpeninaryProvider({
         fetchImpl ??
         ((input, init) =>
           globalThis.fetch(input, { credentials: "include", ...init })),
+      transformsDisabled,
     }),
-    [apiBaseUrl, transformBaseUrl, fetchImpl],
+    [apiBaseUrl, transformBaseUrl, fetchImpl, transformsDisabled],
   );
 
   return (

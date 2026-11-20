@@ -1,7 +1,7 @@
 import { Context, Next } from "hono";
 import { getDb } from "shared";
 import { getAuth } from "shared/auth";
-import { logger, serializeError } from "@openinary/core";
+import { logger, serializeError } from "@openinary/core/light";
 import { clientIp } from "../utils/client-ip";
 
 export type AuthVariables = {

@@ -6,7 +6,6 @@ import {
   parseParams,
   THUMBNAIL_PRIORITY,
   TRANSFORMATION_PRIORITY,
-  TransformService,
   generateUploadSignature,
   stripUrlHostile,
   validateUploadFileType,
@@ -16,9 +15,10 @@ import {
   logger,
   serializeError,
   type RouteDeps,
-} from "@openinary/core";
+} from "@openinary/core/light";
 import fs from "fs";
 import path from "path";
+import type { TransformService } from "@openinary/core";
 import { presignedOrApiKeyAuth } from "../middleware/presigned-upload-auth";
 import heicConvert from "heic-convert";
 
@@ -140,15 +140,22 @@ function parsePrewarmTransformations(formData: FormData): string[] {
   return unique;
 }
 
-export function createUploadRoute(deps: RouteDeps) {
+export function createUploadRoute(
+  deps: RouteDeps,
+  options: {
+    /** Undefined when DISABLE_TRANSFORMS is on. */
+    transformService?: TransformService;
+    transformsEnabled?: boolean;
+  } = {},
+) {
   const { storage, apiSecret, paths, access } = deps;
   const videoJobQueue = deps.queue;
-  const transformService = new TransformService(
-    storage,
-    videoJobQueue,
-    paths,
-    deps.defaults,
-  );
+  const transformService = options.transformService;
+  const transformsEnabled = options.transformsEnabled ?? true;
+  // Bare /t/<path> streams originals, so it exists even without transforms
+  // only when the raw root route is mounted. There the URL is /<path>.
+  const deliveryUrl = (filePath: string) =>
+    transformsEnabled ? `/t/${filePath}` : `/${filePath}`;
   const upload = new Hono();
 
   const writeDenied = (c: Context, folder: string) => {
@@ -182,6 +189,8 @@ export function createUploadRoute(deps: RouteDeps) {
     filePath: string,
     transformations: string[],
   ): Promise<{ prewarmedUrls: string[]; prewarmErrors: string[] }> {
+    if (!transformService) return { prewarmedUrls: [], prewarmErrors: [] };
+
     const prewarmedUrls: string[] = [];
     const prewarmErrors: string[] = [];
 
@@ -383,7 +392,9 @@ export function createUploadRoute(deps: RouteDeps) {
       const customNames = formData.getAll("names");
       let prewarmTransformations: string[] = [];
       try {
-        prewarmTransformations = parsePrewarmTransformations(formData);
+        prewarmTransformations = transformsEnabled
+          ? parsePrewarmTransformations(formData)
+          : [];
       } catch (error) {
         return c.json(
           {
@@ -524,7 +535,7 @@ export function createUploadRoute(deps: RouteDeps) {
               filename: normalizedFileName,
               path: finalPath,
               size: normalizedBuffer.length,
-              url: `/t/${finalPath}`,
+              url: deliveryUrl(finalPath),
             };
 
             if (
@@ -585,7 +596,7 @@ export function createUploadRoute(deps: RouteDeps) {
               filename: normalizedFileName,
               path: finalPath,
               size: normalizedBuffer.length,
-              url: `/t/${finalPath}`,
+              url: deliveryUrl(finalPath),
             };
 
             if (

@@ -6,6 +6,7 @@ import {
   BottomSheet,
   type MediaFile,
   MediaGrid,
+  StatusBar,
   UploadButtonWithDialog,
   UploadDialog,
   useStorageLevel,
@@ -257,6 +258,7 @@ export function AssetsView({
                 }
               />
             </div>
+            <StatusBar />
           </Sheet>
         </ResizablePanel>
         {/* Pulled back across the sheet's right margin and border (8 + 1px)

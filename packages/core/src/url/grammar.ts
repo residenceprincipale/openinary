@@ -85,7 +85,7 @@ const TRANSFORM_VALUE_PATTERNS: Readonly<
   // Only formats an encoder can actually produce. Image sources: webp/jpeg/png/
   // avif/gif via sharp. Video sources: mp4/webm/mov, plus the image formats as
   // thumbnails. psd is an accepted *upload* format but is never an output.
-  f: /^(webp|jpe?g|png|avif|gif|mp4|webm|mov|auto)$/,
+  f: /^(webp|jpe?g|png|avif|gif|mp4|webm|mov|mp3|wav|ogg|flac|aac|m4a|auto)$/,
   // Degrees, auto, and Cloudinary's modes joined with "." (a_hflip.90).
   a: { test: (value: string) => parseAngle(value) !== undefined },
   dpr: { test: (value: string) => parseDpr(value) !== undefined },

@@ -39,6 +39,7 @@ export { createVideoStatusRoute } from "./routes/video-status";
 export { createQueueEventsRoute } from "./routes/queue-events";
 export { createQueueRoute } from "./routes/queue";
 export { createInvalidateRoute } from "./routes/invalidate";
+export { createRawRoute } from "./routes/raw";
 
 // Shared utilities
 export {

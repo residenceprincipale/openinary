@@ -1,6 +1,6 @@
 import { Context, Next } from "hono";
 import { AuthVariables, authenticateRequest } from "./auth";
-import { verifyUploadSignature, logger, serializeError } from "@openinary/core";
+import { verifyUploadSignature, logger, serializeError } from "@openinary/core/light";
 
 /**
  * Lets POST /upload authenticate with an API key or session as usual, or with

@@ -21,9 +21,11 @@ import { processingBody, processingHeaders } from "../eta";
 import {
   contentTypeForFormat,
   determineOutputFormat,
+  isAudioExt,
   isTransformableImageExt,
   isVideoExt,
 } from "../url/media-types";
+import { transformAudio } from "../utils/audio/index";
 import type { CombindedTransformParams, TransformDefaults } from "../types";
 import { NotFoundError, ValidationError } from "../utils/errors";
 import { derivativeEtag, sniffImageContentType } from "../utils/delivery-headers";
@@ -184,16 +186,19 @@ export class TransformService {
       ETag: derivativeEtag(buffer),
       "Content-Length": buffer.length.toString(),
     };
-    if (isVideoExt(ext)) headers["X-Video-Status"] = "ready";
+    const audioOutput = !!effectiveParams.format && isAudioExt(effectiveParams.format);
+    if (isVideoExt(ext) && !audioOutput) headers["X-Video-Status"] = "ready";
 
     // Video sources derive the type from the requested output format: f_avif
     // on a .mp4 caches an image, and the path's extension would mislabel it
-    // video/mp4 (browsers then render an empty player). Images: the cached
+    // video/mp4 (browsers then render an empty player). Audio derivatives
+    // (including audio extracted from a video) do the same. Images: the cached
     // bytes say what they are; the path keeps the source extension, so
     // falling back to it labelled AVIF as image/jpeg.
-    const contentType = isVideoExt(ext)
-      ? contentTypeForFormat(determineOutputFormat(ext, effectiveParams.format).format)
-      : (sniffImageContentType(buffer) ?? "");
+    const contentType =
+      isVideoExt(ext) || isAudioExt(ext)
+        ? contentTypeForFormat(determineOutputFormat(ext, effectiveParams.format).format)
+        : (sniffImageContentType(buffer) ?? "");
 
     return { buffer, contentType, headers };
   }
@@ -206,6 +211,54 @@ export class TransformService {
     cachePath: string,
     { userAgent, acceptHeader, sourceUrl }: TransformRequest,
   ): Promise<TransformResult> {
+    const isImage = isTransformableImageExt(ext);
+    const isAudio = isAudioExt(ext);
+    const audioOutput = !!effectiveParams.format && isAudioExt(effectiveParams.format);
+
+    // Audio (a source track, or the track of a video with f_mp3) is fast
+    // enough to run inline; only video transcodes take the queue.
+    const audioParams =
+      audioOutput ||
+      (isAudio &&
+        (effectiveParams.quality !== undefined ||
+          effectiveParams.volume !== undefined ||
+          effectiveParams.startOffset !== undefined ||
+          effectiveParams.endOffset !== undefined));
+    if (audioParams) {
+      if (isImage) {
+        const message = "An image cannot be delivered as audio. Request an image format (f_webp, f_avif, ...).";
+        return textResult(400, message, {
+          "Content-Length": Buffer.byteLength(message).toString(),
+          "Cache-Control": "no-store",
+        });
+      }
+
+      let audioSource: StagedSource | undefined;
+      try {
+        audioSource = await stageSource(this.storage, this.paths, filePath, sourceUrl);
+        const result = await transformAudio(audioSource.path, effectiveParams);
+        await saveToCaches(
+          this.storage,
+          filePath,
+          effectiveParams,
+          cachePath,
+          result.buffer,
+          result.contentType,
+        );
+        return {
+          buffer: result.buffer,
+          contentType: result.contentType,
+          headers: {
+            "Content-Length": result.buffer.length.toString(),
+            "Cache-Control": IMMUTABLE,
+            ETag: derivativeEtag(result.buffer),
+          },
+        };
+      } finally {
+        await audioSource?.cleanup();
+      }
+    }
+
     // Video transformations (non-thumbnail) are processed by the background
     // job queue, which stages its own source copy when it picks the job up,
     // possibly minutes later and long after a signed sourceUrl would have
@@ -215,11 +268,9 @@ export class TransformService {
       return await this.queueVideo(requestPath, filePath, effectiveParams);
     }
 
-    const isImage = isTransformableImageExt(ext);
-
     // Reached only when effectiveParams is non-empty - the bare-URL case
     // streams the original above. A transform was requested on a type nothing
-    // here knows how to transform (audio, 3D, /t/w_500/doc.pdf). Rejected
+    // here knows how to transform (3D, /t/w_500/doc.pdf). Rejected
     // before staging the source rather than serving the original, which would
     // hide a bug in whatever built this URL.
     if (!isImage && !isVideoExt(ext)) {
