@@ -56,7 +56,11 @@ Type-check and tests both depend on `^build`; run them before pushing.
   `packages/core/src/utils/video/*` (thumbnail → trim → downscale → resize →
   overlay → quality → volume).
 - Video transcodes run in the SQLite-backed job queue. A request returns 202
-  with an ETA; `/video-status/<transform>/<path>` reports progress.
+  with an ETA; `/video-status/<transform>/<path>` reports progress. When a
+  browser is previewing (Accept `text/html`/`video/*`, Range, or
+  Sec-Fetch-Dest `video`), the untouched original is served with
+  `X-Video-Status: processing` and `Cache-Control: no-store` instead of JSON;
+  `?original=1` forces it.
 - Audio runs inline: `f_mp3` on a video extracts its track, and audio sources
   accept `f_`, `q_` (kbps), `v_`, `so_` and `eo_`. 3D files stay opaque.
 - Originals are also served at the root (`/photos/a.jpg`), inline and
