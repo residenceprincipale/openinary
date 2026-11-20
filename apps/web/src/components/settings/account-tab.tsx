@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { standardSchemaResolver } from "@hookform/resolvers/standard-schema"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { Button } from "@openinary/dashboard/ui/button"
@@ -57,7 +57,7 @@ export function AccountTab({
   isOpen,
 }: AccountTabProps) {
   const accountForm = useForm<AccountFormValues>({
-    resolver: zodResolver(accountFormSchema),
+    resolver: standardSchemaResolver(accountFormSchema),
     defaultValues: {
       name: userName,
       email: userEmail,

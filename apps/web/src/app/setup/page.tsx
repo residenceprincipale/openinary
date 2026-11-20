@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { authClient } from "@/lib/auth-client";
@@ -63,7 +63,7 @@ export default function SetupPage() {
   const [configError, setConfigError] = useState<string | null>(null);
 
   const form = useForm<SetupFormValues>({
-    resolver: zodResolver(setupFormSchema),
+    resolver: standardSchemaResolver(setupFormSchema),
     defaultValues: {
       name: "",
       email: "",

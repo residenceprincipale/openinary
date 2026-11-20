@@ -1,6 +1,6 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
+import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import z from "zod";
@@ -35,7 +35,7 @@ export function RenameSection({
     : { base: currentName, extension: "" };
 
   const renameForm = useForm<RenameFormValues>({
-    resolver: zodResolver(renameFormSchema),
+    resolver: standardSchemaResolver(renameFormSchema),
     defaultValues: {
       name: currentBase,
     },

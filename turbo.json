@@ -48,7 +48,8 @@
       "outputs": []
     },
     "test": {
-      "dependsOn": ["^build"],
+      // Own build too: @openinary/ui's tests read its dist declarations.
+      "dependsOn": ["^build", "build"],
       "outputs": ["coverage/**"]
     },
     "start": {

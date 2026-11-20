@@ -2,7 +2,7 @@
 
 import { invalidateStorage } from "../hooks/use-storage-tree";
 import { useOpeninary } from "../provider/openinary-provider";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import z from "zod";
@@ -35,7 +35,7 @@ export function CreateFolderSection({
   const { apiBaseUrl, fetch } = useOpeninary();
   const queryClient = useQueryClient();
   const folderCreateForm = useForm<FolderCreateFormValues>({
-    resolver: zodResolver(folderCreateFormSchema),
+    resolver: standardSchemaResolver(folderCreateFormSchema),
     defaultValues: {
       folder: "",
     },
