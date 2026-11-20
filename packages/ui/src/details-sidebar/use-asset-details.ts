@@ -94,9 +94,11 @@ export function useAssetDetails(
   // Docker deployments where the bundle was built with NEXT_PUBLIC_API_BASE_URL=/api).
   const ready = asset && transformBaseUrl !== null;
   const mediaUrl = ready ? toAbsoluteUrl(`${transformBaseUrl}/t/${encodePath(asset.path)}`) : "";
-  const previewUrl = ready
-    ? `${transformBaseUrl}/t/${dashboardThumbSegment(asset.type === "image" ? "image" : "video", "preview")}/${encodePath(asset.path)}`
-    : "";
+  // Audio and documents have no thumbnail; the preview uses the media URL.
+  const previewUrl =
+    ready && (asset.type === "image" || asset.type === "video")
+      ? `${transformBaseUrl}/t/${dashboardThumbSegment(asset.type, "preview")}/${encodePath(asset.path)}`
+      : "";
 
   // Preload preview media when asset changes
   // Note: Even videos are preloaded as "image" since we extract thumbnails

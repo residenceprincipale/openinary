@@ -23,6 +23,7 @@ import {
   Folder,
   Link2,
   Move,
+  Music,
   Pencil,
   Plus,
   Search,
@@ -103,10 +104,17 @@ function FileTypeIcon({
   type,
   className,
 }: {
-  type: "image" | "video";
+  type: MediaFile["type"];
   className?: string;
 }) {
-  const Icon = type === "video" ? FileVideo : FileImage;
+  const Icon =
+    type === "video"
+      ? FileVideo
+      : type === "audio"
+        ? Music
+        : type === "other"
+          ? File
+          : FileImage;
   return (
     <div
       className={cn(
@@ -151,12 +159,15 @@ function getFolderThumbnailUrl(
   return `${transformBaseUrl}/t/${dashboardThumbSegment(item.type, size)}/${encodePath(item.path)}`;
 }
 
-/** "" while the base is unknown: VideoThumbnail holds its skeleton. */
+/** "" while the base is unknown or the type has no thumbnail. */
 function gridThumbnailUrl(transformBaseUrl: string | null, media: MediaFile) {
   if (transformBaseUrl === null) return "";
-  const kind = media.type === "image" ? "image" : "video";
-  return `${transformBaseUrl}/t/${dashboardThumbSegment(kind, "preview")}/${encodePath(media.path)}`;
+  if (media.type !== "image" && media.type !== "video") return "";
+  return `${transformBaseUrl}/t/${dashboardThumbSegment(media.type, "preview")}/${encodePath(media.path)}`;
 }
+
+const hasThumbnail = (type: MediaFile["type"]) =>
+  type === "image" || type === "video";
 
 export interface MediaGridProps {
   onMediaSelect: (media: MediaFile) => void;
@@ -463,7 +474,9 @@ function MediaGridBody({
   // Search, type filter and sort apply to the current level. Local state:
   // the grid is mounted per route, and ?q= would fight the folder param.
   const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "image" | "video">("all");
+  const [filterType, setFilterType] = useState<
+    "all" | "image" | "video" | "audio" | "other"
+  >("all");
   const [sortBy, setSortBy] = useState<"name" | "type" | "size" | "date">("name");
   const [batchRenameOpen, setBatchRenameOpen] = useState(false);
   const [shareFolder, setShareFolder] = useState<string | null>(null);
@@ -744,6 +757,7 @@ function MediaGridBody({
   // thumbnail (what the grid renders), not the original: /t/<video> now streams
   // the untouched file, which would pull hundreds of MB on a hover.
   const handleMediaHover = (media: MediaFile) => {
+    if (!hasThumbnail(media.type)) return;
     const previewUrl = gridThumbnailUrl(transformBaseUrl, media);
     if (previewUrl) preloadMedia(previewUrl, "image");
   };
@@ -1338,7 +1352,7 @@ function MediaGridBody({
           />
         </div>
         <div className="flex items-center gap-0.5">
-          {(["all", "image", "video"] as const).map((type) => (
+          {(["all", "image", "video", "audio", "other"] as const).map((type) => (
             <Button
               key={type}
               size="sm"
@@ -1955,7 +1969,7 @@ function MediaGridBody({
                                       }
                                     />
                                   </div>
-                                  {hideThumbnails ? (
+                                  {hideThumbnails || !hasThumbnail(media.type) ? (
                                     <FileTypeIcon type={media.type} />
                                   ) : (
                                     <VideoThumbnail
@@ -2155,7 +2169,7 @@ function MediaGridBody({
                                 });
                               }}
                             >
-                              {hideThumbnails ? (
+                              {hideThumbnails || !hasThumbnail(media.type) ? (
                                 <FileTypeIcon type={media.type} />
                               ) : (
                                 <VideoThumbnail

@@ -52,6 +52,8 @@ export function createStorageRoute(deps: RouteDeps) {
   };
 
   const isVisible = (allowed: string[] | null, path: string): boolean => {
+    // The root is everyone's entry point: it only lists what is granted.
+    if (path === "") return true;
     if (isInsideGrant(allowed, path)) return true;
     return (allowed ?? []).some((grant) => grant.startsWith(`${path}/`));
   };

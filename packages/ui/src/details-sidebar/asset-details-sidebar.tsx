@@ -97,6 +97,7 @@ export function AssetDetailsSidebar({
             <AssetPreview
               asset={asset}
               previewUrl={previewUrl}
+              mediaUrl={mediaUrl}
               fileSize={fileSize}
               onClose={hideClose ? undefined : handleClose}
             />
@@ -111,9 +112,17 @@ export function AssetDetailsSidebar({
             />
 
             <Tabs defaultValue="deliver" className="gap-3">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList
+                className={
+                  asset.type === "image" || asset.type === "video"
+                    ? "grid w-full grid-cols-3"
+                    : "grid w-full grid-cols-2"
+                }
+              >
                 <TabsTrigger value="deliver" className="h-8 text-sm">Deliver</TabsTrigger>
-                <TabsTrigger value="transform" className="h-8 text-sm">Transform</TabsTrigger>
+                {(asset.type === "image" || asset.type === "video") && (
+                  <TabsTrigger value="transform" className="h-8 text-sm">Transform</TabsTrigger>
+                )}
                 <TabsTrigger value="info" className="h-8 text-sm">Info</TabsTrigger>
               </TabsList>
 
@@ -125,14 +134,16 @@ export function AssetDetailsSidebar({
                 />
               </TabsContent>
 
-              <TabsContent value="transform">
-                {/* Keyed on the type: image and video take different settings. */}
-                <AssetTransformationsTab
-                  key={asset.type}
-                  asset={asset}
-                  transformBaseUrl={transformBaseUrl}
-                />
-              </TabsContent>
+              {(asset.type === "image" || asset.type === "video") && (
+                <TabsContent value="transform">
+                  {/* Keyed on the type: image and video take different settings. */}
+                  <AssetTransformationsTab
+                    key={asset.type}
+                    asset={asset}
+                    transformBaseUrl={transformBaseUrl}
+                  />
+                </TabsContent>
+              )}
 
               <TabsContent value="info">
                 <AssetInfoTab

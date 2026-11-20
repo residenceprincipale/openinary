@@ -20,10 +20,14 @@ export function AssetDeliverTab({
   const guides = [
     { label: "Next.js", href: `${DOCS}/guides/integrate/nextjs` },
     { label: "React", href: `${DOCS}/guides/integrate/react` },
-    {
-      label: `${asset.type === "image" ? "Image" : "Video"} transformations`,
-      href: `${DOCS}/media-transformations/${asset.type}-transformations`,
-    },
+    ...(asset.type === "image" || asset.type === "video"
+      ? [
+          {
+            label: `${asset.type === "image" ? "Image" : "Video"} transformations`,
+            href: `${DOCS}/media-transformations/${asset.type}-transformations`,
+          },
+        ]
+      : []),
   ];
 
   return (

@@ -13,9 +13,15 @@ export function AssetInfoTab({
   fileSize: number | null;
   createdAt: Date | null;
 }) {
+  const typeLabels = {
+    image: "Image",
+    video: "Video",
+    audio: "Audio",
+    other: "Document",
+  } as const;
   const rows = [
     ["Format", asset.name.split(".").pop()?.toUpperCase() ?? ""],
-    ["Type", asset.type === "image" ? "Image" : "Video"],
+    ["Type", typeLabels[asset.type]],
     ["Size", formatFileSize(fileSize)],
     ["Uploaded", formatDate(createdAt)],
   ];

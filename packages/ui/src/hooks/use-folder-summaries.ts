@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useOpeninary } from "../provider/openinary-provider";
 import type { OpeninaryConfig } from "../provider/openinary-provider";
-import type { MediaType } from "../types";
+// Folder previews only ever contain renderable media.
+type PreviewType = "image" | "video";
 
 export type FolderSummary = {
   itemCount: number;
   truncated: boolean;
-  previewItems: { path: string; type: MediaType }[];
+  previewItems: { path: string; type: PreviewType }[];
 };
 
 const BATCH_DELAY_MS = 40;

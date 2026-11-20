@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { FileText, X } from "lucide-react";
 import { VideoThumbnail } from "../components/video-thumbnail";
 import type { MediaFile } from "../types";
 import { formatFileSize } from "./utils";
@@ -8,6 +8,8 @@ import { formatFileSize } from "./utils";
 interface AssetPreviewProps {
   asset: MediaFile;
   previewUrl: string;
+  /** The original, for types the thumbnail pipeline does not handle. */
+  mediaUrl: string;
   fileSize: number | null;
   /** Shows a close button on the heading's row, sized to the heading. */
   onClose?: () => void;
@@ -16,6 +18,7 @@ interface AssetPreviewProps {
 export function AssetPreview({
   asset,
   previewUrl,
+  mediaUrl,
   fileSize,
   onClose,
 }: AssetPreviewProps) {
@@ -48,13 +51,31 @@ export function AssetPreview({
           later attempt and painted underneath "Failed to load preview", and
           reselecting the asset brought the message straight back.
         */}
-        <VideoThumbnail
-          src={previewUrl}
-          alt={asset.name}
-          className="object-contain"
-          loading="eager"
-          errorLabel="Failed to load preview"
-        />
+        {asset.type === "audio" ? (
+          <div className="flex h-full items-center px-4">
+            <audio src={mediaUrl} controls className="w-full" />
+          </div>
+        ) : asset.type === "other" ? (
+          <div className="flex h-full flex-col items-center justify-center gap-2 text-ds-muted">
+            <FileText className="size-8" />
+            <a
+              href={mediaUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm underline underline-offset-4"
+            >
+              Open file
+            </a>
+          </div>
+        ) : (
+          <VideoThumbnail
+            src={previewUrl}
+            alt={asset.name}
+            className="object-contain"
+            loading="eager"
+            errorLabel="Failed to load preview"
+          />
+        )}
       </div>
       <div className="mt-3 space-y-0.5 text-center">
         <p className="truncate text-sm font-medium" title={asset.name}>

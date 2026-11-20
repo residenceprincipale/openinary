@@ -4,7 +4,7 @@ import { RotateCcw } from "lucide-react";
 import { type CSSProperties, type ReactNode, useState } from "react";
 import { cn, encodePath, toAbsoluteUrl } from "../lib/utils";
 import { useOpeninary } from "../provider/openinary-provider";
-import type { MediaFile, MediaType } from "../types";
+import type { MediaFile } from "../types";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -18,9 +18,10 @@ import {
 import { CopyButton, DeliveryUrl, DetailsCard } from "./delivery-url";
 
 type Params = Partial<Record<"w" | "h" | "c" | "g" | "r" | "q" | "f", string>>;
+type TransformableType = "image" | "video";
 
 // Mirrors the registries in packages/core/src/utils/{image,video}/param-registry.ts.
-const OPTIONS: Record<MediaType, { c: string[]; g: string[]; f: string[] }> = {
+const OPTIONS: Record<TransformableType, { c: string[]; g: string[]; f: string[] }> = {
   image: {
     c: ["fill", "fit", "scale", "crop", "pad"],
     g: ["center", "north", "south", "east", "west", "face", "auto"],
@@ -33,7 +34,7 @@ const OPTIONS: Record<MediaType, { c: string[]; g: string[]; f: string[] }> = {
   },
 };
 
-const PRESETS: Record<MediaType, { label: string; params: Params }[]> = {
+const PRESETS: Record<TransformableType, { label: string; params: Params }[]> = {
   image: [
     { label: "Thumbnail", params: { w: "300", h: "300", c: "fill" } },
     { label: "Banner 16:9", params: { w: "1600", h: "900", c: "fill" } },
@@ -69,11 +70,12 @@ export function AssetTransformationsTab({
   transformBaseUrl: string | null;
 }) {
   const { apiBaseUrl } = useOpeninary();
-  const [params, setParams] = useState<Params>(PRESETS[asset.type][0].params);
+  const type: TransformableType = asset.type === "image" ? "image" : "video";
+  const [params, setParams] = useState<Params>(PRESETS[type][0].params);
   const set = (key: keyof Params) => (value: string) =>
     setParams((current) => ({ ...current, [key]: value }));
 
-  const options = OPTIONS[asset.type];
+  const options = OPTIONS[type];
   const segment = serialize(params);
   const path = encodePath(asset.path);
   const url =
@@ -91,7 +93,7 @@ export function AssetTransformationsTab({
     <div className="space-y-3">
       <DetailsCard title="Presets">
         <div className="flex flex-wrap gap-1.5">
-          {PRESETS[asset.type].map((preset) => {
+          {PRESETS[type].map((preset) => {
             const active = same(params, preset.params);
             return (
               <button
@@ -157,7 +159,7 @@ export function AssetTransformationsTab({
               type="number"
               min={1}
               max={100}
-              placeholder={asset.type === "image" ? "80" : "Auto"}
+              placeholder={type === "image" ? "80" : "Auto"}
               className="h-8"
               value={params.q ?? ""}
               onChange={(event) => set("q")(event.target.value)}
