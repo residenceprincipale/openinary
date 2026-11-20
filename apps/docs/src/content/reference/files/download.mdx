@@ -1,0 +1,58 @@
+---
+title: "Download Original File"
+description: "Download the original uploaded file without any transformation"
+---
+
+Point at the storage path and the original bytes come back as an attachment.
+
+```
+GET /download/{path}
+```
+
+```bash
+curl -O -J https://cdn.openinary.dev/download/photos/portrait.jpg \
+  -H "Authorization: Bearer <api_key>"
+```
+
+**Auth:** API key on Cloud, public and rate limited self-hosted. Drop the header when you call your own instance.
+
+## Path parameters
+
+| Param  | Type     | Description                                                                              |
+| ------ | -------- | ---------------------------------------------------------------------------------------- |
+| `path` | `string` | Required. Path to the file relative to the storage root, including the extension (`videos/clip.mp4`) |
+
+## Response
+
+Returns the raw binary content of the original file with `Content-Disposition: attachment`, so browsers prompt a download rather than displaying it inline.
+
+| Header                | Value                               |
+| --------------------- | ----------------------------------- |
+| `Content-Type`        | Detected from file extension        |
+| `Content-Disposition` | `attachment; filename="{filename}"` |
+| `Content-Length`      | File size in bytes                  |
+| `Cache-Control`       | `private, no-store`                 |
+
+**Status codes:** `200` success · `400` invalid path · `404` not found · `500` error
+
+## Related
+
+<CardGroup cols={2}>
+  <Card
+    title="Transform Media"
+    icon="wand-magic-sparkles"
+    href="/api-reference/media/transform"
+  >
+    Serve transformed versions instead of the original.
+  </Card>
+  <Card title="Upload Files" icon="upload" href="/api-reference/files/upload">
+    Upload new files.
+  </Card>
+  <Card
+    title="Download Multiple Items"
+    icon="file-zipper"
+    href="/api-reference/files/download-zip"
+  >
+    Bundle several files/folders into one ZIP.
+  </Card>
+</CardGroup>

@@ -1,0 +1,86 @@
+---
+title: "Deploy on Coolify"
+description: "Deploy Openinary on Coolify from the Docker image, with the ports, variables and volumes it needs."
+---
+
+Coolify runs Openinary straight from the published image. Create a **Docker Image** resource pointing at:
+
+```bash
+openinary/openinary
+```
+
+Then expose port `3000`, set the environment variables, and add the volumes. You need a Coolify account with access to a server, and Docker support enabled on that instance.
+
+## Deployment steps
+
+<Steps>
+  <Step title="Create the resource">
+    In your project, create a new resource. On the **New Resource** page, select **Docker Image** from the **Docker Based** section, and enter `openinary/openinary`.
+
+    No project yet? Create one first, then open its dashboard.
+  </Step>
+  <Step title="Expose port 3000">
+    In the **General** configuration section, enter `3000` in the **Ports Exposes** field and click **Save**.
+  </Step>
+  <Step title="Set environment variables">
+    Go to **Environment Variables** in the sidebar, switch to Developer View, and add:
+
+    ```bash
+    BETTER_AUTH_SECRET=your-sha256-hash-or-long-secret
+    BETTER_AUTH_URL=your-coolify-generated-url-or-domain
+    IMAGE_TAG=latest
+    NODE_ENV=production
+    PORT=3000
+    ```
+
+    For `BETTER_AUTH_URL`, use the URL Coolify generates in the **General** tab under **Domains**.
+
+    With local file storage, that is all you need. For an S3-compatible bucket, add its configuration too:
+
+    ```bash
+    STORAGE_REGION=your-region
+    STORAGE_ACCESS_KEY_ID=your-access-key
+    STORAGE_SECRET_ACCESS_KEY=your-secret-key
+    STORAGE_BUCKET_NAME=your-bucket-name
+    STORAGE_ENDPOINT=https://your-s3-endpoint.com
+    ```
+
+    See [Storage configuration](/configuration/storage) for the details.
+  </Step>
+  <Step title="Add persistent storage">
+    Go to **Persistent Storage** and add these volume mounts. Without them, the data is lost on every container restart or update.
+
+    | Name | Destination path | Stores |
+    | --- | --- | --- |
+    | `db-data` | `/app/data` | The internal database: admin accounts, API keys, metadata. Always required |
+    | `public-files` | `/app/apps/api/public` | Original uploaded assets and media files. Skip if you use S3 |
+    | `cache-data` | `/app/apps/api/cache` | Optimized and transformed assets, cached for faster delivery. Skip if you use S3 |
+  </Step>
+  <Step title="Deploy">
+    Click **Deploy** and watch the deployment logs to confirm everything starts correctly.
+  </Step>
+  <Step title="Create your admin account">
+    Visit your Coolify-generated URL or custom domain. You land on the initial setup page.
+
+    <Warning>
+      Create the admin account immediately. The setup route is publicly accessible until it is completed.
+    </Warning>
+
+    After signing in, the dashboard shows the sample assets or your bucket content.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+Check the deployment logs in Coolify for error messages, verify every environment variable, and confirm your DNS if you use a custom domain. If problems persist, [create an issue on GitHub](https://github.com/openinary/openinary/issues) with your deployment logs.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Transform Images" icon="image" href="/media-transformations/image-transformations">
+    Learn how to transform and optimize images
+  </Card>
+  <Card title="Transform Videos" icon="video" href="/media-transformations/video-transformations">
+    Learn how to transform and process videos
+  </Card>
+</CardGroup>

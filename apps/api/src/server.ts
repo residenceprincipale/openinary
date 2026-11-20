@@ -1,113 +1,106 @@
 import "dotenv/config";
 import { serve } from "@hono/node-server";
 import app from "./index";
-import { createStorageClient } from "./utils/storage/index";
-import { auth } from "shared/auth";
-import fs from "fs";
-import path from "path";
+import { getSharedStorage } from "./config/storage";
+import { getDb, hasAdmin } from "shared";
+import { getAuth } from "shared/auth";
 import { randomUUID } from "crypto";
-import logger, { serializeError } from "./utils/logger";
-import { videoJobQueue } from "./utils/video-job-queue";
+import { clearAllCache, logger } from "@openinary/core";
+import { enginePaths, videoJobQueue } from "./config/queue";
+import { initTelemetry } from "./utils/telemetry";
+import { deploymentMode } from "./config/mode";
 
-// Function to clean local cache in cloud mode on startup
-const cleanupLocalCacheIfCloudMode = () => {
-  const storage = createStorageClient();
-  if (storage) {
-    const cacheDir = "./cache";
-    if (fs.existsSync(cacheDir)) {
-      try {
-        const files = fs.readdirSync(cacheDir);
-        files.forEach((file) => {
-          const filePath = path.join(cacheDir, file);
-          fs.unlinkSync(filePath);
-        });
-      } catch (error) {
-        logger.warn({ error: serializeError(error) }, "Failed to cleanup local cache on startup");
-      }
-    }
-  }
-};
+// In cloud mode the bucket is the cache: local files from a previous run go.
+if (getSharedStorage()) await clearAllCache(enginePaths.cache);
 
-// Clean local cache on startup if in cloud mode
-cleanupLocalCacheIfCloudMode();
+videoJobQueue.start();
 
-// Create necessary directories
-const dirs = ["./cache", "./temp"];
-dirs.forEach((dir) => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-    logger.info({ dir }, "Created directory");
-  }
-});
-
-// Initialize video job queue with storage client
-const storageClient = createStorageClient();
-const disableTransforms = process.env.DISABLE_TRANSFORMS === "true";
-if (!disableTransforms) {
-  videoJobQueue.initialize(storageClient);
-}
-
-// Initialize authentication and generate API key if needed (only in standalone mode)
+/**
+ * First boot only: creates the admin from OPENINARY_ADMIN_* and, in API mode
+ * or when asked, an initial API key printed once to the log (the CLI reads it
+ * back from the "API Key: " line).
+ */
 async function initializeAuth() {
   try {
-    const mode = process.env.MODE || "fullstack";
-    const db = auth.options.database;
-    const users = db.prepare("SELECT COUNT(*) as count FROM user").get() as { count: number };
-    
-    // In fullstack mode, never create users automatically
-    if (mode === "fullstack") {
-      if (users.count === 0) {
-        logger.info("No users found. Please visit /setup to create your first admin account.");
-      } else {
-        logger.info({ userCount: users.count }, "Database initialized (FULLSTACK mode)");
-      }
-      return;
-    }
-    
-    // In API standalone mode, generate API key only (no exposed credentials)
-    if (users.count === 0) {
-      logger.info("Running in API STANDALONE mode");
-      logger.info("Generating initial API key...");
-      
-      // Create a system user (required for API key association)
-      // This user is internal only - credentials are never exposed or used
-      const systemPassword = randomUUID() + randomUUID(); // Random, never shown
-      const signUpResult = await auth.api.signUpEmail({
-        body: {
-          email: "system@openinary.local",
-          password: systemPassword,
-          name: "System",
-        },
-      });
-      
-      if (signUpResult) {
-        const userId = signUpResult.user.id;
+    const mode = deploymentMode();
+    const modeLabel = mode === "api" ? "API STANDALONE mode" : "FULLSTACK mode";
+    // Fails fast on a missing or changed BETTER_AUTH_SECRET.
+    const auth = getAuth();
+    if (hasAdmin()) return logger.info(`Database initialized (${modeLabel})`);
 
-        // Set the system user as admin
-        const db = auth.options.database;
-        db.prepare("UPDATE user SET role = 'admin' WHERE id = ?").run(userId);
+    const accName = process.env.OPENINARY_ADMIN_NAME?.trim();
+    const accEmail = process.env.OPENINARY_ADMIN_EMAIL?.trim();
+    const accPassword = process.env.OPENINARY_ADMIN_PASSWORD;
+    const generateApiKey =
+      process.env.OPENINARY_GENERATE_API_KEY?.trim() === "true";
 
-        // Create an API key for this user
-        const apiKeyResult = await auth.api.createApiKey({
-          body: {
-            name: "Initial API Key",
-            userId: userId,
-            expiresIn: 365 * 24 * 60 * 60, // 1 year in seconds
-          },
-        });
-        
-        if (apiKeyResult && "key" in apiKeyResult) {
-          logger.info(
-            { apiKeyId: apiKeyResult.id },
-            "┌─────────────────────────────────────────────────────────────────┐\n│                  Initial API Key Generated                      │\n├─────────────────────────────────────────────────────────────────┤\n│                                                                 │\n│  API Key: " + apiKeyResult.key + "                                   │\n│                                                                 │\n│  Save this key now! It will not be shown again.                 │\n│                                                                 │\n└─────────────────────────────────────────────────────────────────┘"
-          );
-        }
-      }
-    } else {
-      logger.info({ userCount: users.count }, "Database initialized (API STANDALONE mode)");
+    if (mode === "fullstack" && !generateApiKey && !accEmail && !accPassword)
+      return logger.info(
+        "No users found. Please visit /setup to create your first admin account.",
+      );
+
+    if ((!accEmail && accPassword) || (accEmail && !accPassword))
+      throw new Error(
+        "You have to configure both admin email and password or none.",
+      );
+
+    if (mode === "fullstack" && generateApiKey && !accEmail)
+      throw new Error(
+        "In fullstack mode you have to also configure admin credentials for generating an API key on initialization.",
+      );
+
+    logger.info("Creating admin user...");
+
+    // API mode needs a user to own the key even without configured credentials.
+    const signUpResult = await auth.api.signUpEmail({
+      body: {
+        email: accEmail || "system@openinary.local",
+        password: accPassword || randomUUID() + randomUUID(),
+        name: accName || "Admin",
+      },
+    });
+
+    if (!signUpResult) throw new Error("Creating initial user failed.");
+
+    logger.info("Initial user created successfully!");
+
+    if (!generateApiKey && mode === "fullstack")
+      return logger.info(`Database initialized (${modeLabel})`);
+
+    const apiKeyResult = await auth.api.createApiKey({
+      body: {
+        name: "Initial API Key",
+        userId: signUpResult.user.id,
+        expiresIn: 365 * 24 * 60 * 60,
+      },
+    });
+
+    if (!apiKeyResult || !("key" in apiKeyResult)) {
+      // Removed so the next boot can try again with the same credentials.
+      const { changes } = getDb()
+        .prepare("DELETE FROM user WHERE id = ?")
+        .run(signUpResult.user.id);
+
+      if (changes === 0)
+        throw new Error(
+          "Initial API Key could not be generated. Deleting user for cleanup failed.",
+        );
+
+      throw new Error(
+        "Initial API Key could not be generated. User was removed again.",
+      );
     }
-  } catch (error) {
-    logger.error({ error: serializeError(error) }, "Error initializing authentication");
+
+    logger.info(
+      { apiKeyId: apiKeyResult.id },
+      "┌─────────────────────────────────────────────────────────────────┐\n│                  Initial API Key Generated                      │\n├─────────────────────────────────────────────────────────────────┤\n│                                                                 │\n│  API Key: " +
+        apiKeyResult.key +
+        "                                   │\n│                                                                 │\n│  Save this key now! It will not be shown again.                 │\n│                                                                 │\n└─────────────────────────────────────────────────────────────────┘",
+    );
+    logger.info(`Database initialized (${modeLabel})`);
+  } catch (error: any) {
+    logger.error(error?.message || "Database setup failed.");
+    process.exit(1);
   }
 }
 
@@ -121,11 +114,12 @@ serve({
 
 logger.info({ port }, "Server running");
 
+// Anonymous usage telemetry (non-blocking, opt-out via OPENINARY_TELEMETRY=false)
+initTelemetry();
+
 // Initialize auth in background (non-blocking)
 // This allows the server to respond to healthchecks immediately
-initializeAuth().catch((error) => {
-  logger.error({ error: serializeError(error) }, "Error during background auth initialization");
-});
+initializeAuth();
 
 // Graceful shutdown
 process.on("SIGTERM", () => {

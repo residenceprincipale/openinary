@@ -1,0 +1,294 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { dashboardThumbSegment } from "@openinary/core/url/dashboard-thumbs";
+import { encodePath, toAbsoluteUrl } from "../lib/utils";
+import { useOpeninary } from "../provider/openinary-provider";
+import { getMediaType } from "../media-type";
+import { invalidateStorage } from "../hooks/use-storage-tree";
+import { usePreloadMedia } from "../hooks/use-preload-media";
+import type { MediaFile } from "../types";
+
+export function useAssetDetails(
+  assetId: string | null,
+  onAssetIdChange: (assetId: string | null) => void,
+  onOpenChange?: (open: boolean) => void,
+) {
+  const { apiBaseUrl, transformBaseUrl, fetch } = useOpeninary();
+  const queryClient = useQueryClient();
+  const [asset, setAsset] = useState<MediaFile | null>(null);
+  const [fileSize, setFileSize] = useState<number | null>(null);
+  const [createdAt, setCreatedAt] = useState<Date | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+
+  const fetchFileMetadata = async (path: string) => {
+    try {
+      const encodedPath = encodePath(path);
+
+      const response = await fetch(`${apiBaseUrl}/storage/${encodedPath}/metadata`, {
+        method: "GET",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+
+        if (data.size !== undefined) {
+          setFileSize(data.size);
+        }
+
+        if (data.createdAt) {
+          setCreatedAt(new Date(data.createdAt));
+        }
+
+        if (data.updatedAt) {
+          setUpdatedAt(new Date(data.updatedAt));
+        }
+      } else if (response.status === 404) {
+        // Deep link to an asset that no longer exists
+        setAsset(null);
+        onAssetIdChange(null);
+        onOpenChange?.(false);
+      }
+    } catch (error) {
+      console.error("Failed to fetch file metadata:", error);
+    }
+  };
+
+  // Resolve the asset directly from its id (the id IS the storage path);
+  // existence is confirmed by the metadata fetch below (404 clears it)
+  useEffect(() => {
+    if (!assetId) {
+      setAsset(null);
+      onOpenChange?.(false);
+      return;
+    }
+
+    const name = assetId.split("/").pop() ?? assetId;
+    const type = getMediaType(name);
+    if (!type) {
+      setAsset(null);
+      return;
+    }
+
+    setAsset({ id: assetId, name, path: assetId, type });
+    onOpenChange?.(true);
+  }, [assetId, onOpenChange]);
+
+  // Fetch metadata when asset changes
+  useEffect(() => {
+    if (asset) {
+      fetchFileMetadata(asset.path);
+    } else {
+      setFileSize(null);
+      setCreatedAt(null);
+      setUpdatedAt(null);
+    }
+  }, [asset]);
+
+  // Resolve to an absolute URL so Copy URL / Open / the displayed field all
+  // produce a shareable link even when transformBaseUrl is empty (same-origin
+  // Docker deployments where the bundle was built with NEXT_PUBLIC_API_BASE_URL=/api).
+  const ready = asset && transformBaseUrl !== null;
+  const mediaUrl = ready ? toAbsoluteUrl(`${transformBaseUrl}/t/${encodePath(asset.path)}`) : "";
+  const previewUrl = ready
+    ? `${transformBaseUrl}/t/${dashboardThumbSegment(asset.type === "image" ? "image" : "video", "preview")}/${encodePath(asset.path)}`
+    : "";
+
+  // Preload preview media when asset changes
+  // Note: Even videos are preloaded as "image" since we extract thumbnails
+  usePreloadMedia(previewUrl, "image");
+
+  const handleCopyUrl = () => {
+    if (mediaUrl) {
+      navigator.clipboard.writeText(mediaUrl);
+      toast.success("URL copied to clipboard");
+    }
+  };
+
+  const handleDownload = () => {
+    if (!asset) return;
+    const downloadUrl = `${apiBaseUrl}/download/${encodePath(asset.path)}`;
+    const a = document.createElement("a");
+    a.href = downloadUrl;
+    a.download = asset.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast.success(`Downloading "${asset.name}"`);
+  };
+
+  const handleOpenInNewTab = () => {
+    if (mediaUrl) {
+      window.open(mediaUrl, "_blank");
+    }
+  };
+
+  // Rename and move change the path, which is the asset's id, so the panel
+  // follows the file to its new path once the server confirms it.
+  const relocate = async (
+    request: Promise<Response>,
+    messages: { loading: string; success: string; error: string },
+  ) => {
+    const run = async () => {
+      const response = await request;
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.message || messages.error);
+      return data?.path as string | undefined;
+    };
+    try {
+      const newPath = await toast
+        .promise(run(), {
+          ...messages,
+          error: (error) => (error instanceof Error ? error.message : messages.error),
+        })
+        .unwrap();
+      invalidateStorage(queryClient);
+      if (newPath) onAssetIdChange(newPath);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleRename = (newName: string) => {
+    if (!asset) return Promise.resolve(false);
+    return relocate(
+      fetch(`${apiBaseUrl}/storage/${encodePath(asset.path)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName }),
+      }),
+      {
+        loading: `Renaming "${asset.name}"...`,
+        success: `Renamed to "${newName}"`,
+        error: `Failed to rename "${asset.name}"`,
+      },
+    );
+  };
+
+  const handleMove = (destination: string) => {
+    if (!asset) return Promise.resolve(false);
+    return relocate(
+      fetch(`${apiBaseUrl}/storage/${encodePath(asset.path)}/move`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ destination }),
+      }),
+      {
+        loading: `Moving "${asset.name}"...`,
+        success: `Moved to "${destination || "Root"}"`,
+        error: `Failed to move "${asset.name}"`,
+      },
+    );
+  };
+
+  const handleClose = () => {
+    onAssetIdChange(null);
+    onOpenChange?.(false);
+  };
+
+  const handleDeleteRequest = () => {
+    if (!asset) return;
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteDialogClose = () => {
+    setDeleteDialogOpen(false);
+  };
+
+  const handleDelete = async () => {
+    if (!asset) return;
+
+    const assetName = asset.name;
+
+    const del = async () => {
+      const encodedPath = encodePath(asset.path);
+
+      const deleteUrl = `${apiBaseUrl}/storage/${encodedPath}`;
+
+      const response = await fetch(deleteUrl, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        // Try to parse JSON error response, but handle cases where it's not JSON
+        let errorMessage = `Failed to delete file (${response.status})`;
+        try {
+          const contentType = response.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const errorBody = await response.json();
+            errorMessage = errorBody.message || errorBody.error || errorMessage;
+          } else {
+            const text = await response.text();
+            if (text) {
+              errorMessage = text;
+            }
+          }
+        } catch (parseError) {
+          // If parsing fails, use the default error message
+        }
+        throw new Error(errorMessage);
+      }
+
+      // For successful responses, consume the body to avoid memory leaks
+      // We don't need the data, so we can safely ignore parsing errors
+      try {
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          await response.json();
+        } else {
+          await response.text();
+        }
+      } catch (parseError) {
+        // Ignore parsing errors for success responses - we don't need the data
+      }
+    };
+
+    setIsDeleting(true);
+    try {
+      await toast.promise(del(), {
+        loading: `Deleting "${assetName}"...`,
+        success: `Deleted "${assetName}"`,
+        error: (error) => (error instanceof Error ? error.message : "Failed to delete file"),
+      }).unwrap();
+
+      // Refresh the storage queries
+      invalidateStorage(queryClient);
+
+      // Close the dialog, sidebar and clear selection
+      setDeleteDialogOpen(false);
+      onAssetIdChange(null);
+      onOpenChange?.(false);
+    } catch (error) {
+      console.error("Failed to delete file:", error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return {
+    asset,
+    fileSize,
+    createdAt,
+    updatedAt,
+    isDeleting,
+    deleteDialogOpen,
+    mediaUrl,
+    previewUrl,
+    apiBaseUrl,
+    transformBaseUrl,
+    handleCopyUrl,
+    handleDownload,
+    handleOpenInNewTab,
+    handleClose,
+    handleRename,
+    handleMove,
+    handleDeleteRequest,
+    handleDeleteDialogClose,
+    handleDelete,
+  };
+}

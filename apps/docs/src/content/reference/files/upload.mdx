@@ -1,0 +1,164 @@
+---
+title: "Upload Files"
+description: "Upload one or more media files, optionally pre-generating cached transformation variants"
+---
+
+Post a multipart form to `/upload`. Every file comes back with its storage path and a `/t/` delivery URL.
+
+```
+POST /upload
+```
+
+```bash
+curl -X POST https://cdn.openinary.dev/upload \
+  -H "Authorization: Bearer <api_key>" \
+  -F "files=@photo.jpg"
+```
+
+**Auth:** API Key, session, or a presigned signature from [Sign Upload](/api-reference/files/upload-sign)
+**Content-Type:** `multipart/form-data`
+
+## Form fields
+
+| Field             | Type       | Description                                                                                                       |
+| ----------------- | ---------- | ----------------------------------------------------------------------------------------------------------------- |
+| `files`           | `file[]`   | Required. One or more files, each validated for type and size                                                     |
+| `folder`          | `string`   | Destination folder within storage, nested paths supported (`uploads/2024/january`). Files go to the root if omitted |
+| `names`           | `string[]` | Custom filenames, in the same order as `files`. Must include the extension. Defaults to the original filename      |
+| `transformations` | `string[]` | Transformation segments to prewarm immediately after upload (`w_800,h_600,c_fill`), up to 20 variants. Self-hosted only: Cloud ignores this field and generates variants on first request |
+
+**Allowed types:** JPEG, PNG, WebP, AVIF, GIF, HEIC/HEIF, PSD, MP4, MOV, WebM, WAV, MP3, OGG, GLB, glTF
+
+**Max size per file:** configurable via `MAX_FILE_SIZE_MB`, default 50 MB
+
+Prewarming pre-generates and caches each variant, so the first user request is served from cache with no processing delay.
+
+HEIC and HEIF files are transcoded to JPEG on upload. The returned `filename`, `path` and `url` carry a `.jpg` extension instead of the original `.heic` or `.heif`.
+
+<Warning>
+  Content is checked, not just the extension. The first bytes of each file must
+  match the format it claims to be, so a `.jpg` holding an HTML document is
+  rejected here rather than stored. A mismatch fails that one file with `File
+  content does not match its .jpg type` and the rest of the batch still uploads.
+</Warning>
+
+## Examples
+
+<Tabs>
+<Tab title="Upload to folder">
+
+```bash
+curl -X POST https://cdn.openinary.dev/upload \
+  -H "Authorization: Bearer <api_key>" \
+  -F "files=@photo.jpg" \
+  -F "folder=products/2024"
+```
+
+</Tab>
+
+<Tab title="Upload with prewarm">
+
+```bash
+curl -X POST https://media.example.com/upload \
+  -H "Authorization: Bearer <api_key>" \
+  -F "files=@photo.jpg" \
+  -F "folder=photos" \
+  -F "transformations=w_800,h_600,c_fill,f_webp" \
+  -F "transformations=w_400,h_400,c_fill,g_face"
+```
+
+Uploads the file and immediately generates two cached variants. Self-hosted only: Cloud accepts the field and ignores it.
+
+</Tab>
+
+<Tab title="Multiple files with custom names">
+
+```bash
+curl -X POST https://cdn.openinary.dev/upload \
+  -H "Authorization: Bearer <api_key>" \
+  -F "files=@IMG_001.jpg" \
+  -F "files=@IMG_002.jpg" \
+  -F "names=hero-banner.jpg" \
+  -F "names=thumbnail.jpg" \
+  -F "folder=assets"
+```
+
+</Tab>
+</Tabs>
+
+## Response
+
+| Code  | Meaning                                            |
+| ----- | -------------------------------------------------- |
+| `200` | All files uploaded successfully                    |
+| `207` | Partial success, some files failed                 |
+| `400` | Validation error (invalid type, size exceeded, etc.) |
+
+A fully successful upload returns only `success` and `files`. There is no `errors` key, and the optional per-file arrays appear only when they have something in them:
+
+```json
+{
+  "success": true,
+  "files": [
+    {
+      "filename": "photo.jpg",
+      "path": "photos/photo.jpg",
+      "size": 204800,
+      "url": "/t/photos/photo.jpg",
+      "prewarmedUrls": ["/t/w_800,h_600,c_fill/photos/photo.jpg"]
+    }
+  ]
+}
+```
+
+That is the self-hosted shape. On Cloud the `url` carries the bucket prefix, `/b/{bucketId}/t/photos/photo.jpg`, and `prewarmedUrls` is absent: variants are generated on the first request instead.
+
+| Field     | Type      | Description                                                                                         |
+| --------- | --------- | --------------------------------------------------------------------------------------------------- |
+| `success` | `boolean` | `true` if at least one file was processed. Still `true` on a `207`, so check `errors` for partial failure |
+| `files`   | `array`   | Successfully uploaded files                                                                         |
+| `errors`  | `array`   | Files that failed to upload. Present only on a `207` or a `400`                                     |
+
+Each entry in `files`:
+
+| Field                      | Type       | Description                                                                                |
+| -------------------------- | ---------- | ------------------------------------------------------------------------------------------ |
+| `filename`                 | `string`   | Original or custom filename. A HEIC or HEIF upload comes back with a `.jpg` extension       |
+| `path`                     | `string`   | Storage path relative to root                                                              |
+| `size`                     | `number`   | File size in bytes, after any conversion                                                   |
+| `url`                      | `string`   | Root-relative delivery path. Self-hosted it starts with `/t/`, on Cloud with `/b/{bucketId}/t/`. Prefix your base URL for an absolute URL |
+| `prewarmedUrls`            | `string[]` | Image transformation paths generated and cached during the upload. Omitted when empty      |
+| `prewarmErrors`            | `string[]` | Prewarm failures. The file still uploaded successfully. Omitted when empty                 |
+| `queuedTransformationUrls` | `string[]` | Video transformation paths queued for background processing. Omitted when empty            |
+| `queueErrors`              | `string[]` | Queue submission errors. Omitted when empty                                                |
+
+Each entry in `errors` carries `filename`, the name of the failed file, and `error`, the message.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card
+    title="Create Folder"
+    icon="folder-plus"
+    href="/api-reference/files/create-folder"
+  >
+    Create an empty folder in storage.
+  </Card>
+  <Card
+    title="Upload & Cache Warming"
+    icon="bolt"
+    href="/media-transformations/upload-and-prewarm"
+  >
+    Prewarm strategy guide.
+  </Card>
+  <Card title="Delete File" icon="trash" href="/api-reference/storage/delete">
+    Remove a file and its cached variants.
+  </Card>
+  <Card
+    title="Sign Upload"
+    icon="signature"
+    href="/api-reference/files/upload-sign"
+  >
+    Let an untrusted client upload without your API key.
+  </Card>
+</CardGroup>

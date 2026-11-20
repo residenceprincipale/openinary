@@ -1,0 +1,98 @@
+---
+title: "Automatic Format Selection"
+description: "How Openinary picks AVIF, WebP, or JPEG from browser support, what f_auto changes, and how to force a format with the f parameter."
+---
+
+Omit `f` and Openinary picks the format from what the browser accepts: AVIF where possible, WebP next, JPEG or PNG otherwise.
+
+```http
+GET /t/w_1200/photo.jpg
+```
+
+That one URL serves a different format to each browser, and each one is cached separately.
+
+## How it works
+
+<Steps>
+<Step title="Detect browser support">
+  Reads the `Accept` header and `User-Agent` to determine which modern formats
+  the client accepts.
+</Step>
+
+<Step title="Pick the best supported format">
+  Takes the first format the browser supports, in this order:
+
+**AVIF → WebP → JPEG / PNG**
+
+PNG originals stay PNG when neither AVIF nor WebP is available, so transparency survives.
+
+</Step>
+
+<Step title="Encode once and cache">
+  Encodes to that single format at a quality chosen for it, then stores the
+  result. Every later request for the same URL is served from cache.
+</Step>
+</Steps>
+
+The choice comes from browser support alone. Openinary does not encode several candidates and compare their sizes unless you ask for `f_auto`, and it does not inspect image content to pick a codec.
+
+## Comparing candidates with `f_auto`
+
+`f_auto` opts into the slower, thorough path: Openinary encodes the image in every format the browser supports, compares the actual byte counts, and serves the smallest.
+
+```http
+GET /t/f_auto/image.jpg
+```
+
+It costs more CPU on the first request for a URL, so it earns its keep on images served at high volume, where the cached winner is reused indefinitely. For everything else the default path is the better trade.
+
+## Quality defaults
+
+With no `q`, quality follows the chosen format rather than a single fixed number:
+
+| Format | Default quality       |
+| ------ | --------------------- |
+| AVIF   | 80                    |
+| WebP   | 85                    |
+| JPEG   | 90                    |
+| PNG    | 100 (lossless)        |
+
+Large files shift this by a few points, and the result is clamped to the 70 to 95 range. An explicit `q` between 1 and 100 is used exactly as given.
+
+## Typical size reductions
+
+| Original format | To AVIF        | To WebP        |
+| --------------- | -------------- | -------------- |
+| JPEG            | 40-50% smaller | 25-35% smaller |
+| PNG             | 50-70% smaller | 25-40% smaller |
+
+Actual savings depend on the image and how well it was already compressed.
+
+## Manual format override
+
+Use the [`f` parameter](/api-reference/media/transform#image-parameters) to force a specific format regardless of browser support.
+
+```http
+GET /t/f_avif,q_80/image.jpg
+GET /t/f_webp,q_85/image.jpg
+GET /t/f_jpeg,q_90/image.jpg
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Image Transformations"
+    icon="image"
+    href="/media-transformations/image-transformations"
+  >
+    Full reference for resize, crop, rotate, and format parameters.
+  </Card>
+  <Card
+    title="Upload & Cache Warming"
+    icon="upload"
+    href="/media-transformations/upload-and-prewarm"
+  >
+    Pre-generate optimized variants at upload time.
+  </Card>
+</CardGroup>

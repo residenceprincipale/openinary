@@ -1,0 +1,54 @@
+name: registry
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/registry/**'
+      - 'packages/ui/src/file-uploader/**'
+      - 'apps/marketing/components/openinary/**'
+      - 'scripts/sync-registry-block.mjs'
+      - '.github/workflows/registry.yml'
+  pull_request:
+    paths:
+      - 'packages/registry/**'
+      - 'packages/ui/src/file-uploader/**'
+      - 'apps/marketing/components/openinary/**'
+      - 'scripts/sync-registry-block.mjs'
+      - '.github/workflows/registry.yml'
+  workflow_dispatch: {}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Regenerate the file-uploader copies from packages/registry
+        run: node scripts/sync-registry-block.mjs
+
+      - name: Fail if a generated file-uploader copy was edited by hand
+        run: |
+          if ! git diff --exit-code -- packages/ui/src/file-uploader/ apps/marketing/components/openinary/; then
+            echo "::error::packages/registry/src/file-uploader is the source. Edit it, run 'node scripts/sync-registry-block.mjs' and commit the result."
+            exit 1
+          fi
+
+      # The output is not committed: marketing's prebuild regenerates public/r
+      # on every build, so this only proves the registry builds from source.
+      - name: Build registry
+        run: pnpm --filter registry registry:build

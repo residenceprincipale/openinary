@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "./dist",
+    "rootDir": "./",
+    "types": ["node"]
+  },
+  // The container image: only what runs there. The Worker (worker/, scripts/)
+  // is its own program, worker/tsconfig.json.
+  "include": ["./container/**/*.ts", "./shared/**/*.ts"],
+  "exclude": ["./**/*.test.ts"]
+}

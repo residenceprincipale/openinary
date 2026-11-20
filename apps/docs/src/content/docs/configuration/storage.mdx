@@ -1,0 +1,93 @@
+---
+title: "Storage"
+description: "Point Openinary at S3, R2, MinIO or any S3-compatible bucket"
+---
+
+Openinary writes to local disk by default. Set these five variables and it writes to your bucket instead.
+
+```bash
+STORAGE_REGION=us-east-1
+STORAGE_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+STORAGE_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+STORAGE_BUCKET_NAME=my-openinary-bucket
+STORAGE_PUBLIC_URL=https://my-openinary-bucket.s3.us-east-1.amazonaws.com
+```
+
+The provider is detected from `STORAGE_ENDPOINT`: set it for anything that is not AWS S3, leave it unset for AWS. Only these exact names are read, there is no fallback to `S3_`-prefixed ones.
+
+<Warning>
+  **The bundled Docker Compose file does not pass these through.** Its services
+  declare no `STORAGE_*` entries and no `env_file`, so putting them in the root
+  `.env` does nothing and the container silently falls back to local disk. Add
+  them to the service's `environment:` block yourself:
+
+```yaml
+services:
+  openinary:
+    environment:
+      - STORAGE_REGION=${STORAGE_REGION}
+      - STORAGE_ACCESS_KEY_ID=${STORAGE_ACCESS_KEY_ID}
+      - STORAGE_SECRET_ACCESS_KEY=${STORAGE_SECRET_ACCESS_KEY}
+      - STORAGE_BUCKET_NAME=${STORAGE_BUCKET_NAME}
+      - STORAGE_PUBLIC_URL=${STORAGE_PUBLIC_URL}
+```
+
+  Platforms that inject environment variables directly (Railway, Coolify,
+  Dokploy) need nothing extra. From source, they are read from `apps/api/.env`.
+</Warning>
+
+## Variables
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `STORAGE_ACCESS_KEY_ID` | | Access key ID. Never commit it |
+| `STORAGE_SECRET_ACCESS_KEY` | | Secret access key. Keep it out of logs and client code |
+| `STORAGE_BUCKET_NAME` | | Bucket files are stored in |
+| `STORAGE_REGION` | `auto` | Region identifier. `auto` is what R2 expects, so AWS and other region-bound providers must set it explicitly |
+| `STORAGE_ENDPOINT` | | Endpoint for non-AWS providers. Omit for AWS S3 |
+| `STORAGE_PUBLIC_URL` | | Base URL used to build file URLs. Point it at your CDN or custom domain to avoid exposing raw S3 URLs |
+| `STORAGE_PREFIX` | `public` | Key prefix media is stored under. Set it to serve a bucket whose layout you do not own: an uploader already writing `photos/2024/sunset.jpg` is then delivered at `/t/photos/2024/sunset.jpg` with no object moved. **In a dotenv file `STORAGE_PREFIX=` is not the same as omitting the line** — an empty value is a deliberate choice and means the bucket root, while an absent one keeps the `public/` default. `cache/` and `.openinary/` are reserved: rejected as a prefix at startup, and with an empty prefix they are left out of listings and stats and cannot be read or written as media |
+| `STORAGE_MAX_SOCKETS` | `50` | Simultaneous connections to the provider. Raise it if you hit connection pool exhaustion |
+| `STORAGE_CONNECTION_TIMEOUT` | `0` | Connection timeout in ms. `0` means no timeout |
+| `STORAGE_REQUEST_TIMEOUT` | `0` | Request timeout in ms. Use `300000` or more for large uploads |
+| `STORAGE_SOCKET_TIMEOUT` | `0` | TCP socket timeout in ms |
+
+## Endpoints by provider
+
+| Provider | `STORAGE_ENDPOINT` | `STORAGE_REGION` |
+| --- | --- | --- |
+| AWS S3 | omit | your region, e.g. `us-east-1` |
+| Cloudflare R2 | `https://<account-id>.r2.cloudflarestorage.com` | `auto` |
+| MinIO | `http://minio.example.com:9000` | `us-east-1` |
+| DigitalOcean Spaces | `https://nyc3.digitaloceanspaces.com` | region of the space |
+| Wasabi | `https://s3.wasabisys.com` | your region |
+
+Backblaze B2 and other S3-compatible services work the same way: set their endpoint and a region.
+
+## Production timeouts
+
+Defaults leave every timeout off, which is fine on a fast link and unhelpful when the provider stalls. A reasonable production set:
+
+```bash
+STORAGE_MAX_SOCKETS=100
+STORAGE_CONNECTION_TIMEOUT=5000
+STORAGE_REQUEST_TIMEOUT=30000
+STORAGE_SOCKET_TIMEOUT=60000
+```
+
+Raise `STORAGE_REQUEST_TIMEOUT` well past `30000` if you accept large video uploads.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="bolt" href="/quickstart">
+    Run Openinary with local or S3 storage.
+  </Card>
+  <Card
+    title="Upload & Cache Warming"
+    icon="upload"
+    href="/media-transformations/upload-and-prewarm"
+  >
+    Upload files and prewarm the transformation cache.
+  </Card>
+</CardGroup>

@@ -1,0 +1,66 @@
+---
+title: "Create Folder"
+description: "Create an empty folder in storage"
+---
+
+Post the path you want as a multipart `folder` field. Nested paths are created in one call.
+
+```
+POST /upload/createfolder
+```
+
+```bash
+curl -X POST https://cdn.openinary.dev/upload/createfolder \
+  -H "Authorization: Bearer <api_key>" \
+  -F "folder=products/2024"
+```
+
+**Auth:** API Key required
+**Content-Type:** `multipart/form-data`
+
+## Form fields
+
+| Field    | Type     | Description                                                                    |
+| -------- | -------- | ------------------------------------------------------------------------------ |
+| `folder` | `string` | Required. Path of the folder to create, nested paths supported (`uploads/2024/january`) |
+
+## Response
+
+`201` on success:
+
+```json
+{
+  "success": true,
+  "folder": "uploads/2024",
+  "error": null
+}
+```
+
+`409` when the folder already exists:
+
+```json
+{
+  "success": false,
+  "folder": null,
+  "error": "Folder already exists"
+}
+```
+
+A `400` means the folder path is invalid.
+
+Note that `folder` is `null` on the `409`, not the path you asked for. Read the path you sent from your own request, not from this response.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Upload Files" icon="upload" href="/api-reference/files/upload">
+    Upload files into a folder.
+  </Card>
+  <Card
+    title="List Storage"
+    icon="folder-open"
+    href="/api-reference/storage/list"
+  >
+    Browse the folder tree.
+  </Card>
+</CardGroup>

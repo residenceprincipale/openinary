@@ -1,0 +1,43 @@
+name: deploy-marketing
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/marketing/**'
+      # The app's prebuild builds these into the site: pricing from plans, the
+      # shadcn registry served from /r, and the synced file-uploader block.
+      - 'packages/plans/**'
+      - 'packages/registry/**'
+      - 'scripts/sync-registry-block.mjs'
+      - '.github/workflows/deploy-marketing.yml'
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # No `version:` input - it conflicts with the root packageManager field,
+      # which is the single source of truth for the pnpm version here.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and deploy
+        run: pnpm run deploy:marketing
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: 94c4079b2c83ce0a8a9c73c84a80b221
+          # No NEXT_PUBLIC_COSSISTANT_API_KEY: the support widget belongs to the
+          # dashboard (apps/cloud/web), not to this site, and it inherited the
+          # variable from the marketing repo's own workflow. Passing a secret this
+          # repo does not define only makes the deploy look like it is missing one.

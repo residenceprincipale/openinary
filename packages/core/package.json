@@ -1,0 +1,66 @@
+{
+  "name": "@openinary/core",
+  "version": "1.8.0",
+  "private": true,
+  "description": "Openinary's media transformation engine and route handlers (image/video processing, storage, job queue) as a standalone, embeddable package.",
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/openinary/openinary",
+    "directory": "packages/core"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./eta": {
+      "types": "./dist/eta.d.ts",
+      "import": "./dist/eta.js",
+      "default": "./dist/eta.js"
+    },
+    "./url": {
+      "types": "./dist/url/index.d.ts",
+      "import": "./dist/url/index.js",
+      "default": "./dist/url/index.js"
+    },
+    "./url/grammar": {
+      "types": "./dist/url/grammar.d.ts",
+      "import": "./dist/url/grammar.js",
+      "default": "./dist/url/grammar.js"
+    },
+    "./url/dashboard-thumbs": {
+      "types": "./dist/url/dashboard-thumbs.d.ts",
+      "import": "./dist/url/dashboard-thumbs.js",
+      "default": "./dist/url/dashboard-thumbs.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc && node ../../scripts/add-js-extensions.cjs",
+    "type-check": "tsc --noEmit",
+    "test": "node --import tsx --test $(find src -name '*.test.ts')"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.855.0",
+    "@webtoon/psd": "^0.4.0",
+    "fflate": "^0.8.3",
+    "fluent-ffmpeg": "^2.1.2",
+    "hono": "^4.12.30",
+    "pino": "^10.1.0",
+    "pino-pretty": "^13.1.2",
+    "sharp": "^0.33.0"
+  },
+  "devDependencies": {
+    "@types/fluent-ffmpeg": "^2.1.27",
+    "@types/node": "^24.2.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.2"
+  }
+}

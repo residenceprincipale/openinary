@@ -1,0 +1,186 @@
+---
+title: "Upload & Cache Warming"
+description: "Upload images and videos via the API and pre-generate transformed variants so the first public request is served instantly from cache."
+---
+
+Send a `transformations` list with an upload and Openinary renders those variants right away, so the first visitor hits a warm cache instead of paying for the processing.
+
+```bash
+curl -X POST http://localhost:3000/upload \
+  -H "Authorization: Bearer <api_key>" \
+  -F "files=@photo.jpg" \
+  -F 'transformations=["w_800,f_webp", "w_400,h_400,c_fill"]'
+```
+
+It matters most for video, where an unwarmed first request answers `202` and makes the visitor wait for an encode.
+
+For the full endpoint reference, all parameters, form fields, and response schema, see the [Upload Files API reference](/api-reference/files/upload).
+
+## Upload video with queued transformations
+
+Video transformations run in a background queue, they don't block the upload response.
+
+```bash
+curl -X POST "http://localhost:3000/upload" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -F "files=@./video.mp4;type=video/mp4" \
+  -F 'transformations=["w_1280,h_720,q_75","w_640,h_360,q_60"]'
+```
+
+<Note>
+  An upload never processes a video on its own, not even for a thumbnail. To
+  prewarm one, request it like any other variant:
+  `t_true,tt_5,f_webp,w_500,h_500,c_fill,q_80`. Thumbnails are queued ahead of
+  other video work. Without it, every request to a thumbnail URL
+  extracts the frame again (~1s): the on-demand path returns the frame without
+  writing it to the variant cache, so only queued thumbnails are cached. That
+  makes prewarming the difference between paying once and paying every time.
+</Note>
+
+## TypeScript examples
+
+<Tabs>
+<Tab title="Image upload">
+
+```ts
+import { readFile } from "node:fs/promises";
+
+const apiKey = process.env.OPENINARY_API_KEY;
+if (!apiKey) throw new Error("Missing OPENINARY_API_KEY");
+
+const bytes = await readFile("./photo.jpg");
+const file = new File([bytes], "photo.jpg", { type: "image/jpeg" });
+
+const form = new FormData();
+form.append("files", file);
+form.append(
+  "transformations",
+  JSON.stringify(["w_800,h_600,f_webp,q_80", "w_400,h_400,c_fill,f_avif,q_70"]),
+);
+
+const res = await fetch("http://localhost:3000/upload", {
+  method: "POST",
+  headers: { Authorization: `Bearer ${apiKey}` },
+  body: form,
+});
+
+if (!res.ok)
+  throw new Error(`Upload failed: ${res.status} ${await res.text()}`);
+
+const data = await res.json();
+console.log(data);
+```
+
+</Tab>
+
+<Tab title="Video upload">
+
+```ts
+import { readFile } from "node:fs/promises";
+
+const apiKey = process.env.OPENINARY_API_KEY;
+if (!apiKey) throw new Error("Missing OPENINARY_API_KEY");
+
+const bytes = await readFile("./video.mp4");
+const file = new File([bytes], "video.mp4", { type: "video/mp4" });
+
+const form = new FormData();
+form.append("files", file);
+form.append(
+  "transformations",
+  JSON.stringify(["w_1280,h_720,q_75", "w_640,h_360,q_60"]),
+);
+
+const res = await fetch("http://localhost:3000/upload", {
+  method: "POST",
+  headers: { Authorization: `Bearer ${apiKey}` },
+  body: form,
+});
+
+if (!res.ok)
+  throw new Error(`Upload failed: ${res.status} ${await res.text()}`);
+
+const data = await res.json();
+console.log(data);
+```
+
+</Tab>
+
+<Tab title="Multiple fields">
+
+```ts
+import { readFile } from "node:fs/promises";
+
+const apiKey = process.env.OPENINARY_API_KEY;
+if (!apiKey) throw new Error("Missing OPENINARY_API_KEY");
+
+const bytes = await readFile("./photo.jpg");
+const file = new File([bytes], "photo.jpg", { type: "image/jpeg" });
+
+const form = new FormData();
+form.append("files", file);
+// Each append is one transformation string
+form.append("transformations", "w_1200,h_800,f_webp,q_82");
+form.append("transformations", "w_600,h_600,c_fill,f_avif,q_70");
+
+const res = await fetch("http://localhost:3000/upload", {
+  method: "POST",
+  headers: { Authorization: `Bearer ${apiKey}` },
+  body: form,
+});
+
+if (!res.ok)
+  throw new Error(`Upload failed: ${res.status} ${await res.text()}`);
+
+const data = await res.json();
+console.log(data);
+```
+
+</Tab>
+</Tabs>
+
+## Limits
+
+- Max **20 transformations** per upload request.
+- Max file size defaults to **50 MB**. Configurable via [`MAX_FILE_SIZE_MB`](/configuration/server#upload-and-rate-limiting), useful for large video uploads in self-hosted setups.
+
+## Tips
+
+- Prewarm only the variants you actually serve, don't prewarm speculatively.
+- Use consistent transformation strings across your frontend and backend to maximize cache hits.
+- For video, monitor the queue via `GET /queue/stats` during high-volume ingestion.
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Upload API reference"
+    icon="code"
+    href="/api-reference/files/upload"
+  >
+    Full endpoint reference: all fields, validation, and response schema.
+  </Card>
+  <Card
+    title="Image Transformations"
+    icon="image"
+    href="/media-transformations/image-transformations"
+  >
+    Full parameter reference for resizing, cropping, and format conversion.
+  </Card>
+  <Card
+    title="Video Transformations"
+    icon="video"
+    href="/media-transformations/video-transformations"
+  >
+    Resize, trim, and extract thumbnails from video files.
+  </Card>
+  <Card
+    title="File Uploader Component"
+    icon="upload"
+    href="/guides/file-uploader"
+  >
+    Drop a ready-to-use React uploader into your app with a single shadcn/ui
+    command.
+  </Card>
+</CardGroup>
+

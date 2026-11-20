@@ -1,0 +1,40 @@
+---
+title: "List Folders"
+description: "Get every folder path in storage, for building a folder picker"
+---
+
+Returns every folder path in storage in one call, which is what powers "Move to" folder pickers.
+
+```
+GET /storage/folders
+```
+
+```bash
+curl https://cdn.openinary.dev/storage/folders \
+  -H "Authorization: Bearer <api_key>"
+```
+
+**Auth:** API Key required
+
+## Response
+
+```json
+{
+  "folders": ["archive", "photos", "photos/2024"]
+}
+```
+
+| Field     | Type       | Description                                                             |
+| --------- | ---------- | ----------------------------------------------------------------------- |
+| `folders` | `string[]` | Every folder path, relative to the storage root, sorted alphabetically. |
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Move File or Folder" icon="folder-tree" href="/api-reference/storage/move">
+    Move a file or folder into one of these destinations.
+  </Card>
+  <Card title="List Storage" icon="folder-open" href="/api-reference/storage/list">
+    Browse the full file and folder tree.
+  </Card>
+</CardGroup>

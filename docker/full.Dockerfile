@@ -1,69 +1,109 @@
 # Multi-stage build for a monolithic image containing API, Web, and Nginx
 
 # Stage 1: Build API
-FROM node:20-slim AS api-builder
+FROM node:22.23.4-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d AS api-builder
 RUN apt-get update && apt-get install -y --no-install-recommends openssl ffmpeg && \
     rm -rf /var/lib/apt/lists/*
-RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+RUN corepack enable && corepack prepare pnpm@10.13.1 --activate
 
 WORKDIR /app
 
-# Install deps (cached unless lockfile/package.json change)
-COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
-COPY packages/shared/package.json ./packages/shared/package.json
-COPY apps/api/package.json ./apps/api/package.json
-RUN pnpm install --filter shared... --filter api... --frozen-lockfile
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+# The root manifest declares a patchedDependencies entry; pnpm reads the patch
+# file even for a filtered install that never applies it.
+COPY patches/ ./patches/
 
-# Copy source and build (re-runs only on source changes)
-COPY packages/ ./packages/
+# The API's own workspace closure in full, every other package by manifest
+# only: packages/dashboard alone carries 25 MB of demo media for the web stage below.
+COPY packages/core/ ./packages/core/
+COPY packages/shared/ ./packages/shared/
+COPY packages/telemetry-schema/ ./packages/telemetry-schema/
+COPY packages/cli/package.json ./packages/cli/
+COPY packages/dashboard/package.json ./packages/dashboard/
+COPY packages/plans/package.json ./packages/plans/
+COPY packages/registry/package.json ./packages/registry/
+COPY packages/ui/package.json ./packages/ui/
+COPY scripts/ ./scripts/
 COPY apps/api/ ./apps/api/
-RUN mkdir -p apps/api/cache apps/api/public
-RUN pnpm --filter shared build && pnpm --filter api build
+COPY apps/web/package.json ./apps/web/
+# --frozen-lockfile compares the lockfile against every workspace project, so
+# the apps this stage never builds still need their manifest present.
+COPY apps/marketing/package.json ./apps/marketing/
+COPY apps/docs/package.json ./apps/docs/
+COPY apps/telemetry/package.json ./apps/telemetry/
+COPY apps/cloud/server/package.json ./apps/cloud/server/
+COPY apps/cloud/web/package.json ./apps/cloud/web/
+COPY apps/cloud/admin/package.json ./apps/cloud/admin/
 
-# ponytail: single-stage for api build — multi-stage would save ~50MB but adds complexity
+# Install only the workspace dependencies needed for shared + api (dev + prod)
+# for build. No `pnpm fetch` first: it downloads everything the lockfile names,
+# which since the monorepo merge means the Cloud apps and the marketing site.
+RUN pnpm install --filter shared... --filter api... --frozen-lockfile
+RUN mkdir -p apps/api/cache apps/api/public
+
+# "api..." builds the API after every workspace package it depends on.
+RUN pnpm --filter api... build
+
+# Prune devDependencies pour ne garder que les deps de production
 RUN pnpm prune --prod
 
 # Stage 2: Build Web
-FROM node:20-slim AS web-builder
+FROM node:22.23.4-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d AS web-builder
 ARG NEXT_PUBLIC_API_BASE_URL="/api"
 ARG IMAGE_TAG="latest"
 RUN apt-get update && apt-get install -y --no-install-recommends openssl && \
     rm -rf /var/lib/apt/lists/*
-RUN corepack enable && corepack prepare pnpm@9.0.0 --activate
+RUN corepack enable && corepack prepare pnpm@10.13.1 --activate
 
 WORKDIR /app
 
-# Install deps (cached unless lockfile/package.json change)
-COPY pnpm-lock.yaml package.json pnpm-workspace.yaml ./
-COPY packages/shared/package.json ./packages/shared/package.json
-COPY apps/web/package.json ./apps/web/package.json
-RUN pnpm install --frozen-lockfile --prod=false
+COPY pnpm-workspace.yaml ./
+COPY package.json ./
+COPY pnpm-lock.yaml ./
+COPY patches/ ./patches/
 
-# Copy source and build (re-runs only on source changes)
 COPY packages/ ./packages/
+COPY scripts/ ./scripts/
 COPY apps/web/ ./apps/web/
-RUN pnpm --filter shared build
+COPY apps/api/package.json ./apps/api/
+# --frozen-lockfile compares the lockfile against every workspace project, so
+# the apps this stage never builds still need their manifest present.
+COPY apps/marketing/package.json ./apps/marketing/
+COPY apps/docs/package.json ./apps/docs/
+COPY apps/telemetry/package.json ./apps/telemetry/
+COPY apps/cloud/server/package.json ./apps/cloud/server/
+COPY apps/cloud/web/package.json ./apps/cloud/web/
+COPY apps/cloud/admin/package.json ./apps/cloud/admin/
 
-# Create data directory for auth database (needed during build)
-RUN mkdir -p /app/data
+# Filtered for the same reason as the API stage above.
+RUN pnpm install --filter web... --frozen-lockfile --prod=false
+
+# "web^..." builds every workspace package web depends on; web itself
+# builds below, once its env is set.
+RUN pnpm --filter "web^..." build
 
 ENV NODE_ENV=production
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
-ENV BETTER_AUTH_SECRET=build-time-secret-will-be-replaced
-# BETTER_AUTH_URL is runtime-only (set via docker-compose)
-# Copy favicon to public directory before build so Next.js can serve it
-RUN mkdir -p /app/apps/web/public && cp /app/apps/web/src/app/favicon.ico /app/apps/web/public/favicon.ico || true
+RUN mkdir -p /app/apps/web/public && cp /app/apps/web/src/app/favicon.ico /app/apps/web/public/favicon.ico
 RUN pnpm --filter web build
 
 # Stage 3: Final monolithic image
-FROM node:20-slim
+FROM node:22.23.4-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d
 # Runtime args only - will be overridden by docker-compose environment
 ARG NEXT_PUBLIC_API_BASE_URL="/api"
 ARG IMAGE_TAG="latest"
 
-# Install nginx, ffmpeg, supervisor, cron and sqlite3 for process management
-RUN apt-get update && apt-get install -y --no-install-recommends nginx ffmpeg supervisor cron sqlite3 && \
-    rm -rf /var/lib/apt/lists/*
+# Install nginx, ffmpeg, supervisor, cron, sqlite3 and jemalloc for process management
+# jemalloc replaces glibc malloc to avoid RSS bloat from arena fragmentation under
+# sharp/libvips and ffmpeg workloads (freed memory not returned to the OS)
+RUN apt-get update && apt-get install -y --no-install-recommends nginx ffmpeg supervisor cron sqlite3 libjemalloc2 && \
+    rm -rf /var/lib/apt/lists/* && \
+    ln -sf "$(dpkg -L libjemalloc2 | grep 'libjemalloc\.so\.2$')" /usr/lib/libjemalloc.so.2
+
+# Reduce glibc malloc arena fragmentation and preload jemalloc as the allocator for
+# all supervised processes (api, web)
+ENV MALLOC_ARENA_MAX=2
+ENV LD_PRELOAD=/usr/lib/libjemalloc.so.2
 
 WORKDIR /app
 
@@ -90,9 +130,9 @@ RUN echo "${IMAGE_TAG}" > /app/version.txt && \
 RUN mkdir -p /app/apps/api/cache /app/apps/api/public /app/data /app/web-standalone/data /var/log/supervisor && \
     chown -R node:node /app/apps/api/cache /app/apps/api/public /app/data /app/web-standalone/data
 
-# Make wrapper script executable and fix line endings (CRLF to LF)
+# CRLF to LF, in case the checkout was made on Windows
 RUN chmod +x /app/scripts/init-env-wrapper.sh && \
-    sed -i 's/\r$//' /app/scripts/init-env-wrapper.sh || true
+    sed -i 's/\r$//' /app/scripts/init-env-wrapper.sh
 
 # Copy nginx configuration
 COPY docker/nginx.conf /etc/nginx/nginx.conf
@@ -103,19 +143,15 @@ COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 # Expose port
 EXPOSE 3000
 
-# Set environment variables
 ENV NODE_ENV=production
-ENV API_PORT=3002
-ENV WEB_PORT=3001
-# Set default BETTER_AUTH_SECRET (will be overridden by init-env.js if needed)
+# With an empty BETTER_AUTH_SECRET, init-env.js reuses the one persisted on
+# the data volume or generates it.
 ENV BETTER_AUTH_SECRET=""
-# BETTER_AUTH_URL must be provided at runtime via docker-compose
-# It is not set at build time to allow the same image to be deployed anywhere
+# BETTER_AUTH_URL is left to runtime so the same image deploys anywhere.
 ENV NEXT_PUBLIC_API_BASE_URL="${NEXT_PUBLIC_API_BASE_URL}"
 ENV MODE="fullstack"
-ENV DOCKER_CONTAINER="true"
+ENV DB_PATH="/app/data/auth.db"
 
-# Run init script wrapper to set env vars, run security script before starting supervisor
-# Source the wrapper script to export env vars, then run secure-db and start supervisor
+# The wrapper is sourced so the secret it settles on reaches supervisord.
 CMD ["/bin/sh", "-c", ". /app/scripts/init-env-wrapper.sh && cd /app && node scripts/secure-db.js && exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"]
 

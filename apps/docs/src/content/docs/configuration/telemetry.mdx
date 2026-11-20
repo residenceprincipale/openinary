@@ -1,0 +1,45 @@
+---
+title: "Telemetry"
+description: "Exactly what anonymous usage data Openinary sends, where it goes, and how to turn it off"
+---
+
+Openinary sends three anonymous events with a fixed set of properties. No file names, media content, URLs, or user data, ever. Turn it off with one variable:
+
+```bash
+OPENINARY_TELEMETRY=false
+```
+
+Any value other than the exact string `false` leaves it on. The rest of this page is what gets sent when it is on, so you can decide with the facts.
+
+## What is sent
+
+| Event | When | Properties |
+| --- | --- | --- |
+| `instance_started` | Once, on an instance's first ever boot | `version`, `deployment_mode`, `storage_backend`, `os_platform`, `os_arch`, `node_version` |
+| `daily_heartbeat` | Every ~24h while the process runs | `version`, `deployment_mode`, `storage_backend`, `video_jobs_bucket` |
+| `onboarding_completed` | Once per account, when it finishes the first-run questionnaire | `role`, `use_cases`, `source` |
+
+The onboarding answers are the ids of the options picked (for example `solo`, `images`, `github`), or `skipped`. The name, workspace name and pictures typed into the same form stay on your instance.
+
+Counts are never raw numbers. They are bucketed into `0`, `1-10`, `11-100`, `101-1000` and `1000+`.
+
+Every event carries an `instance_id`, a UUID that cannot be reversed into anything about you or your data. When `BETTER_AUTH_SECRET` is at least 32 characters and not the known placeholder, the id is a salted SHA-256 of that secret, truncated into UUID shape. That is the normal case, and because it is derived rather than stored it survives a database wipe, which stops one instance being counted as many. Otherwise a random UUID is generated once and stored locally. Rotating the secret produces a new id and the old one simply stops reporting.
+
+## Where it goes
+
+Events go to `telemetry.openinary.dev`, a proxy maintained by the project. It validates each payload against the same whitelist, rate-limits per instance and per IP, then forwards accepted events to PostHog. Your instance never talks to PostHog directly and never holds a PostHog key.
+
+**Your IP does reach PostHog.** The payload contains no IP address, but your instance's IP reaches the proxy the way it reaches any HTTP server, and the proxy passes it on as the `$ip` property so events geolocate to your country rather than to the proxy's datacenter. It is used for coarse geographic aggregation. If that is not acceptable for your deployment, turn telemetry off: there is no setting that keeps the events and drops the IP.
+
+## Why it exists
+
+Openinary is self-hosted and the codebase is public, so there is no way to see usage the way a hosted SaaS would. Without any signal it is guesswork which features matter or how many instances exist. This gives direction, not precise counts.
+
+## Pointing it elsewhere
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `OPENINARY_TELEMETRY` | `true` | Set to exactly `false` to send nothing at all |
+| `TELEMETRY_ENDPOINT` | `https://telemetry.openinary.dev/collect` | Collector to post to. Point it at your own to inspect what your instance sends, or keep the data in your infrastructure |
+
+Both sides are readable: the sender is [`apps/api/src/utils/telemetry.ts`](https://github.com/openinary/openinary/blob/main/apps/api/src/utils/telemetry.ts) and the proxy is [`apps/telemetry`](https://github.com/openinary/openinary/blob/main/apps/telemetry/src/index.ts). Check this page against them.

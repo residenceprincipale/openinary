@@ -1,0 +1,111 @@
+---
+title: "Delete File or Folder"
+description: "Permanently delete a file or folder, with all its cached transformation variants"
+---
+
+<Warning>
+  This action is irreversible, and it deletes folders recursively. Pointing this
+  endpoint at a folder removes that folder, everything inside it at every depth,
+  and all their cached variants, in one call and with no confirmation step.
+  Check the path before you send it.
+</Warning>
+
+Deletes the file or folder at `{path}`, along with its cached transformation variants.
+
+```
+DELETE /storage/{path}
+```
+
+```bash
+curl -X DELETE https://cdn.openinary.dev/storage/photos/portrait.jpg \
+  -H "Authorization: Bearer <api_key>"
+```
+
+To clear cached variants and keep the original, use [Invalidate Cache](/api-reference/cache/invalidate) instead.
+
+**Auth:** API key required. A dashboard session cookie also works.
+
+## Path parameters
+
+| Param  | Type   | Required | Description                                                                                                                                        |
+| ------ | ------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `path` | string | yes      | Path to the file or folder relative to the storage root, e.g. `photos/2026`. Use the `path` of a file or folder returned by [List Storage](/api-reference/storage/list). |
+
+## Response
+
+```json
+{
+  "success": true,
+  "message": "Asset deleted successfully",
+  "details": {
+    "jobsDeleted": 0,
+    "localCacheFilesDeleted": 3,
+    "cloudCacheFilesDeleted": 0
+  }
+}
+```
+
+| Field     | Type    | Description                                    |
+| --------- | ------- | ---------------------------------------------- |
+| `success` | boolean | `true` when the delete completed with no errors |
+| `message` | string  | Human-readable result summary                   |
+| `details` | object  | Counters, below                                 |
+
+- `jobsDeleted`, number: queued processing jobs cancelled and removed
+- `localCacheFilesDeleted`, number: cached transformation variants removed from local disk
+- `cloudCacheFilesDeleted`, number: cached transformation variants removed from cloud storage
+
+Deleting a folder on cloud storage returns early once the folder is removed, so `jobsDeleted` and the cache counters stay at `0` even though the folder's objects are gone.
+
+### Partial deletion
+
+If the original was removed but some cleanup step failed, the response has a different shape: no `success` field, and an `errors` array inside `details`.
+
+```json
+{
+  "error": "Partial deletion",
+  "message": "Asset deleted but some cleanup operations failed",
+  "details": {
+    "originalFileDeleted": true,
+    "jobsDeleted": 0,
+    "localCacheFilesDeleted": 2,
+    "cloudCacheFilesDeleted": 0,
+    "errors": ["Failed to delete cached variant w_200/photo.jpg"]
+  }
+}
+```
+
+The status is `200` when `originalFileDeleted` is `true` and `500` when it is `false`. Branch on the presence of `error`, not on `success`.
+
+| Code  | Meaning                                           |
+| ----- | ------------------------------------------------- |
+| `200` | Deleted, or deleted with non-fatal cleanup errors |
+| `400` | Path is missing                                   |
+| `404` | Nothing exists at that path                       |
+| `500` | The original could not be deleted                 |
+
+## Related
+
+<CardGroup cols={2}>
+  <Card
+    title="Invalidate Cache"
+    icon="rotate"
+    href="/api-reference/cache/invalidate"
+  >
+    Clear cached variants while keeping the original.
+  </Card>
+  <Card
+    title="List Storage"
+    icon="folder-open"
+    href="/api-reference/storage/list"
+  >
+    Browse folders and files before deleting.
+  </Card>
+  <Card
+    title="Move File or Folder"
+    icon="folder-tree"
+    href="/api-reference/storage/move"
+  >
+    Move instead of deleting.
+  </Card>
+</CardGroup>

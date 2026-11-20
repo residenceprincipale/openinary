@@ -1,0 +1,192 @@
+---
+description: Technical writing guidelines for the Openinary docs (Nimbus) with component usage patterns
+globs:
+  - "*.mdx"
+  - "*.md"
+alwaysApply: true
+---
+
+# Openinary documentation rules
+
+## House style: summarize first, then go deep
+
+This section outranks everything below it. Where the generic guidance
+that follows asks for completeness, it means accurate, not exhaustive.
+
+Readers scan. Most arrive from a search result, take what they need, and leave.
+Write so someone who reads only the top of a page can still get their job done.
+
+**Every page opens with a synthesis.** Before the first heading, in a few lines:
+what this is, what it does, and the shortest thing that works. Someone who stops
+reading there should be able to use the feature. Only then go into detail.
+
+**Show it before explaining it.** A working example belongs on the first screen,
+not after the parameter reference. A reader who has seen one working URL
+understands the next 200 lines faster.
+
+**Never open a page with a callout.** A bordered box before the content is a
+disclaimer where the answer should be. Lead with the sentence that answers the
+page's title.
+
+**Callouts are rare and expensive.** A `<Warning>` means this costs data, money
+or a broken production deploy. A `<Note>` means a real gotcha, not an aside.
+Aim for zero per page, at most one. If a page has three, none of them is read.
+Anything that is merely useful is a sentence in the prose.
+
+**Reference goes in tables, not prose.** Parameters, formats, status codes and
+options belong in a table with the shortest description that is still true.
+A paragraph per value with an obvious meaning is noise. Keep prose for the
+few parameters that genuinely need a caveat.
+
+**One idea per sentence, under about 20 words.** Never write a sentence whose
+job is to justify the previous one.
+
+**Delegate instead of enumerating.** A card grid pointing at four pages beats
+four paragraphs summarizing them.
+
+**Cut, do not annotate.** If something is only true in an edge case nobody hits,
+it does not need a note. It needs deleting.
+
+### The shape of a page
+
+```
+title + one-line description        what this is
+synthesis (2 to 5 lines)            what it does, and the shortest thing that works
+first example                       working code, on the first screen
+common cases                        the 80%, each with a short lead and code
+full reference                      tables
+edge cases and gotchas              last, and short
+```
+
+### Before and after
+
+Before, 47 words to say one thing, opening on a box:
+
+```mdx
+<Note>
+  This is the core Openinary endpoint. The first request processes and caches
+  the result; subsequent requests are served from cache in ~50ms.
+</Note>
+
+## Endpoint
+```
+
+After, the answer first, then proof:
+
+```mdx
+Put the transformation in the URL. The first request renders and caches it,
+the rest are served from cache.
+
+```http
+GET /t/w_800,h_600,c_fill/photo.jpg
+```
+```
+
+# Writing guidelines
+
+## Core writing principles
+
+### Language and style requirements
+
+- Use clear, direct language appropriate for technical audiences
+- Write in second person ("you") for instructions and procedures
+- Use active voice over passive voice
+- Employ present tense for current states, future tense for outcomes
+- Avoid jargon unless necessary and define terms when first used
+- Maintain consistent terminology throughout all documentation
+- Keep sentences concise while providing necessary context
+- Use parallel structure in lists, headings, and procedures
+
+### Content organization standards
+
+- Lead with the most important information (inverted pyramid structure), and see
+  the house style above: the synthesis at the top of the page is not optional
+- Use progressive disclosure: basic concepts before advanced ones
+- Break complex procedures into numbered steps
+- Include prerequisites and context before instructions
+- Provide expected outcomes for each major step
+- Use descriptive, keyword-rich headings for navigation and SEO
+- Group related information logically with clear section breaks
+
+### User-centered approach
+
+- Focus on user goals and outcomes rather than system features
+- Anticipate common questions and address them proactively
+- Include troubleshooting for likely failure points
+- Write for scannability with clear headings, lists, and white space
+- Include verification steps to confirm success
+
+
+## Components
+
+The site is built with [Nimbus](https://nimbus-docs.com) (Astro). Pages live in
+`src/content/docs/` and the API reference in `src/content/reference/` (served at
+`/api-reference`). `changelog.mdx` is read by the marketing site's /changelog. The sidebar
+order is set by hand in `astro.config.ts`: add a new page there.
+
+These components work in any `.mdx` without an import (`src/components.ts`).
+Anything else fails the build, by design:
+
+| Component | Use |
+| --- | --- |
+| `<Steps>` / `<Step title>` | Procedures, in order |
+| `<Tabs>` / `<Tab title>` | Alternatives: platforms, languages, frameworks |
+| `<AccordionGroup>` / `<Accordion title>` | Progressive disclosure, FAQs |
+| `<CardGroup>` / `<Card title icon href>` | Links to the next pages. `icon` is a Font Awesome name (`rocket`), drawn in Solar Bold Duotone through `src/lib/icons.ts`, or an Iconify name (`solar:rocket-bold-duotone`) |
+| `<Note>`, `<Warning>`, `<Aside type>` | Callouts, rarely (see the house style) |
+| `<Frame>` | A screenshot. Image paths start with `/docs/images/` |
+| `<Update label description tags>` | One changelog release, in `changelog.mdx` only |
+
+There is no `<ParamField>`, `<ResponseField>`, `<CodeGroup>`, `<Tip>`, `<Info>`
+or `<Check>`: use tables for parameters and fields, `<Tabs>` for the same code
+in several languages, and `<Note>` for the rest.
+
+Give a code block a file name with `title`: ```` ```ts title="app/api/route.ts" ````.
+Internal links are written without the `/docs` base: `[Quick Start](/quickstart)`.
+
+
+## Required page structure
+
+Every documentation page must begin with YAML frontmatter:
+
+```yaml
+---
+title: "Clear, specific, keyword-rich title"
+description: "Concise description explaining page purpose and value"
+---
+```
+
+## Content quality standards
+
+### Code examples requirements
+
+- Always include complete, runnable examples that users can copy and execute
+- Show proper error handling and edge case management
+- Use realistic data instead of placeholder values
+- Include expected outputs and results for verification
+- Test all code examples thoroughly before publishing
+- Specify language and include filename when relevant
+- Add explanatory comments for complex logic
+- Never include real API keys or secrets in code examples
+
+### API documentation requirements
+
+Accurate and complete are not the same thing. Cover every parameter, but in a
+table row, not a paragraph.
+
+- List every parameter, in a table. Description column: one short phrase
+- Show the success response. Show an error response only when its shape differs
+  in a way a client must branch on
+- State rate limits and auth once, near the top, not per endpoint
+- List status codes in a table. Explain only the ones whose meaning is not
+  obvious from the code itself
+- Document a caveat only where it changes what the reader writes
+
+### Accessibility requirements
+
+- Include descriptive alt text for all images and diagrams
+- Use specific, actionable link text instead of "click here"
+- Ensure proper heading hierarchy starting with H2
+- Provide keyboard navigation considerations
+- Use sufficient color contrast in examples and visuals
+- Structure content for easy scanning with headers and lists

@@ -1,0 +1,79 @@
+---
+title: "Create API Key"
+description: "Generate a new API key for authenticating requests"
+---
+
+**Self-hosted only.** Cloud keys are created in the dashboard, not through the API.
+
+Post to `/api-keys/create` and the response carries the full key. That is the only time you see it, so store it immediately.
+
+```bash
+curl -X POST https://media.example.com/api-keys/create \
+  -H "Authorization: Bearer <api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "production", "expiresIn": 31536000}'
+```
+
+```
+POST /api-keys/create
+```
+
+**Auth:** API Key or Session · **Content-Type:** `application/json`
+
+## Body parameters
+
+| Field | Type | Default | Notes |
+| --- | --- | --- | --- |
+| `name` | string | | Human-readable label for this key |
+| `expiresIn` | number | `31536000` | Expiration in seconds from now, default 365 days |
+
+## Response
+
+```json
+{
+  "success": true,
+  "apiKey": {
+    "id": "key_abc123",
+    "key": "xxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "name": "production",
+    "start": "xxxxxx",
+    "createdAt": "2024-03-15T10:30:00.000Z",
+    "expiresAt": "2025-03-15T10:30:00.000Z"
+  },
+  "message": "API key created successfully. Save this key - it will not be shown again!"
+}
+```
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `success` | boolean | Whether the key was created |
+| `apiKey` | object | The new key, fields below |
+| `message` | string | Reminder that the key is shown once |
+
+`apiKey` fields:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | Unique key identifier, used for update and delete |
+| `key` | string | The full API key value, only returned here |
+| `name` | string | The key's display name |
+| `start` | string | Key prefix, safe to display |
+| `createdAt` | string | ISO 8601 creation timestamp |
+| `expiresAt` | string | ISO 8601 expiration timestamp |
+
+**Status codes:** `200` success · `401` unauthorized · `500` error
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="List API Keys" icon="list" href="/api-reference/api-keys/list">
+    View all active keys.
+  </Card>
+  <Card
+    title="Delete API Key"
+    icon="trash"
+    href="/api-reference/api-keys/delete"
+  >
+    Revoke a key.
+  </Card>
+</CardGroup>

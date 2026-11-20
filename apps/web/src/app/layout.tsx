@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono, Mona_Sans } from "next/font/google";
 import { NuqsAdapter } from 'nuqs/adapters/next/app'
-import { ThemeProvider } from "@/components/theme-provider";
+import { FieldErrors, OpeninaryProvider, Toaster } from "@openinary/ui";
+import { ThemeProvider } from "next-themes";
 import { QueryProvider } from "@/components/query-provider";
-import { BrandingProvider } from "@/components/branding-provider";
-import { FeaturesProvider } from "@/components/features-provider";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const monaSans = Mona_Sans({
+  variable: "--font-mona-sans",
   subsets: ["latin"],
 });
 
@@ -30,11 +29,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const disableTransforms = process.env.DISABLE_TRANSFORMS === "true";
   return (
     <html suppressHydrationWarning lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${monaSans.variable} ${geistMono.variable} antialiased`}
       >
         <QueryProvider>
           <ThemeProvider
@@ -43,11 +41,14 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <NuqsAdapter>
-              <FeaturesProvider disableTransforms={disableTransforms}>
-                <BrandingProvider>{children}</BrandingProvider>
-              </FeaturesProvider>
-            </NuqsAdapter>
+            <OpeninaryProvider
+              apiBaseUrl={process.env.NEXT_PUBLIC_API_BASE_URL || ""}
+              transformBaseUrl={process.env.NEXT_PUBLIC_TRANSFORM_BASE_URL}
+            >
+              <NuqsAdapter>{children}</NuqsAdapter>
+              <Toaster />
+              <FieldErrors />
+            </OpeninaryProvider>
           </ThemeProvider>
         </QueryProvider>
       </body>

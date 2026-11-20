@@ -1,0 +1,207 @@
+---
+title: "Cloudinary vs Openinary"
+description: "An honest, feature-by-feature comparison of what Cloudinary offers versus what Openinary supports today."
+---
+
+Openinary covers core transformation and delivery well: resize, crop, format conversion, quality, video trimming, upload, caching and signed URLs. It covers the common image effects but not artistic or AI ones, and does not cover AI and generative features, adaptive streaming, text overlays, or an enterprise DAM layer.
+
+Cloudinary is a mature commercial product with years of development behind it. Openinary is early-stage open source. This page is the honest version of that gap.
+
+The **Openinary** column below is [Openinary Cloud](/cloud/overview), the managed version, since that is the like-for-like comparison. Where self-hosting differs, the cell says so.
+
+**Openinary fits when** your use case is core image and video delivery, you would rather not pay per transformation, and you want the option to run the whole thing yourself. That last one is the structural difference: self-hosting is a first-class path on any plan, under AGPL, where Cloudinary reserves it for Enterprise.
+
+**Cloudinary is the better choice today when** you need AI or generative transformations, adaptive streaming, artistic effects, text overlays, team roles or SSO, a full DAM with search and workflows, official SDKs in your language, or webhooks.
+
+The tables below are the detail behind that summary. Ready to move? [Migrate from Cloudinary](/migrate-from-cloudinary) walks through it.
+
+---
+
+## Image transformations
+
+| Feature                      | Cloudinary                                                      | Openinary                                           |
+| ---------------------------- | --------------------------------------------------------------- | --------------------------------------------------- |
+| Resize (`w`, `h`)            | ✓                                                               | ✓                                                   |
+| Aspect ratio (`ar`)          | ✓                                                               | ✓                                                   |
+| Crop modes                   | ✓ 14 modes (`fill`, `pad`, `thumb`, `lfill`, `imagga_crop`, …)  | ✓ 9 modes (`fill`, `fit`, `scale`, `crop`, `pad`, `lfill`, `lpad`, `mfit`, `mpad`) |
+| Gravity / focal point        | ✓ Face, body, object, custom coordinates, auto (entropy)        | ✓ Face, compass directions, auto (entropy), center  |
+| Rotation (`a`)               | ✓ Degrees + `vflip`, `hflip`, `auto_right`, `auto_left`, EXIF   | ✓ Degrees, `vflip`, `hflip`, combined with `.`      |
+| Background color (`b`)       | ✓ Colors, `auto`, blurred, `gen_fill` (AI-generated)            | ✓ Hex, `rgb:`, CSS names, `transparent`, `auto` (all modes, palettes), blurred |
+| Round corners (`r`)          | ✓                                                               | ✓ Uniform, per-corner, or `max` (circle/oval)       |
+| Quality (`q`)                | ✓ Numeric + `auto` (content-aware)                              | ✓ Numeric 1-100 + `auto` (per-format)               |
+| Format (`f`)                 | ✓ AVIF, WebP, JPEG, PNG, GIF, HEIC, SVG, TIFF, BMP, PDF, `auto` | ✓ AVIF, WebP, JPEG, PNG, GIF, `auto` (via Accept header) |
+| Auto format selection        | ✓                                                               | ✓                                                   |
+| Device pixel ratio (`dpr`)   | ✓ Including `auto`                                              | ✓ Numeric (`auto` serves 1x)                        |
+| Zoom (`z`)                   | ✓                                                               | ✗                                                   |
+| Named transformations        | ✓ (reusable presets)                                            | ✗                                                   |
+| Chained transformations      | ✓ (multiple steps in one URL)                                   | ✗                                                   |
+| Default image fallback (`d`) | ✓                                                               | ✓ (self-hosted only for now)                        |
+
+## Image effects
+
+| Feature                                 | Cloudinary | Openinary |
+| --------------------------------------- | ---------- | --------- |
+| Blur, sharpen, unsharp mask             | ✓          | ✓         |
+| Brightness, contrast, saturation, hue, gamma | ✓     | ✓         |
+| Fill light                              | ✓          | ✓ (approximation) |
+| Grayscale, sepia, negate                | ✓          | ✓         |
+| Trim                                    | ✓          | ✓         |
+| Opacity (`o`)                           | ✓          | ✓         |
+| Border (`bo`)                           | ✓          | ✓         |
+| Vignette, shadow, outline               | ✓          | ✗         |
+| Pixelate (full, faces, regions)         | ✓          | ~ (full image only) |
+| Cartoonify, oil paint, artistic filters | ✓          | ✗         |
+| Color tint / colorize                   | ✓          | ✓         |
+| Recolor                                 | ✓          | ✗         |
+| Colorblind simulation / assistance      | ✓          | ✗         |
+| Distort, shear, displace                | ✓          | ✗         |
+
+## AI & generative features
+
+| Feature                                | Cloudinary | Openinary                      |
+| -------------------------------------- | ---------- | ------------------------------ |
+| Background removal                     | ✓          | ✗                              |
+| Generative fill (extend image with AI) | ✓          | ✗                              |
+| Generative replace (swap objects)      | ✓          | ✗                              |
+| Generative remove (erase objects)      | ✓          | ✗                              |
+| Generative recolor                     | ✓          | ✗                              |
+| Generative restore (denoise, enhance)  | ✓          | ✗                              |
+| Auto enhance (AI quality boost)        | ✓          | ✗                              |
+| Auto brightness / contrast / color     | ✓          | ✗                              |
+| Object detection / segmentation        | ✓          | ✗                              |
+| OCR (text extraction)                  | ✓          | ✗                              |
+| AI content moderation                  | ✓          | ✗                              |
+| AI auto-tagging                        | ✓          | ✗                              |
+| Smart thumbnails via AI                | ✓          | ~ (entropy-based gravity only) |
+
+## Overlays & composition
+
+| Feature                   | Cloudinary | Openinary |
+| ------------------------- | ---------- | --------- |
+| Image overlay / watermark | ✓          | ✓         |
+| Text overlay              | ✓          | ✗         |
+| Video overlay             | ✓          | ✓ (image on video) |
+| Underlay                  | ✓          | ✗         |
+| Subtitles layer           | ✓          | ✗         |
+| Blend modes               | ✓          | ✗         |
+
+## Video transformations
+
+| Feature                                           | Cloudinary                            | Openinary             |
+| ------------------------------------------------- | ------------------------------------- | --------------------- |
+| Resize (`w`, `h`)                                 | ✓                                     | ✓                     |
+| Crop modes                                        | ✓                                     | ✓ (`fill`, `crop`)    |
+| Quality / CRF                                     | ✓ Numeric + `auto`                    | ✓ Numeric 1-100 (CRF) |
+| Trim (`so`, `eo`)                                 | ✓                                     | ✓                     |
+| Frame thumbnail extraction                        | ✓                                     | ✓                     |
+| Output format                                     | ✓ MP4, WebM, OGV, MKV, `auto`         | ✓ MP4, WebM, MOV      |
+| Input formats                                     | ✓ MP4, MOV, WebM, AVI, MKV, FLV, …    | ✓ MP4, MOV, WebM      |
+| Adaptive bitrate streaming (HLS/DASH)             | ✓                                     | ✗                     |
+| HDR / content-aware encoding                      | ✓                                     | ✗                     |
+| Video effects (fade, loop, boomerang, reverse, …) | ✓                                     | ✗                     |
+| Audio track manipulation                          | ✓ (codec, bitrate, frequency, remove) | ✗                     |
+| Video codec control (`vc`)                        | ✓ H.264, H.265, VP9, AV1              | ✗ (H.264 fixed)       |
+| Subtitles / captions                              | ✓                                     | ✗                     |
+| Video player (embed)                              | ✓                                     | ✗                     |
+| Background processing queue                       | ✓                                     | ✓                     |
+| Real-time processing status (SSE)                 | ✗                                     | ✓                     |
+
+## Upload & storage
+
+| Feature                              | Cloudinary     | Openinary |
+| ------------------------------------ | -------------- | --------- |
+| Upload via API                       | ✓              | ✓         |
+| Multiple files per request           | ✓              | ✓         |
+| Custom filename                      | ✓              | ✓         |
+| Folder management                    | ✓              | ✓         |
+| Eager transformations (prewarm)      | ✓              | ✓ (self-hosted only) |
+| Upload presets                       | ✓              | ✗         |
+| Upload via remote URL (fetch)        | ✓              | ✗         |
+| Client-side upload (direct to cloud) | ✓              | ✓ (presigned) |
+| Rename / move files                  | ✓              | ✓         |
+| Copy files                           | ✓              | ✓ (same folder) |
+| Delete file                          | ✓              | ✓         |
+| Restore from backup                  | ✓ (paid plans) | ✗         |
+| File metadata (size, timestamps)     | ✓              | ✓         |
+| Custom metadata fields               | ✓              | ✗         |
+| Tags                                 | ✓              | ✗         |
+| Archive / ZIP creation               | ✓              | ✓ (self-hosted only) |
+| Sprite generation                    | ✓              | ✗         |
+| PDF page extraction                  | ✓              | ✗         |
+
+## Delivery & caching
+
+| Feature                     | Cloudinary     | Openinary        |
+| --------------------------- | -------------- | ---------------- |
+| Global CDN                  | ✓ (included)   | ✓ (included on Cloud, yours to run when self-hosting) |
+| Cache invalidation          | ✓              | ✓                |
+| Signed / authenticated URLs | ✓              | ✓ (self-hosted only for now) |
+| Custom domain               | ✓ (paid plans) | ✓ (self-hosted)  |
+| Rate limiting               | ✓ (plan-based) | ✓ (configurable) |
+| Download original           | ✓              | ✓                |
+
+## Authentication & access control
+
+| Feature                        | Cloudinary     | Openinary        |
+| ------------------------------ | -------------- | ---------------- |
+| API keys                       | ✓              | ✓                |
+| Session-based auth (dashboard) | ✓              | ✓                |
+| API key expiration             | ✓              | ✓                |
+| Multiple users / teams         | ✓              | ✗ (one account, one admin)         |
+| Role-based access control      | ✓              | ✗                |
+| OAuth / SSO                    | ✓ (Enterprise) | ✗                |
+| IP allowlist                   | ✓ (Enterprise) | ✗                |
+
+## Webhooks & events
+
+| Feature                          | Cloudinary | Openinary |
+| -------------------------------- | ---------- | --------- |
+| Upload webhooks (outgoing HTTP)  | ✓          | ✗         |
+| Transformation complete webhooks | ✓          | ✗         |
+| Real-time queue events (SSE)     | ✗          | ✓         |
+
+## SDKs & integrations
+
+| Feature                                | Cloudinary | Openinary         |
+| -------------------------------------- | ---------- | ----------------- |
+| Node.js SDK                            | ✓          | ✗ (REST API only) |
+| Python SDK                             | ✓          | ✗                 |
+| PHP SDK                                | ✓          | ✗                 |
+| Ruby SDK                               | ✓          | ✗                 |
+| Java SDK                               | ✓          | ✗                 |
+| Go SDK                                 | ✓          | ✗                 |
+| .NET SDK                               | ✓          | ✗                 |
+| React / Next.js component              | ✓          | ✓ (file uploader) |
+| CMS plugins (WordPress, Contentful, …) | ✓          | ✗                 |
+
+## DAM (Digital Asset Management)
+
+| Feature                         | Cloudinary | Openinary |
+| ------------------------------- | ---------- | --------- |
+| Web dashboard                   | ✓          | ✓ (basic) |
+| Folder browsing                 | ✓          | ✓         |
+| Search (by name, tag, metadata) | ✓          | ✗         |
+| Collections / albums            | ✓          | ✗         |
+| Bulk operations                 | ✓          | ✗         |
+| Approval workflows              | ✓          | ✗         |
+| Version history                 | ✓          | ✗         |
+| Usage analytics                 | ✓          | ✗         |
+| Bandwidth / storage reports     | ✓          | ✗         |
+
+## Infrastructure & deployment
+
+| Feature               | Cloudinary          | Openinary           |
+| --------------------- | ------------------- | ------------------- |
+| Managed SaaS          | ✓                   | ✓                   |
+| Self-hosted / Docker  | ✓ (Enterprise only) | ✓ (any plan, AGPL)  |
+| S3-compatible storage | ✓                   | ✓                   |
+| SQLite database       | ✗                   | ✓                   |
+| Multi-region          | ✓                   | ✓ (edge-cached delivery on Cloud), single instance when self-hosting |
+| Open source           | ✗                   | ✓                   |
+| Free tier             | ✓ (limited)         | ✓ (Free plan, or self-host at no cost) |
+
+---
+
+## Contributing
+
+Openinary is open source and looking for contributors. If something on this list matters to you, that is a good place to start: pick a feature, open a discussion, and help shape what gets built. [Join the conversation](https://github.com/openinary/openinary/discussions) or [browse open issues](https://github.com/openinary/openinary/issues).

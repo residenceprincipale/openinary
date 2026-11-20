@@ -1,0 +1,142 @@
+---
+title: "Quick Start"
+description: "Install Openinary with one command, create an admin account, and make your first image transformation."
+---
+
+One command scaffolds a project, writes its config, and starts the containers. You need [Docker](https://docs.docker.com/get-docker/) 20.x or higher, and Node 20+ to run the CLI.
+
+```bash
+npx create-openinary
+```
+
+Answer the prompts (full stack or API-only, and optionally S3-compatible storage). It writes an `openinary/` directory with a `docker-compose.yml` and a `.env` carrying a generated `BETTER_AUTH_SECRET`, then starts the containers on **http://localhost:3000**. The container ships with sample media, so you can transform something straight away:
+
+```http
+GET http://localhost:3000/t/w_400,h_400,c_fill/example-loan.jpg
+```
+
+Running the hosted version instead? See the [Cloud Quickstart](/cloud/quickstart).
+
+## Create your admin account
+
+In full stack mode, open **http://localhost:3000** and you land on `/setup`. Create the account, then open your profile in the bottom-left of the dashboard and go to **API Keys** to create your first key.
+
+In API-only mode a key is generated on first boot and printed to the container logs **once**. Grab it with `docker logs <container-id>`. You can also pre-seed the account and key from the environment, see [admin bootstrap](/configuration/server#admin-bootstrap).
+
+## Sample media
+
+Four files ship in the image at `/app/apps/api/public/`: `example-loan.jpg`, `example-grant-ritchie.jpg`, `example-kristopher-villa.jpg` and `example-rahime-gul.mp4`.
+
+## CLI commands
+
+`npx create-openinary` scaffolds. To manage the project afterwards, install the CLI globally:
+
+```bash
+npm i -g create-openinary
+```
+
+| Command | Description |
+| --- | --- |
+| `create` | Scaffold a new Openinary project |
+| `start` | Start services |
+| `stop` | Stop services, data preserved |
+| `restart` | Restart services |
+| `upgrade` | Update to the latest compatible version, syncing env vars and showing the changelog |
+| `reset` | Delete local data and recreate the instance. Destructive, asks for confirmation |
+
+Every command also works without the global install: `npx create-openinary start`, or `pnpm create openinary start`.
+
+## Volumes
+
+Three volumes hold everything that matters. Mount all three to durable storage in production, or use [S3-compatible storage](/configuration/storage) instead of local volumes.
+
+| Volume | Path in container | Contains |
+| --- | --- | --- |
+| `openinary-db` | `/app/data` | Database (accounts, API keys) |
+| `openinary-public` | `/app/apps/api/public` | Uploaded files |
+| `openinary-cache` | `/app/apps/api/cache` | Cached transformations |
+
+## Manual setup
+
+<AccordionGroup>
+<Accordion title="Run with raw Docker commands (no CLI)">
+
+<Tabs>
+
+<Tab title="Full stack">
+
+API and web dashboard together.
+
+```bash
+docker run --platform linux/amd64 -d -p 3000:3000 \
+  -v openinary-cache:/app/apps/api/cache \
+  -v openinary-public:/app/apps/api/public \
+  -v openinary-db:/app/data \
+  openinary/openinary:latest
+```
+
+</Tab>
+
+<Tab title="With S3 storage">
+
+Replaces local file storage with a cloud bucket.
+
+```bash
+docker run --platform linux/amd64 -d -p 3000:3000 \
+  -v openinary-db:/app/data \
+  -e STORAGE_REGION=us-east-1 \
+  -e STORAGE_ACCESS_KEY_ID=XXXXXXXXXXXXXXXXXXXX \
+  -e STORAGE_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
+  -e STORAGE_BUCKET_NAME=your-bucket \
+  -e STORAGE_ENDPOINT=https://s3.filebase.com/ \
+  openinary/openinary:latest
+```
+
+</Tab>
+
+<Tab title="API only">
+
+Headless, no dashboard. An API key is auto-generated on first run and printed to the logs once.
+
+```bash
+docker run --platform linux/amd64 -d -p 3000:3000 \
+  -v openinary-cache:/app/apps/api/cache \
+  -v openinary-public:/app/apps/api/public \
+  -v openinary-db:/app/data \
+  -e MODE=api \
+  openinary/openinary-api:latest
+```
+
+</Tab>
+
+</Tabs>
+
+</Accordion>
+
+<Accordion title="Run from source">
+
+See [Local Development](/local-development).
+
+</Accordion>
+</AccordionGroup>
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Transform Media"
+    icon="wand-magic-sparkles"
+    href="/api-reference/media/transform"
+  >
+    Every parameter for images and video, in one page.
+  </Card>
+  <Card title="Storage" icon="cloud" href="/configuration/storage">
+    Connect AWS S3, Cloudflare R2, or any S3-compatible provider.
+  </Card>
+  <Card title="File Uploader" icon="upload" href="/guides/file-uploader">
+    Drop a React uploader into your app, no API key in the browser.
+  </Card>
+  <Card title="Server Configuration" icon="gear" href="/configuration/server">
+    Secrets, CORS, upload limits, and the admin bootstrap.
+  </Card>
+</CardGroup>

@@ -1,0 +1,53 @@
+---
+title: "Move File or Folder"
+description: "Move a file or folder into a different parent folder"
+---
+
+Moves one file or folder into another folder. There is no bulk endpoint, so call it once per item.
+
+```
+POST /storage/{path}/move
+```
+
+```bash
+curl -X POST https://cdn.openinary.dev/storage/photos/portrait.jpg/move \
+  -H "Authorization: Bearer <api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{"destination": "archive"}'
+```
+
+**Auth:** API Key required
+
+## Parameters
+
+| Param         | In   | Type   | Required | Description                                                                                                        |
+| ------------- | ---- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| `path`        | path | string | yes      | Path to the file or folder relative to the storage root, e.g. `photos/portrait.jpg`. Use the `path` from [List Storage](/api-reference/storage/list). |
+| `destination` | body | string | no       | Destination folder, relative to the storage root, e.g. `photos/2024`. Omit or leave empty to move to the root.       |
+
+## Response
+
+```json
+{
+  "success": true,
+  "path": "archive/portrait.jpg"
+}
+```
+
+| Field     | Type    | Description                             |
+| --------- | ------- | --------------------------------------- |
+| `success` | boolean | `true` if the move succeeded            |
+| `path`    | string  | The new full path of the file or folder |
+
+**Status codes:** `200` success · `400` already in that folder · `404` not found · `500` error
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Copy File" icon="copy" href="/api-reference/storage/copy">
+    Duplicate a file into a different folder.
+  </Card>
+  <Card title="List Folders" icon="folder-tree" href="/api-reference/storage/folders">
+    Get every folder path, useful for building a "Move to" picker.
+  </Card>
+</CardGroup>

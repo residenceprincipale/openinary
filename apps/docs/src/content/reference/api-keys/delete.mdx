@@ -1,0 +1,47 @@
+---
+title: "Delete API Key"
+description: "Permanently revoke an API key"
+---
+
+**Self-hosted only.** Cloud keys are managed in the dashboard, not through the API.
+
+Deletes a key by its ID. This is irreversible, and any service using that key loses access immediately. To block access temporarily instead, [update the key](/api-reference/api-keys/update) with `"enabled": false`.
+
+```bash
+curl -X DELETE https://media.example.com/api-keys/key_abc123 \
+  -H "Authorization: Bearer <api_key>"
+```
+
+```
+DELETE /api-keys/{keyId}
+```
+
+**Auth:** API Key or Session
+
+## Parameters
+
+| Field | In | Type | Notes |
+| --- | --- | --- | --- |
+| `keyId` | path | string | Required. ID of the key to delete, from [List API Keys](/api-reference/api-keys/list) |
+
+## Response
+
+```json
+{
+  "success": true,
+  "message": "API key deleted successfully"
+}
+```
+
+**Status codes:** `200` success · `401` unauthorized · `403` forbidden · `404` not found · `500` error
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="List API Keys" icon="list" href="/api-reference/api-keys/list">
+    Find the key ID before deleting.
+  </Card>
+  <Card title="Update API Key" icon="pen" href="/api-reference/api-keys/update">
+    Disable a key temporarily.
+  </Card>
+</CardGroup>

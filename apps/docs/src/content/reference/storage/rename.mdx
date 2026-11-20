@@ -1,0 +1,53 @@
+---
+title: "Rename File or Folder"
+description: "Rename a file or folder in place, without changing its parent location"
+---
+
+Renames a file or folder in place. Send the new name only, never a full path.
+
+```
+PATCH /storage/{path}
+```
+
+```bash
+curl -X PATCH https://cdn.openinary.dev/storage/photos/portrait.jpg \
+  -H "Authorization: Bearer <api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "headshot.jpg"}'
+```
+
+**Auth:** API Key required
+
+## Parameters
+
+| Param  | In   | Type   | Required | Description                                                                                                        |
+| ------ | ---- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------ |
+| `path` | path | string | yes      | Path to the file or folder relative to the storage root, e.g. `photos/portrait.jpg`. Use the `path` from [List Storage](/api-reference/storage/list). |
+| `name` | body | string | yes      | The new name, not a full path. Must not contain `/` or `\`.                                                          |
+
+## Response
+
+```json
+{
+  "success": true,
+  "path": "photos/new-name.jpg"
+}
+```
+
+| Field     | Type    | Description                                |
+| --------- | ------- | ------------------------------------------ |
+| `success` | boolean | `true` if the rename succeeded             |
+| `path`    | string  | The new full path of the file or folder    |
+
+**Status codes:** `200` success · `400` invalid name · `404` not found · `409` a file or folder with that name already exists · `500` error
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Move File or Folder" icon="folder-tree" href="/api-reference/storage/move">
+    Move a file or folder to a different parent folder.
+  </Card>
+  <Card title="List Storage" icon="folder-open" href="/api-reference/storage/list">
+    Browse all files and folders.
+  </Card>
+</CardGroup>

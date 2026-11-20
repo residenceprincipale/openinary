@@ -1,0 +1,317 @@
+---
+title: "Changelog"
+description: "New features, improvements, and fixes shipped in Openinary"
+---
+
+<Update label="November 16, 2026" description="v0.9.0" tags={["Feature", "Improvement", "Fix"]}>
+  ## New features
+
+**Know when a transformation will be ready**, A 202 no longer asks you to poll blindly. It says which phase the job is in (`queued`, `processing`, or `waking` while a cloud server starts), how far it has got, and when it should be done, with a typical and a pessimistic figure. `Retry-After` follows that estimate, so a client that simply honors it asks again at the right time. Video progress comes from the encoder itself, and the estimate learns how fast your server encodes. `/video-status` carries the same estimate. See [transform](/api-reference/media/transform).
+
+## Improvements
+
+**A new look for the dashboard**, The self-hosted dashboard and Openinary Cloud share one calmer design: a grouped sidebar with your account at the bottom, denser working screens, and setup, login and onboarding rebuilt on the same layout. Your data, settings and URLs don't change.
+
+**The docs moved to openinary.dev/docs**, Same pages, now on the main site. Old docs.openinary.dev links redirect to their new address.
+
+**Steadier loading in the dashboard**, Loading states are now skeletons shaped like the real page, in the cloud dashboard and the self-hosted app, so nothing jumps when the data arrives.
+
+## Bug fixes
+
+- **The API-only Docker image starts again**, The `openinary-api` image stopped on startup with a permission error before serving anything. It now starts normally. The full `openinary` image was not affected.
+</Update>
+
+<Update label="November 5, 2026" description="v0.8.0" tags={["Feature", "Fix"]}>
+  ## New features
+
+**Image effects**, Adjust images straight from the URL with `e_`: `e_fill_light`, `e_blur`, `e_sharpen`, `e_brightness`, `e_contrast`, `e_saturation`, `e_grayscale`, `e_sepia`, `e_tint`, `e_colorize` and more, plus `o_` for opacity and `co_` for color. For example `/t/w_800,e_fill_light:70:20/photo.jpg`. See [transform](/api-reference/media/transform).
+
+**Smarter backgrounds and borders**, `b_auto` picks the padding color from the image itself, `b_blurred` pads with a blurred copy of it, and colors accept CSS names and 3, 4 or 8 digit hex. `bo_4px_solid_red` draws a border.
+
+**`dpr_`, flips and more crop modes**, `dpr_2,w_400` serves a 2x image, `a_hflip` and `a_vflip` mirror it, and `c_lfill`, `c_lpad`, `c_mfit` and `c_mpad` behave as their names say.
+
+**Default images**, `d_placeholders:avatar.png` serves a placeholder, with the same transformation, when the requested file doesn't exist.
+
+**Configurable storage prefix**, `STORAGE_PREFIX` lets Openinary serve a bucket something else already writes to, without moving a single object. It defaults to `public`, so existing setups don't change. See [storage](/configuration/storage). Thanks to [andrzejb2137](https://github.com/andrzejb2137).
+
+Effects, backgrounds, `dpr_`, borders and default images are thanks to [pankajmyt](https://github.com/pankajmyt).
+
+## Bug fixes
+
+- **Phone photos come out upright**, Transformed images now follow their EXIF orientation, as `a_auto` always promised. `a_ignore` keeps the stored orientation.
+- **Overlays resize instead of cropping**, An image overlay with `lw_` or `lh_` is scaled to that size instead of being cut.
+</Update>
+
+<Update label="November 4, 2026" description="v0.7.0" tags={["Feature", "Fix"]}>
+  ## New features
+
+**Image and video overlays**, Put a logo or watermark on any image or video straight from the URL with `l_`, for example `/t/l_logos:watermark.png,lo_50,lg_southeast/photo.jpg`. Set the opacity (`lo_`), position (`lg_`, `lx_`, `ly_`), size (`lw_`, `lh_`) or repeat it across the asset (`lt_`, `ls_`). Video thumbnails can carry the overlay too, and a pending watermarked video is never served without its watermark. Overlays only come from your own storage. See [overlays & watermarks](/media-transformations/overlays). Thanks to [KesSaft](https://github.com/KesSaft).
+
+## Bug fixes
+
+- **Cached images keep their real type**, From the second request on, a negotiated AVIF or WebP was labelled with the source's type (e.g. `image/jpeg`), and its ETag changed between the first and cached responses. Both now match the bytes actually served. Thanks to [meditatingsurgeon](https://github.com/meditatingsurgeon) for the report.
+- **Cached videos aren't transcoded again on S3**, A video with two or more params (e.g. `w_320,h_240`, or any overlay) was transcoded again whenever the local cache was empty, even though the result was already in the bucket. Existing multi-param entries are regenerated once.
+</Update>
+
+<Update label="November 4, 2026" description="v0.6.0" tags={["Improvement", "Fix"]}>
+  ## Improvements
+
+**A tidier asset details panel**, The panel opens on the asset itself with its actions in one row, and is split into Deliver, Transform and Info. Transform has presets and a small URL builder whose preview costs no transformation.
+
+## Bug fixes
+
+- **Docker images run on Node.js 22**, Node.js 20 is end-of-life and no longer gets security patches. The self-hosted images now build and run on a patched Node.js 22.
+- **`f_webm` videos encode**, Every `f_webm` transform failed within a second because H.264 and AAC can't go in a WebM container. WebM output is now encoded with VP9 and Opus.
+</Update>
+
+<Update label="October 1, 2026" description="v0.5.0" tags={["Feature", "Improvement", "Fix"]}>
+  ## New features
+
+**A redesigned dashboard**, A compact sidebar, settings as their own pages, and Quick actions on `Cmd/Ctrl+K`, grouped into actions, pages, tools, settings and help.
+
+**Logs**, Every public delivery is now logged and charted. The table keeps the latest 500 deliveries, while the chart and figures (total, images, videos, failure rate) come from hourly counts kept for a year, so a busy instance still sees its whole week. Recent video processing jobs are listed alongside.
+
+**Get started, playgrounds and Integrate**, The image and video playgrounds, the integration guide and a three-step checklist now ship with self-hosted too, pointed at your instance.
+
+**First-run onboarding**, New accounts get a short questionnaire after sign-in that sets your workspace name and logo, shown at the top of the sidebar. Accounts that existed before the upgrade skip it. With telemetry on, the multiple-choice answers are sent anonymously as option ids only, see [telemetry](/configuration/telemetry). `OPENINARY_TELEMETRY=false` keeps them on your server.
+
+## Bug fixes
+
+- **Transforms no longer hang on some file names**, Files whose names contain `,`, `&` or `@` stayed on "processing" forever.
+- **Camera JPEGs that libvips rejects are served instead of failing**, When a JPEG can't be decoded, the original is streamed with `X-Transform-Fallback: original` and is never cached as a transform. Thanks to [benjaminstary](https://github.com/benjaminstary).
+- **Large uploads from the dashboard go through**, Selections are sent in batches of 20 with retries on `429`, instead of one request that could time out. Thanks to [benjaminstary](https://github.com/benjaminstary).
+- **Signed authenticated URLs work in the Docker image**, nginx now proxies `/authenticated` to the API. Thanks to [diveshagarwal213](https://github.com/diveshagarwal213).
+</Update>
+
+<Update label="August 11, 2026" description="v0.4.0" tags={["Feature", "Fix"]}>
+  ## New features
+
+**Create the admin account from environment variables**, Set `OPENINARY_ADMIN_EMAIL` and `OPENINARY_ADMIN_PASSWORD` (and optionally `OPENINARY_ADMIN_NAME`) and the account exists on first boot, with no visit to `/setup`. `OPENINARY_GENERATE_API_KEY=true` also creates an API key and prints it to the logs, and an `api` mode instance gets one on first boot regardless. See [admin bootstrap](/configuration/server#admin-bootstrap). Thanks to [KesSaft](https://github.com/KesSaft).
+
+## Bug fixes
+
+- **Transform parameters on a file that can't be transformed return a 400**, A URL such as `/t/w_500/doc.pdf` came back as an unlabeled 500. It now answers `400` with a message pointing at the bare `/t/<path>` URL, which streams the original. Thanks to [brian-soltani](https://github.com/brian-soltani).
+- **`MAX_FILE_SIZE_MB` is the only upload limit in the Docker image**, The full image's nginx capped uploads at 100 MB whatever the setting and answered with its own bare 413. The API's limit and error message now apply. Expect an oversized upload to be received in full before it is rejected.
+</Update>
+
+<Update label="August 9, 2026" description="v0.3.1" tags={["Feature", "Fix"]}>
+  ## New features
+
+**Audio and 3D files**, Openinary now accepts audio (`wav`, `mp3`, `ogg`) and 3D model (`glb`, `gltf`) files, stored and delivered as untouched originals with their real content type. A bare `/t/<path>` URL streams the file back byte for byte. No waveforms, thumbnails or format conversion for these types yet, transformations still apply to images and videos only. See the [upload API reference](/api-reference/files/upload). Thanks to [andrzejb2137](https://github.com/andrzejb2137) for both contributions in this release.
+
+## Bug fixes
+
+- **Uploads are validated against the file's actual bytes**, Every accepted type now carries a magic-byte signature, so a payload renamed to an allowed extension is rejected at upload instead of being stored. The MIME type and the extension are both set by the uploader, so on their own they only ever stopped honest mistakes.
+- **`nosniff` on every delivery response**, All delivery routes, including signed authenticated URLs, now send `X-Content-Type-Options: nosniff`, so stored bytes can never be content-sniffed into HTML on your origin. Stored originals are labelled from the same media-type table the upload whitelist uses.
+</Update>
+
+<Update label="July 29, 2026" description="Cloud" tags={["Announcement"]}>
+  ## Openinary Cloud is in public alpha
+
+**Sign-up is open**, No more invite list: create your account at [app.openinary.dev](https://app.openinary.dev) and you're in, on the free plan. It's an alpha, expect rough edges, and please report what breaks. See the [Cloud overview](/cloud/overview).
+</Update>
+
+<Update label="July 29, 2026" description="v0.3.0" tags={["Feature", "Improvement", "Fix"]}>
+  ## New features
+
+**Openinary Cloud documentation**, The hosted version of Openinary is now documented, including a quickstart, the API reference and the drop-in file uploader. Early access is open, see the [Cloud overview](/cloud/overview).
+
+## Improvements
+
+**Videos are only transcoded when you ask**, A bare `/t/<video>` URL now streams the original untouched and queues no job. Transcoding starts when the URL actually requests it, with `q_auto` or any explicit parameter, so uploading a video no longer costs processing time nobody asked for. See [video transformations](/media-transformations/video-transformations).
+
+**No more automatic thumbnails on video upload**, Uploads no longer queue a thumbnail job by default. Thumbnails are still generated on the first request in about a second, and you can pre-generate them by listing them in `transformations` at upload time. See [upload & cache warming](/media-transformations/upload-and-prewarm).
+
+## Bug fixes
+
+- **Pending video transforms no longer serve the original**, While a transformation is still processing, the endpoint answers `202` instead of falling back to the untransformed file, which could serve un-watermarked or un-cropped content under a transformed URL. The `statusUrl` in that response now points at the job the transform actually queued.
+- **Output formats no encoder can produce are rejected**, `f_gif` on an image returned PNG bytes labelled `image/gif`, and `f_mp4` on a `.jpg` returned PNG bytes labelled `image/mp4`. GIF is now a real output format, and `f_psd`, `f_avi`, `f_mp3`, `f_wav`, `f_ogg` and `f_pdf` are rejected instead of silently falling back. PSD stays a supported upload format. See the [transform API reference](/api-reference/media/transform#f-image).
+- **Upload picker matches what the API accepts**, The dashboard file picker no longer offers formats the API then rejects, and its supported-formats label mentions HEIC.
+- **Tabs indicator during resize**, The tab indicator now tracks the container while it is being resized instead of lagging behind through its transition.
+
+<Warning>
+  Breaking: `f_psd` and `f_avi` URLs no longer parse as transformations. The
+  segment is read as a folder name and returns a 404 instead of silently falling
+  back to another format.
+</Warning>
+</Update>
+
+<Update label="July 11, 2026" description="CLI patch fixes" tags={["Fix"]}>
+  **Clearer next steps when Docker isn't running**, `openinary create` now tells
+  you clearly what to do next if Docker isn't available on your machine, instead
+  of leaving you stuck.
+</Update>
+
+<Update label="July 11, 2026" description="Weekly update" tags={["Feature", "Fix"]}>
+  ## New features
+
+**Official Openinary CLI**, Spin up a new Openinary instance in seconds with `create-openinary`, or manage an existing one with the `openinary` CLI. This is now the recommended way to get started, see the [quickstart guide](/quickstart).
+
+**Presigned client-side uploads**, Large files can now be uploaded directly to your storage backend using presigned URLs, taking load off your server and speeding up uploads.
+
+**Appearance settings**, You can now hide thumbnails in the media grid from the dashboard's appearance settings, handy for large libraries or slower connections.
+
+**Anonymous usage telemetry**, Openinary now collects anonymous, non-identifying usage data to help us understand how the project is used and prioritize improvements.
+
+## Improvements
+
+**Faster folder browsing**, The dashboard now loads folder contents on demand instead of fetching your entire storage tree at once, making navigation much faster on large libraries.
+
+**Media grid and bulk actions**, The media grid got a round of polish, including support for selecting and acting on multiple files at once.
+
+## Bug fixes
+
+- **`.DS_Store` files ignored on upload**, Folder uploads from macOS no longer fail or clutter your storage because of stray `.DS_Store` files.
+- **Video worker concurrency**, Video processing now correctly detects available memory in containerized environments, avoiding overloaded workers on small instances.
+- **Video jobs no longer block the API**, Video processing on small containers no longer starves HTTP requests, keeping transformations responsive during heavy video load.
+- **Lower memory usage after jobs**, Memory is now released more reliably after image and video processing, reducing RSS growth over time.
+</Update>
+
+<Update label="June 27, 2026" description="Weekly update" tags={["Feature", "Fix", "Improvement"]}>
+  ## New features
+
+**Round corners transformation**, You can now round the corners of any image using the `r` parameter, including full circles and ovals. See the [transform API reference](/api-reference/media/transform#r).
+
+## Improvements
+
+**Parallel video processing**, Video jobs are now processed in parallel up to your configured concurrency limit, speeding up queues with multiple pending videos.
+
+**Faster image transformations**, Image processing now uses non-blocking file I/O, improving throughput under load.
+
+**Open source help links**, In-app help links now point to GitHub instead of commercial resources.
+
+## Bug fixes
+
+- **API key Bearer auth bypass**, Fixed an authentication issue where API key validation could be bypassed via the Bearer header.
+- **Crop and resize combined**, Fixed aspect-ratio cropping being ignored when combined with a resize parameter.
+- **Video content type**, Thumbnails and non-MP4 video outputs now report the correct content type.
+- **File extension casing**, Extensions are now lowercased before format matching, fixing edge cases with mixed-case file names.
+</Update>
+
+<Update label="April 27, 2026" description="Weekly update" tags={["Fix"]}>
+  ## Bug fixes
+
+- **Uppercase file extensions**, Files with uppercase extensions (such as `.JPG` or `.PNG`) are now correctly recognized and processed instead of being rejected as unsupported. See the [transform API reference](/api-reference/media/transform) for supported formats.
+</Update>
+
+<Update label="April 20, 2026" description="April update" tags={["Feature", "Fix"]}>
+  ## New features
+
+**Round corners transformation**, You can now round the corners of any image using the `r` parameter. Apply a uniform radius, set each corner individually, or use `r_max` for a full circle or oval. Pair with `b_rgb:<hex>` to fill the corners with a solid color. See the [transform API reference](/api-reference/media/transform#r) for all syntax options.
+
+**PSD file support**, Openinary now accepts Adobe Photoshop (`.psd`) files. Upload PSD files through the API or the web dashboard, and apply image transformations just like any other format. PSD sources are automatically converted before processing.
+
+**HEIC and HEIF upload support**, You can now upload images in HEIC and HEIF formats (common on iOS devices). Files are automatically normalized for compatibility with the transformation pipeline.
+
+**Configurable upload file size limit**, The maximum upload size is no longer hardcoded. Set the `MAX_FILE_SIZE_MB` environment variable to allow larger files, useful for video uploads on self-hosted instances. Defaults to 50 MB. See [server configuration](/configuration/server#max-file-size-mb).
+
+**Original file download route**, A new `GET /download/{path}` endpoint lets you retrieve the original uploaded file without any transformations applied. See the [download API reference](/api-reference/files/download).
+
+**Folder management in the web UI**, You can now create and delete folders directly from the Openinary dashboard, including support for empty folders on S3 and R2 storage backends.
+
+**Upload prewarming**, When uploading files, you can pass a list of transformations to pre-generate and cache immediately. The first public request for those variants is served instantly instead of triggering on-demand processing. See [upload & cache warming](/media-transformations/upload-and-prewarm).
+
+**Multi-architecture Docker images**, Docker images now support both AMD64 and ARM64 architectures, so you can run Openinary on Raspberry Pi, Apple Silicon, and AWS Graviton without any extra steps.
+
+**Cache invalidation endpoint**, A new authenticated endpoint lets you programmatically purge cached transformations. See the [cache invalidation API reference](/api-reference/cache/invalidate).
+
+**Signed URLs**, Restrict who can request transformations by signing delivery URLs with HMAC-SHA256. Requests with a missing or invalid signature are rejected. See [signed URLs](/media-transformations/signed-urls).
+
+**Public rate limiting**, Public transformation and download routes are now rate-limited per IP. Configure the window and max requests with `PUBLIC_RATE_LIMIT_MAX` and `PUBLIC_RATE_LIMIT_WINDOW_MS`. See [server configuration](/configuration/server#public-rate-limit-max).
+
+## Improvements
+
+**Folder thumbnails**, Folders in the media grid now display thumbnail previews of their contents.
+
+**Configurable S3/R2 connection settings**, You can now set socket limits, request timeouts, and connection timeouts for S3-compatible storage backends via environment variables. See [storage configuration](/configuration/storage).
+
+## Bug fixes
+
+- **Transparency preserved with quality parameter**, Applying a `q` (quality) parameter no longer strips the alpha channel from PNG, WebP, or AVIF images.
+- **Folder names with underscores**, Folder names containing underscores are no longer misidentified as transformation segments in the URL path.
+- **Image transformation race condition**, Fixed a concurrency issue that could cause intermittent failures when multiple transformations were requested simultaneously.
+- **Empty folder handling on S3/R2**, Creating and displaying empty folders now works correctly with S3 and R2 storage backends.
+</Update>
+
+<Update label="April 12, 2026" description="Weekly update" tags={["Feature", "Fix"]}>
+  ## New features
+
+**Configurable upload file size limit**, Set the `MAX_FILE_SIZE_MB` environment variable to allow larger uploads on self-hosted instances. See [server configuration](/configuration/server#max-file-size-mb).
+
+## Improvements
+
+**Folder thumbnails**, Folders in the media grid now show thumbnail previews of their contents.
+
+## Bug fixes
+
+- **Transparency preserved with quality parameter**, Applying a `q` (quality) parameter no longer strips the alpha channel from PNG, WebP, or AVIF images.
+- **Folder names with underscores**, Folder names containing underscores are no longer misidentified as transformation segments in the URL path.
+</Update>
+
+<Update label="April 7, 2026" description="Weekly update" tags={["Feature", "Fix"]}>
+  ## New features
+
+**HEIC and HEIF upload support**, You can now upload images in HEIC and HEIF formats, common on iOS devices. Files are automatically normalized for the transformation pipeline.
+
+**PSD file support**, Openinary now accepts Adobe Photoshop (`.psd`) files, automatically converted before processing.
+
+**Folder management in the web UI**, Create and delete folders directly from the dashboard, including empty folders on S3 and R2 storage backends.
+
+## Bug fixes
+
+- **Image transformation race condition**, Fixed a concurrency issue that could cause intermittent failures when multiple transformations were requested simultaneously.
+</Update>
+
+<Update label="March 7, 2026" description="Weekly update" tags={["Feature", "Fix"]}>
+  ## New features
+
+**Named file uploads**, Uploads now support custom file names instead of relying only on generated ones.
+
+**Target folder on upload**, Specify a destination folder directly when uploading a file.
+
+**Signed URLs**, Restrict who can request transformations by signing delivery URLs with HMAC-SHA256. See [signed URLs](/media-transformations/signed-urls).
+
+**Multi-architecture Docker images**, Docker images now support both AMD64 and ARM64, so Openinary runs on Raspberry Pi, Apple Silicon, and AWS Graviton without extra steps.
+
+## Bug fixes
+
+- **Docker build reliability**, Fixed a missing OpenSSL dependency and a SQLite race condition during table initialization.
+- **API key auth compatibility**, Fixed the `apiKey` table schema for compatibility with newer Better Auth versions.
+- **Environment template**, Corrected `STORAGE_*` variable names in `env.template`.
+</Update>
+
+<Update label="December 27, 2025" description="Weekly update" tags={["Feature"]}>
+  ## New features
+
+**Cache invalidation endpoint**, A new authenticated endpoint lets you programmatically purge cached transformations after replacing a file directly in storage. See the [cache invalidation API reference](/api-reference/cache/invalidate).
+
+**Configurable S3/R2 connection settings**, Set socket limits, request timeouts, and connection timeouts for S3-compatible storage backends via environment variables. See [storage configuration](/configuration/storage).
+
+</Update>
+
+<Update label="December 23, 2025" description="Weekly update" tags={["Feature", "Fix", "Security"]}>
+  ## New features
+
+**Single admin account enforcement**, Sign-ups are now restricted to a single admin account, enforced at the database level.
+
+**Version endpoint**, A new public `/api/version` endpoint and UI components let you check the running Openinary version.
+
+## Improvements
+
+**Stricter session validation**, Sessions are now revalidated against the database on every request, so deleted users lose access immediately.
+
+**Async auth initialization**, Authentication now initializes asynchronously, improving startup performance.
+
+## Bug fixes
+
+- **Loading screen after login**, Fixed a stuck loading screen caused by stale sessions for deleted users.
+- **Setup page 500 error**, Fixed a crash on `/setup` when an admin account already existed.
+</Update>
+
+<Update label="December 20, 2025" description="Initial release" tags={["Feature"]}>
+  ## Openinary is live
+
+The first beta release of Openinary: a media transformation API for images and videos, with a web dashboard, API key management, S3-compatible and local storage support, automatic video transcoding via FFmpeg, and Docker support for easy self-hosting.
+
+</Update>
+

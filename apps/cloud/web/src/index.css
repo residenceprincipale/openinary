@@ -1,0 +1,22 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@openinary/dashboard/theme.css";
+@import "@openinary/dashboard/uploader-demo.css";
+/* Tailwind v4 build of the Cossistant widget - it ships no styles of its own
+   and inherits the shadcn tokens the theme defines. */
+@import "@cossistant/next/support.css";
+
+/* The package's source, not its dist: the dev server does not rescan dist
+   when the package is rebuilt, so new classes silently went missing until the
+   build cache was cleared. Same path apps/web scans. */
+@source "../../../../packages/ui/src";
+@source "../../../../packages/dashboard/src";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+html,
+body {
+  @media (prefers-color-scheme: dark) {
+    color-scheme: dark;
+  }
+}

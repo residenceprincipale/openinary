@@ -1,0 +1,80 @@
+---
+title: "List API Keys"
+description: "Retrieve every API key on the account"
+---
+
+**Self-hosted only.** Cloud keys are managed in the dashboard, not through the API.
+
+Returns every key on the account, without the secret values. Use `id` for update and delete calls.
+
+```bash
+curl https://media.example.com/api-keys/list \
+  -H "Authorization: Bearer <api_key>"
+```
+
+```
+GET /api-keys/list
+```
+
+**Auth:** API Key or Session
+
+## Response
+
+```json
+{
+  "success": true,
+  "keys": [
+    {
+      "id": "key_abc123",
+      "name": "production",
+      "start": "xxxxxx",
+      "prefix": null,
+      "enabled": true,
+      "expiresAt": "2025-03-15T10:30:00.000Z",
+      "createdAt": "2024-03-15T10:30:00.000Z",
+      "updatedAt": "2024-03-15T10:30:00.000Z",
+      "remaining": null,
+      "rateLimitEnabled": false
+    }
+  ]
+}
+```
+
+Each entry in `keys`:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `id` | string | Unique identifier, used for update and delete |
+| `name` | string | Display name |
+| `start` | string | Key prefix, safe to display. Identifies the key without exposing its value |
+| `prefix` | string | Key type prefix. `null` if none is configured |
+| `enabled` | boolean | Whether the key is currently active |
+| `expiresAt` | string | ISO 8601 expiration timestamp |
+| `createdAt` | string | ISO 8601 creation timestamp |
+| `updatedAt` | string | ISO 8601 last-modified timestamp |
+| `remaining` | number | Remaining request quota. `null` if unlimited |
+| `rateLimitEnabled` | boolean | Whether per-key rate limiting is configured |
+
+**Status codes:** `200` success · `401` unauthorized · `500` error
+
+## Related
+
+<CardGroup cols={2}>
+  <Card
+    title="Create API Key"
+    icon="plus"
+    href="/api-reference/api-keys/create"
+  >
+    Generate a new key.
+  </Card>
+  <Card title="Update API Key" icon="pen" href="/api-reference/api-keys/update">
+    Rename or enable/disable a key.
+  </Card>
+  <Card
+    title="Delete API Key"
+    icon="trash"
+    href="/api-reference/api-keys/delete"
+  >
+    Revoke a key permanently.
+  </Card>
+</CardGroup>

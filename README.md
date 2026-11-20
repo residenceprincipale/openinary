@@ -1,6 +1,6 @@
 <p align="center">
     <a href="https://openinary.dev" target="_blank" rel="noopener">
-        <img src="https://i.imgur.com/P5Qfm65.png" alt="Openinary - self-hosted media processing platform" />
+        <img src=".github/readme-banner.jpg" alt="Openinary - self-hosted media processing platform" />
     </a>
 </p>
 
@@ -27,25 +27,29 @@
 ## Quick Start
 
 <p align="left">
-    <a href="https://railway.com/deploy/openinary-1?referralCode=imHr5N&utm_medium=integration&utm_source=template&utm_campaign=generic" target="_blank" rel="noopener" style="display: inline-block;"><img src="https://www.openinary.dev/deploy/railway.svg" alt="Deploy with Railway" style="display: block;" /></a>&nbsp;&nbsp;<a href="https://docs.openinary.dev/guides/coolify-deployment" target="_blank" rel="noopener" style="display: inline-block;"><img src="https://www.openinary.dev/deploy/coolify.svg" alt="Deploy with Coolify" style="display: block;" /></a>&nbsp;&nbsp;<a href="https://docs.openinary.dev/guides/dokploy-deployment" target="_blank" rel="noopener" style="display: inline-block;"><img src="https://www.openinary.dev/deploy/dokploy.svg" alt="Deploy with Dokploy" style="display: block;" /></a>
+    <a href="https://app.openinary.dev" target="_blank" rel="noopener" style="display: inline-block;"><img src="https://www.openinary.dev/deploy/cloud.svg" alt="Use Openinary Cloud" style="display: block;" /></a>&nbsp;&nbsp;<a href="https://railway.com/deploy/openinary-1?referralCode=imHr5N&utm_medium=integration&utm_source=template&utm_campaign=generic" target="_blank" rel="noopener" style="display: inline-block;"><img src="https://www.openinary.dev/deploy/railway.svg" alt="Deploy with Railway" style="display: block;" /></a>&nbsp;&nbsp;<a href="https://docs.openinary.dev/guides/coolify-deployment" target="_blank" rel="noopener" style="display: inline-block;"><img src="https://www.openinary.dev/deploy/coolify.svg" alt="Deploy with Coolify" style="display: block;" /></a>&nbsp;&nbsp;<a href="https://docs.openinary.dev/guides/dokploy-deployment" target="_blank" rel="noopener" style="display: inline-block;"><img src="https://www.openinary.dev/deploy/dokploy.svg" alt="Deploy with Dokploy" style="display: block;" /></a>
 </p>
 
 ### Installation
 
-Make sure to have Docker 20.x+ installed and running.
+Make sure to have Docker 20.x+ and Node.js 20+ installed and running.
 
 ```bash
-docker run --platform linux/amd64 -d -p 3000:3000 \
-  -v openinary-cache:/app/apps/api/cache \
-  -v openinary-public:/app/apps/api/public \
-  -v openinary-db:/app/data \
-  openinary/openinary:latest
+npx create-openinary
+```
+
+Follow the prompts to choose full stack vs. API-only and, optionally, S3-compatible storage. It scaffolds a project, writes a `docker-compose.yml` and `.env`, and starts the containers. Once it finishes, your Openinary instance is running at http://localhost:3000.
+
+To get the full CLI suite (`start`, `stop`, `upgrade`, ...), install it globally:
+
+```bash
+npm i -g create-openinary
 ```
 
 ### Initial Setup
 
-1. Open http://localhost:3000
-2. Visit `/setup` to create admin account
+1. Open http://localhost:3000, you'll be redirected to `/setup`
+2. Create your admin account
 3. Click on your profile in the bottom left navigation, then go to 'API Keys' to generate your first API key
 
 ## Usage Examples
@@ -125,5 +129,30 @@ STORAGE_PUBLIC_URL=https://your-cdn-domain.com
 
 [Full Documentation](https://docs.openinary.dev) | [Issues](https://github.com/openinary/openinary/issues) | [Contact](https://x.com/initflorian)
 
+## Repository layout
+
+This repository holds the self-hosted product and the managed Cloud service side
+by side, so a fix to the shared engine reaches both without a release in between.
+
+```
+apps/api  apps/web  apps/telemetry   the self-hosted product
+apps/cloud                           Openinary Cloud (server, web, admin)
+apps/marketing  apps/docs            openinary.dev and its documentation
+packages/                            core, ui, cli, registry, shared
+```
+
+See [Project Structure](https://docs.openinary.dev/project-structure) for the
+full tour.
+
 ## License
-This project is licensed under the  AGPL-3.0 License - see the [LICENSE](LICENSE) file for details.
+
+Everything in this repository is **AGPL-3.0** — see [LICENSE](LICENSE) — with two
+exceptions:
+
+- **`apps/cloud/`** is the managed Cloud service. It is source-available, not
+  open source: read it, audit it, contribute to it, but running it needs a
+  written agreement. See [apps/cloud/LICENSE](apps/cloud/LICENSE).
+- **`apps/marketing/`** (the website) is MIT.
+
+Self-hosting Openinary needs nothing from `apps/cloud/`. The AGPL parts are the
+whole product.

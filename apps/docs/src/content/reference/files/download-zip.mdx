@@ -1,0 +1,70 @@
+---
+title: "Download Multiple Items as ZIP"
+description: "Bundle a mixed selection of files and folders into a single ZIP archive"
+---
+
+**Self-hosted only.** Not available on Cloud.
+
+Post a list of paths, get one ZIP back. Send either `items` or `paths`, non-empty, with at most 200 entries total.
+
+```
+POST /download-zip
+```
+
+```bash
+curl -X POST https://media.example.com/download-zip \
+  -H "Authorization: Bearer <api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{"items": [{"path": "photos/portrait.jpg", "kind": "file"}, {"path": "videos", "kind": "folder"}]}' \
+  -o download.zip
+```
+
+**Auth:** API Key required
+
+## Body parameters
+
+| Param   | Type       | Description                                                                          |
+| ------- | ---------- | ------------------------------------------------------------------------------------ |
+| `items` | `object[]` | Files and/or folders to include, each with a `path` and an optional `kind`           |
+| `paths` | `string[]` | Shorthand alternative to `items`, a plain list of paths. Ignored if `items` is also provided |
+
+Each item object:
+
+| Field  | Type     | Description                                                                    |
+| ------ | -------- | ------------------------------------------------------------------------------ |
+| `path` | `string` | Required. Path relative to the storage root                                    |
+| `kind` | `string` | `"file"` or `"folder"`. If omitted, the server checks whether the path is a folder |
+
+Prefer `items` when you already know each item's kind: it skips a lookup per item and lets everything download in parallel. With `paths`, the server determines whether each one is a file or folder. Missing files are skipped rather than failing the whole request.
+
+## Response
+
+Returns a ZIP archive named `download.zip`. Each entry keeps its full relative path, including folder prefixes, so files with the same name in different folders don't collide inside the archive.
+
+| Header                | Value                                 |
+| --------------------- | ------------------------------------- |
+| `Content-Type`        | `application/zip`                     |
+| `Content-Disposition` | `attachment; filename="download.zip"` |
+| `Content-Length`      | Archive size in bytes                 |
+| `Cache-Control`       | `private, no-store`                   |
+
+**Status codes:** `200` success · `400` invalid body or too many items (max 200) · `404` no files found for the given paths · `500` error
+
+## Related
+
+<CardGroup cols={2}>
+  <Card
+    title="Download Folder as ZIP"
+    icon="folder-tree"
+    href="/api-reference/files/download-folder"
+  >
+    Download a single folder without listing its files individually.
+  </Card>
+  <Card
+    title="Download Original File"
+    icon="download"
+    href="/api-reference/files/download"
+  >
+    Download a single file.
+  </Card>
+</CardGroup>

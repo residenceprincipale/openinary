@@ -1,14 +1,13 @@
 "use client";
 
-import Image from "next/image";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { authClient } from "@/lib/auth-client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button } from "@openinary/dashboard/ui/button";
+import { Input } from "@openinary/dashboard/ui/input";
 import {
   Form,
   FormControl,
@@ -17,10 +16,10 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "skullet/react";
 import logger from "@/lib/logger";
 import { validateAuthConfig } from "@/lib/validate-auth-config";
-import { VersionBadge } from "@/components/ui/version-badge";
+import { AuthError, AuthShell } from "@/components/auth-shell";
 
 const loginFormSchema = z.object({
   email: z
@@ -51,7 +50,6 @@ export default function LoginPage() {
   // Check if user is already authenticated and if setup is required on mount
   useEffect(() => {
     let isMounted = true;
-    let timeoutId: NodeJS.Timeout;
 
     const checkAuthAndSetup = async () => {
       try {
@@ -70,11 +68,13 @@ export default function LoginPage() {
         // Next, check if user is already authenticated
         // Add timeout to prevent infinite loading
         const sessionPromise = authClient.getSession();
-        const timeoutPromise = new Promise((_, reject) =>
+        // Promise<never>: it only ever rejects, so the race keeps the session's
+        // own type instead of widening to unknown.
+        const timeoutPromise = new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error("Session check timeout")), 3000)
         );
-        
-        const session = await Promise.race([sessionPromise, timeoutPromise]) as any;
+
+        const session = await Promise.race([sessionPromise, timeoutPromise]);
         
         if (!isMounted) return;
         
@@ -125,7 +125,7 @@ export default function LoginPage() {
     };
 
     // Add a fallback timeout to ensure we never stay stuck
-    timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       if (isMounted) {
         logger.warn("Auth check timeout - unblocking UI");
         setCheckingSetup(false);
@@ -133,16 +133,14 @@ export default function LoginPage() {
     }, 5000); // 5 second absolute timeout
 
     checkAuthAndSetup().finally(() => {
-      if (isMounted && timeoutId) {
+      if (isMounted) {
         clearTimeout(timeoutId);
       }
     });
 
     return () => {
       isMounted = false;
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
+      clearTimeout(timeoutId);
     };
   }, [router]);
 
@@ -168,110 +166,80 @@ export default function LoginPage() {
         logger.error("[Login] Sign in failed - no data in result", { result });
         throw new Error(result?.error?.message || "Sign in failed - please try again");
       }
-    } catch (err: any) {
+    } catch (err) {
       logger.error("[Login] Sign in error", { error: err });
-      setError(err.message || "Incorrect email or password");
+      setError(
+        err instanceof Error && err.message
+          ? err.message
+          : "Incorrect email or password",
+      );
     }
   };
 
-  if (checkingSetup) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background px-4">
-        <div className="text-center">
-          <Spinner className="mx-auto" />
-        </div>
-      </div>
-    );
-  }
-
+  // The form itself, measured into a skeleton while the setup check runs.
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <VersionBadge />
-      <div className="w-full max-w-md space-y-8">
-      <div className="flex justify-center">
-          <Image
-            src="/openinary.svg"
-            alt="Openinary"
-            width={120}
-            height={120}
-            className="dark:invert"
-          />
-        </div>
-        <div className="text-center">
-          <h1 className="text-3xl font-bold tracking-tight">
-            Sign In
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Sign in to your account
-          </p>
-        </div>
-
-        {configError && (
-          <div className="rounded-md bg-destructive/15 p-4 border border-destructive/30">
-            <pre className="text-xs text-destructive whitespace-pre-wrap font-mono">
+    <Skeleton loading={checkingSetup} label="Loading sign in">
+      <AuthShell title="Sign in" description="Welcome back. Use the account you set up on this instance.">
+          {configError && (
+            <pre className="mb-4 whitespace-pre-wrap rounded-[10px] bg-ds-red/10 px-3.5 py-2.5 font-mono text-ds-red text-xs">
               {configError}
             </pre>
-          </div>
-        )}
+          )}
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="mt-8 space-y-6">
-            <div className="space-y-4">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="admin@example.com"
-                        autoComplete="email"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="email"
+                          placeholder="admin@example.com"
+                          autoComplete="email"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="••••••••"
-                        autoComplete="current-password"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {error && (
-              <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive">
-                {error}
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
+                          autoComplete="current-password"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-            )}
 
-            <Button
-              type="submit"
-              disabled={form.formState.isSubmitting || !!configError}
-              className="w-full"
-            >
-              {form.formState.isSubmitting ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-        </Form>
-      </div>
-    </div>
+              {error && <AuthError>{error}</AuthError>}
+
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting || !!configError}
+                className="w-full"
+              >
+                {form.formState.isSubmitting ? "Signing in…" : "Sign in"}
+              </Button>
+            </form>
+          </Form>
+      </AuthShell>
+    </Skeleton>
   );
 }

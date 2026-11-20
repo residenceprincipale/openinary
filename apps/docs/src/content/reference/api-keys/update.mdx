@@ -1,0 +1,67 @@
+---
+title: "Update API Key"
+description: "Rename or enable/disable an existing API key"
+---
+
+**Self-hosted only.** Cloud keys are managed in the dashboard, not through the API.
+
+Patch a key by its ID to rename it, or to disable it without deleting it. Send only the fields you want to change.
+
+```bash
+curl -X PATCH https://media.example.com/api-keys/key_abc123 \
+  -H "Authorization: Bearer <api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "production-v2"}'
+```
+
+```
+PATCH /api-keys/{keyId}
+```
+
+**Auth:** API Key or Session · **Content-Type:** `application/json`
+
+Get `keyId` from [List API Keys](/api-reference/api-keys/list).
+
+## Parameters
+
+| Field | In | Type | Notes |
+| --- | --- | --- | --- |
+| `keyId` | path | string | Required. ID of the key to update |
+| `name` | body | string | New display name |
+| `enabled` | body | boolean | `false` disables the key, `true` re-enables it |
+
+## Disable a key
+
+```bash
+curl -X PATCH https://media.example.com/api-keys/key_abc123 \
+  -H "Authorization: Bearer <api_key>" \
+  -H "Content-Type: application/json" \
+  -d '{"enabled": false}'
+```
+
+## Response
+
+```json
+{
+  "success": true,
+  "key": {
+    "id": "key_abc123",
+    "name": "production-v2",
+    "enabled": true
+  },
+  "message": "API key updated successfully"
+}
+```
+
+**Status codes:** `200` success · `401` unauthorized · `403` forbidden · `404` not found · `500` error
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="List API Keys" icon="list" href="/api-reference/api-keys/list">
+    Find the key ID.
+  </Card>
+  <Card title="Delete API Key" icon="trash" href="/api-reference/api-keys/delete">
+    Permanently revoke a key.
+  </Card>
+</CardGroup>

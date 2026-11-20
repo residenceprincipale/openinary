@@ -1,0 +1,54 @@
+---
+title: "Get File Metadata"
+description: "Retrieve size and timestamps for a specific file"
+---
+
+Returns the size and timestamps of one file.
+
+```
+GET /storage/{path}/metadata
+```
+
+```bash
+curl https://cdn.openinary.dev/storage/photos/portrait.jpg/metadata \
+  -H "Authorization: Bearer <api_key>"
+```
+
+**Auth:** API Key required
+
+## Path parameters
+
+| Param  | Type   | Required | Description                                                                                                    |
+| ------ | ------ | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `path` | string | yes      | Path to the file relative to the storage root, e.g. `photos/portrait.jpg`. Use the `path` from [List Storage](/api-reference/storage/list). |
+
+The path must point to a file. A folder path returns `400` on local disk storage but `404` on a cloud storage backend, which has no directory to stat. Treat both as "not a file" rather than branching on the code.
+
+## Response
+
+```json
+{
+  "size": 204800,
+  "createdAt": "2024-03-15T10:30:00.000Z",
+  "updatedAt": "2024-03-15T10:30:00.000Z"
+}
+```
+
+| Field       | Type   | Description                             |
+| ----------- | ------ | --------------------------------------- |
+| `size`      | number | File size in bytes                      |
+| `createdAt` | string | ISO 8601 timestamp of file creation     |
+| `updatedAt` | string | ISO 8601 timestamp of last modification |
+
+**Status codes:** `200` success · `400` path is a directory (local storage only) · `404` not found · `500` error
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="List Storage" icon="folder-open" href="/api-reference/storage/list">
+    Browse all files and folders.
+  </Card>
+  <Card title="Delete File" icon="trash" href="/api-reference/storage/delete">
+    Remove a file and its cached variants.
+  </Card>
+</CardGroup>

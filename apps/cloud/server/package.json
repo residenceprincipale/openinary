@@ -1,0 +1,46 @@
+{
+  "name": "cloud-server",
+  "private": true,
+  "license": "SEE LICENSE IN ../LICENSE",
+  "exports": {
+    "./router": "./worker/rpc/index.ts"
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit && tsc --noEmit -p worker",
+    "check:bundle": "node scripts/check-worker-bundle.mjs",
+    "test": "tsx shared/video-metering.test.ts && tsx worker/cdn/path.test.ts && tsx worker/cdn/cache-keys.test.ts && tsx worker/cdn/overlays.test.ts && tsx worker/cdn/effects.test.ts && tsx worker/owner-cache.test.ts && tsx worker/usage-meter-storage.test.ts && tsx worker/bucket-delete.test.ts && tsx worker/rename-cache-purge.test.ts && tsx worker/url-hostile-keys.test.ts && tsx worker/upload-token.test.ts && tsx worker/upload-routes.test.ts && tsx worker/video-duration.test.ts && tsx worker/lib/billing.test.ts && tsx worker/lib/auth.test.ts && tsx worker/lib/account.test.ts && tsx worker/team-routes.test.ts && tsx worker/lib/delivery-log.test.ts && tsx worker/lib/loops-lifecycle.test.ts && tsx worker/lib/sign-in-probe.test.ts && tsx worker/lib/signup-attribution.test.ts && tsx scripts/loops-collisions.test.ts",
+    "dev": "wrangler dev --port 3100",
+    "dev:local": "wrangler dev --port 3100 --local",
+    "deploy": "wrangler deploy",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@better-auth/api-key": "1.7.25",
+    "@cloudflare/containers": "^0.3.7",
+    "@hono/node-server": "^1.14.4",
+    "@neondatabase/serverless": "^1.1.0",
+    "@openinary/core": "workspace:*",
+    "@openinary/plans": "workspace:*",
+    "@orpc/client": "^1.14.8",
+    "@orpc/server": "^1.14.8",
+    "autumn-js": "1.2.43",
+    "better-auth": "^1.7.25",
+    "dotenv": "^16.4.7",
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.12.30",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261116.1",
+    "@types/node": "^22.13.11",
+    "drizzle-kit": "^0.31.11",
+    "tsx": "^4.23.15",
+    "typescript": "^5.8.2",
+    "wrangler": "^4.162.0"
+  }
+}

@@ -1,0 +1,97 @@
+---
+title: "Video Transformations"
+description: "Common video recipes: resizing, trimming, poster frames, and what the 202 means"
+---
+
+Videos use the same URL shape as images, with one difference that shapes everything else: encoding runs as a background job.
+
+```http
+GET /t/w_1280,h_720,q_80/videos/clip.mp4
+```
+
+A bare `/t/videos/clip.mp4` is never transcoded. It streams the stored file with range requests, so seeking works. Transcoding happens only when the URL asks for it, and `q_auto` is enough to opt in.
+
+The full parameter table is in the [API reference](/api-reference/media/transform#video-parameters).
+
+## The first request returns 202
+
+A transformation that is not cached yet answers `202`, not the original file. That is deliberate: an untransformed, full-size video is never served in place of the one you asked for.
+
+```json
+{
+  "status": "processing",
+  "phase": "queued",
+  "progress": 0,
+  "estimatedSeconds": 14,
+  "estimatedRange": [14, 31],
+  "retryAfter": 14,
+  "statusUrl": "/video-status/w_640/videos/clip.mp4"
+}
+```
+
+Wait for `Retry-After` and request the same URL again; each `202` carries a fresher estimate, and once encoding starts it follows the encoder's real progress. You can also poll the `statusUrl`, keeping its transformation segment, since jobs are keyed on the path **and** its parameters. See [waiting on a 202](/api-reference/media/transform#waiting-on-a-202) and [video status](/api-reference/video/status).
+
+Encoding time depends mostly on the output duration and format: WebM (VP9) is markedly slower than MP4 (H.264), and trimming with `so`/`eo` shortens the job. For anything you know you will serve, [prewarm it at upload](/media-transformations/upload-and-prewarm) so the first visitor never meets the `202`.
+
+## Recipes
+
+**Downscale to 720p**
+
+```http
+GET /t/w_1280,h_720,q_80/clip.mp4
+```
+
+Without an explicit `w` or `h`, videos are downscaled to 720p anyway. That default is what makes an 8K source processable at all.
+
+**Trim a section**
+
+```http
+GET /t/so_5,eo_12/clip.mp4
+```
+
+Offsets in seconds. `eo` is exclusive, so this is a 7 second clip.
+
+**A poster frame**
+
+```http
+GET /t/t_true,tt_5,f_webp,w_500/clip.mp4
+```
+
+`t_true` extracts a single frame as an image instead of transcoding, and `tt` picks which second. Thumbnails are queued ahead of other video work.
+
+**A smaller file**
+
+```http
+GET /t/q_40/clip.mp4
+```
+
+`q` maps to CRF as `round(51 - q / 100 * 33)`, so a lower `q` is a smaller, rougher file. The default `q_60` favors encoding speed, which matters most on large sources.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card
+    title="All video parameters"
+    icon="code"
+    href="/api-reference/media/transform#video-parameters"
+  >
+    The full table, plus the CRF mapping and supported formats.
+  </Card>
+  <Card
+    title="Upload & Cache Warming"
+    icon="upload"
+    href="/media-transformations/upload-and-prewarm"
+  >
+    Queue variants at upload so the first request is already warm.
+  </Card>
+  <Card title="Video Status" icon="video" href="/api-reference/video/status">
+    Poll a queued transformation.
+  </Card>
+  <Card
+    title="Video Processing Config"
+    icon="gear"
+    href="/configuration/video-processing"
+  >
+    Worker concurrency, retries and encode limits.
+  </Card>
+</CardGroup>

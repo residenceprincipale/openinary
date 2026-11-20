@@ -1,0 +1,97 @@
+---
+title: "Deploy on Dokploy"
+description: "Deploy Openinary on Dokploy by importing a ready-made Compose configuration."
+---
+
+Dokploy runs Openinary as a Compose service. The base64 blob below carries the image, the port, the volumes and the variables, so you paste one config instead of filling forms. You need a Dokploy account with access to a server, and Docker support enabled on that instance.
+
+## Deployment steps
+
+<Steps>
+
+<Step title="Create a Compose service">
+
+In your project, create a new service. Choose **Compose** as the service type, set the name to **Openinary**, select **Docker Compose** as the compose type, and click **Create**.
+
+No project yet? Create one first, then open its dashboard.
+
+</Step>
+
+<Step title="Import the configuration">
+
+Go to the **Advanced** tab, scroll to the **Import** section, and paste this base64 config:
+
+```bash
+ewogICJjb21wb3NlIjogInZlcnNpb246IFwiMy44XCJcbnNlcnZpY2VzOlxuICBvcGVuaW5hcnk6XG4gICAgaW1hZ2U6IG9wZW5pbmFyeS9vcGVuaW5hcnk6JHtJTUFHRV9UQUc6LWxhdGVzdH1cbiAgICBwdWxsX3BvbGljeTogYWx3YXlzXG4gICAgcmVzdGFydDogdW5sZXNzLXN0b3BwZWRcbiAgICBleHBvc2U6XG4gICAgICAtIDMwMDBcbiAgICBlbnZpcm9ubWVudDpcbiAgICAgIE5PREVfRU5WOiBwcm9kdWN0aW9uXG4gICAgICBNT0RFOiBmdWxsc3RhY2tcbiAgICAgIE5FWFRfUFVCTElDX0FQSV9CQVNFX1VSTDogJHtORVhUX1BVQkxJQ19BUElfQkFTRV9VUkw6LS9hcGl9XG4gICAgICBCRVRURVJfQVVUSF9TRUNSRVQ6ICR7QkVUVEVSX0FVVEhfU0VDUkVUfVxuICAgICAgQkVUVEVSX0FVVEhfVVJMOiAke0JFVFRFUl9BVVRIX1VSTH1cbiAgICAgIElNQUdFX1RBRzogJHtJTUFHRV9UQUc6LWxhdGVzdH1cbiAgICB2b2x1bWVzOlxuICAgICAgLSBjYWNoZS1kYXRhOi9hcHAvYXBwcy9hcGkvY2FjaGVcbiAgICAgIC0gcHVibGljLWZpbGVzOi9hcHAvYXBwcy9hcGkvcHVibGljXG4gICAgICAtIGRiLWRhdGE6L2FwcC9kYXRhXG4gICAgICAtIGRiLWRhdGE6L2FwcC93ZWItc3RhbmRhbG9uZS9kYXRhXG5cbnZvbHVtZXM6XG4gIGNhY2hlLWRhdGE6XG4gIHB1YmxpYy1maWxlczpcbiAgZGItZGF0YToiLAogICJjb25maWciOiAiW3ZhcmlhYmxlc11cbm1haW5fZG9tYWluID0gXCIke2RvbWFpbn1cIlxuaW1hZ2VfdGFnID0gXCJsYXRlc3RcIlxuYmV0dGVyX2F1dGhfc2VjcmV0ID0gXCIke3Bhc3N3b3JkOjY0fVwiXG5iZXR0ZXJfYXV0aF91cmwgPSBcImh0dHA6Ly8ke21haW5fZG9tYWlufVwiXG5cbltjb25maWddXG5bW2NvbmZpZy5kb21haW5zXV1cbnNlcnZpY2VOYW1lID0gXCJvcGVuaW5hcnlcIlxucG9ydCA9IDMwMDBcbmhvc3QgPSBcIiR7bWFpbl9kb21haW59XCJcblxuW2NvbmZpZy5lbnZdXG5JTUFHRV9UQUcgPSBcIiR7aW1hZ2VfdGFnfVwiXG5CRVRURVJfQVVUSF9TRUNSRVQgPSBcIiR7YmV0dGVyX2F1dGhfc2VjcmV0fVwiXG5CRVRURVJfQVVUSF9VUkwgPSBcIiR7YmV0dGVyX2F1dGhfdXJsfVwiXG5cbltbY29uZmlnLm1vdW50c11dXG5zZXJ2aWNlTmFtZSA9IFwib3BlbmluYXJ5XCJcbnZvbHVtZU5hbWUgPSBcImNhY2hlLWRhdGFcIlxubW91bnRQYXRoID0gXCIvYXBwL2FwcHMvYXBpL2NhY2hlXCJcblxuW1tjb25maWcubW91bnRzXV1cbnNlcnZpY2VOYW1lID0gXCJvcGVuaW5hcnlcIlxudm9sdW1lTmFtZSA9IFwicHVibGljLWZpbGVzXCJcbm1vdW50UGF0aCA9IFwiL2FwcC9hcHBzL2FwaS9wdWJsaWNcIlxuXG5bW2NvbmZpZy5tb3VudHNdXVxuc2VydmljZU5hbWUgPSBcIm9wZW5pbmFyeVwiXG52b2x1bWVOYW1lID0gXCJkYi1kYXRhXCJcbm1vdW50UGF0aCA9IFwiL2FwcC9kYXRhXCJcblxuW1tjb25maWcubW91bnRzXV1cbnNlcnZpY2VOYW1lID0gXCJvcGVuaW5hcnlcIlxudm9sdW1lTmFtZSA9IFwiZGItZGF0YVwiXG5tb3VudFBhdGggPSBcIi9hcHAvd2ViLXN0YW5kYWxvbmUvZGF0YVwiIgp9
+```
+
+Click **Load**, then **Import**. The configuration is imported automatically once it validates.
+
+</Step>
+
+<Step title="Check the environment variables">
+
+The import pre-configures the variables with placeholders:
+
+```bash
+IMAGE_TAG=latest
+BETTER_AUTH_SECRET=your-sha256-hash-or-long-secret
+BETTER_AUTH_URL=your-dokploy-generated-url-or-domain
+```
+
+Set `BETTER_AUTH_URL` to your base URL, the domain where Openinary will be accessible.
+
+The template is pre-configured for local storage, so nothing more is needed there. For an S3-compatible bucket, add its configuration:
+
+```bash
+STORAGE_REGION=your-region
+STORAGE_ACCESS_KEY_ID=your-access-key
+STORAGE_SECRET_ACCESS_KEY=your-secret-key
+STORAGE_BUCKET_NAME=your-bucket-name
+STORAGE_ENDPOINT=https://your-s3-endpoint.com
+STORAGE_PUBLIC_URL=https://your-cdn-domain.com
+```
+
+See the [Storage configuration](/configuration/storage) page for detailed setup instructions.
+
+</Step>
+
+<Step title="Deploy">
+
+Verify everything in the **Environment** tab, click **Deploy**, then **Confirm**. The deployment logs end with:
+
+```
+Docker Compose Deployed: ✅
+```
+
+</Step>
+
+<Step title="Create your admin account">
+
+Go to the **Domains** tab and visit the generated URL or your configured custom domain. You land on the initial setup page.
+
+<Warning>
+  Create the admin account immediately. The setup route is publicly accessible until it is completed.
+</Warning>
+
+After signing in, the dashboard shows the sample assets or your bucket content.
+
+</Step>
+
+</Steps>
+
+## Troubleshooting
+
+Check the deployment logs in Dokploy for error messages, verify every environment variable, and confirm your DNS if you use a custom domain. If problems persist, [create an issue on GitHub](https://github.com/openinary/openinary/issues) with your deployment logs.
+
+## Next steps
+
+<CardGroup cols={2}>
+<Card title="Transform Images" icon="image" href="/media-transformations/image-transformations">
+Learn how to transform and optimize images
+</Card>
+
+<Card title="Transform Videos" icon="video" href="/media-transformations/video-transformations">
+Learn how to transform and process videos
+</Card>
+</CardGroup>

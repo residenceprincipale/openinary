@@ -1,0 +1,57 @@
+---
+title: "Queue Statistics"
+description: "Job counts per status for the video processing queue"
+---
+
+**Self-hosted only.** Cloud exposes `/queue/events` only.
+
+Counts the job rows currently in the queue table, per status.
+
+```bash
+curl https://media.example.com/queue/stats \
+  -H "Authorization: Bearer <api_key>"
+```
+
+```
+GET /queue/stats
+```
+
+**Auth:** API Key required
+
+## Response
+
+```json
+{
+  "total": 154,
+  "pending": 2,
+  "processing": 1,
+  "completed": 148,
+  "error": 3
+}
+```
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `total` | number | Every job row in the table, including cancelled ones |
+| `pending` | number | Jobs queued and waiting for a worker |
+| `processing` | number | Jobs a worker is running right now |
+| `completed` | number | Jobs that finished successfully |
+| `error` | number | Jobs that exhausted their retries |
+
+There is no `cancelled` key. Cancelled jobs are counted in `total` only, so `total` is not the sum of the other four.
+
+Completed and errored jobs are purged after `VIDEO_JOB_CLEANUP_HOURS`. These counts are a snapshot of the retention window, not a lifetime tally.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="List Jobs" icon="list" href="/api-reference/queue/jobs">
+    View individual job details with filtering.
+  </Card>
+  <Card title="Queue Events" icon="satellite-dish" href="/api-reference/queue/events">
+    Subscribe to real-time job status updates via SSE.
+  </Card>
+  <Card title="Worker Statistics" icon="gears" href="/api-reference/queue/worker-stats">
+    Check the background worker's current state.
+  </Card>
+</CardGroup>

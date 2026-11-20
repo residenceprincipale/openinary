@@ -16,12 +16,15 @@ services:
       - public-files:/app/apps/api/public
       # Mount data folder for shared auth database
       - db-data:/app/data
-    # Note: .env files are optional and loaded by init-env.js at runtime if they exist
+    # Only the variables listed under environment reach the container: add a
+    # line here for any other one you set in .env. (No env_file: older Compose
+    # can't parse its optional form and the short form fails without a .env.)
     environment:
       - NODE_ENV=production
       - MODE=api
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3000}
+      - API_SECRET=${API_SECRET:-}
       # IMAGE_TAG automatically mapped from IMAGE_TAG (single source of truth)
       - IMAGE_TAG=${IMAGE_TAG:-latest}
       # Video queue configuration
@@ -32,7 +35,30 @@ services:
       - VIDEO_JOB_CLEANUP_HOURS=${VIDEO_JOB_CLEANUP_HOURS:-24}
       - VIDEO_WORKER_POLL_INTERVAL_MS=${VIDEO_WORKER_POLL_INTERVAL_MS:-1000}
       - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-50}
-      - STORAGE_LIMIT_MB=${STORAGE_LIMIT_MB:-0}
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
+      - OPENINARY_TELEMETRY=${OPENINARY_TELEMETRY:-}
+      - ALLOW_REMOTE_SOURCE=${ALLOW_REMOTE_SOURCE:-}
+      - PUBLIC_RATE_LIMIT_MAX=${PUBLIC_RATE_LIMIT_MAX:-}
+      - PUBLIC_RATE_LIMIT_WINDOW_MS=${PUBLIC_RATE_LIMIT_WINDOW_MS:-}
+      # S3-compatible storage (local disk when STORAGE_BUCKET_NAME is empty)
+      - STORAGE_BUCKET_NAME=${STORAGE_BUCKET_NAME:-}
+      - STORAGE_REGION=${STORAGE_REGION:-}
+      - STORAGE_ACCESS_KEY_ID=${STORAGE_ACCESS_KEY_ID:-}
+      - STORAGE_SECRET_ACCESS_KEY=${STORAGE_SECRET_ACCESS_KEY:-}
+      - STORAGE_ENDPOINT=${STORAGE_ENDPOINT:-}
+      - STORAGE_PUBLIC_URL=${STORAGE_PUBLIC_URL:-}
+      # No value on purpose: unset keeps the public/ default, while an empty
+      # STORAGE_PREFIX= in .env means the bucket root.
+      - STORAGE_PREFIX
+      - STORAGE_MAX_SOCKETS=${STORAGE_MAX_SOCKETS:-}
+      - STORAGE_CONNECTION_TIMEOUT=${STORAGE_CONNECTION_TIMEOUT:-}
+      - STORAGE_REQUEST_TIMEOUT=${STORAGE_REQUEST_TIMEOUT:-}
+      - STORAGE_SOCKET_TIMEOUT=${STORAGE_SOCKET_TIMEOUT:-}
+      # Initial Authentication configuration
+      - OPENINARY_ADMIN_NAME=${OPENINARY_ADMIN_NAME}
+      - OPENINARY_ADMIN_EMAIL=${OPENINARY_ADMIN_EMAIL}
+      - OPENINARY_ADMIN_PASSWORD=${OPENINARY_ADMIN_PASSWORD}
+      - OPENINARY_GENERATE_API_KEY=${OPENINARY_GENERATE_API_KEY:-true}
     networks:
       - openinary-network
     # Resource limits to prevent video processing from crashing the server
@@ -70,16 +96,19 @@ services:
       - public-files:/app/apps/api/public
       # Mount shared data folder for auth database persistence
       - db-data:/app/data
-      # Also mount for web standalone path (for backwards compatibility)
+      # Where images built before DB_PATH was set may look for the database.
       - db-data:/app/web-standalone/data
-    # Note: .env files are optional and loaded by init-env.js at runtime if they exist
+    # Only the variables listed under environment reach the container: add a
+    # line here for any other one you set in .env. (No env_file: older Compose
+    # can't parse its optional form and the short form fails without a .env.)
     environment:
       - NODE_ENV=production
       - MODE=fullstack
-      - NEXT_PUBLIC_API_BASE_URL=/api
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-/api}
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3000}
       - BETTER_AUTH_INTERNAL_URL=${BETTER_AUTH_INTERNAL_URL:-http://127.0.0.1:3001}
+      - API_SECRET=${API_SECRET:-}
       # IMAGE_TAG automatically mapped from IMAGE_TAG (single source of truth)
       - IMAGE_TAG=${IMAGE_TAG:-latest}
       # Video queue configuration
@@ -90,7 +119,30 @@ services:
       - VIDEO_JOB_CLEANUP_HOURS=${VIDEO_JOB_CLEANUP_HOURS:-24}
       - VIDEO_WORKER_POLL_INTERVAL_MS=${VIDEO_WORKER_POLL_INTERVAL_MS:-1000}
       - MAX_FILE_SIZE_MB=${MAX_FILE_SIZE_MB:-50}
-      - STORAGE_LIMIT_MB=${STORAGE_LIMIT_MB:-0}
+      - CORS_ORIGIN=${CORS_ORIGIN:-}
+      - OPENINARY_TELEMETRY=${OPENINARY_TELEMETRY:-}
+      - ALLOW_REMOTE_SOURCE=${ALLOW_REMOTE_SOURCE:-}
+      - PUBLIC_RATE_LIMIT_MAX=${PUBLIC_RATE_LIMIT_MAX:-}
+      - PUBLIC_RATE_LIMIT_WINDOW_MS=${PUBLIC_RATE_LIMIT_WINDOW_MS:-}
+      # S3-compatible storage (local disk when STORAGE_BUCKET_NAME is empty)
+      - STORAGE_BUCKET_NAME=${STORAGE_BUCKET_NAME:-}
+      - STORAGE_REGION=${STORAGE_REGION:-}
+      - STORAGE_ACCESS_KEY_ID=${STORAGE_ACCESS_KEY_ID:-}
+      - STORAGE_SECRET_ACCESS_KEY=${STORAGE_SECRET_ACCESS_KEY:-}
+      - STORAGE_ENDPOINT=${STORAGE_ENDPOINT:-}
+      - STORAGE_PUBLIC_URL=${STORAGE_PUBLIC_URL:-}
+      # No value on purpose: unset keeps the public/ default, while an empty
+      # STORAGE_PREFIX= in .env means the bucket root.
+      - STORAGE_PREFIX
+      - STORAGE_MAX_SOCKETS=${STORAGE_MAX_SOCKETS:-}
+      - STORAGE_CONNECTION_TIMEOUT=${STORAGE_CONNECTION_TIMEOUT:-}
+      - STORAGE_REQUEST_TIMEOUT=${STORAGE_REQUEST_TIMEOUT:-}
+      - STORAGE_SOCKET_TIMEOUT=${STORAGE_SOCKET_TIMEOUT:-}
+      # Initial Authentication configuration
+      - OPENINARY_ADMIN_NAME=${OPENINARY_ADMIN_NAME}
+      - OPENINARY_ADMIN_EMAIL=${OPENINARY_ADMIN_EMAIL}
+      - OPENINARY_ADMIN_PASSWORD=${OPENINARY_ADMIN_PASSWORD}
+      - OPENINARY_GENERATE_API_KEY=${OPENINARY_GENERATE_API_KEY:-false}
     networks:
       - openinary-network
     # Resource limits to prevent video processing from crashing the server

@@ -1,0 +1,55 @@
+---
+title: "Docker Resources"
+description: "CPU and memory limits for the Openinary container, and what to set them to per server size"
+---
+
+`docker-compose.yml` reads these four variables to constrain the container. Pick the row that matches your server and move on.
+
+| Server | CPU limit | Memory limit | CPU reservation | Memory reservation |
+| --- | --- | --- | --- | --- |
+| 1-2 GB, images only | `1.0` | `2G` | `0.25` | `512M` |
+| 4 GB (default) | `2.0` | `4G` | `0.5` | `1G` |
+| 16 GB, video-heavy | `4.0` | `12G` | `1.0` | `2G` |
+
+```bash
+DOCKER_CPU_LIMIT=2.0
+DOCKER_MEMORY_LIMIT=4G
+DOCKER_CPU_RESERVATION=0.5
+DOCKER_MEMORY_RESERVATION=1G
+```
+
+<Warning>
+  A container that exceeds `DOCKER_MEMORY_LIMIT` is OOM-killed. Video processing
+  is memory-hungry: give it at least 2 GB, and 4 GB if you encode anything
+  large. Below 2 GB, video jobs fail and the deployment is image-only.
+</Warning>
+
+## What each one does
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `DOCKER_CPU_LIMIT` | `2.0` | Hard cap in cores. The container never exceeds it, even on an idle host |
+| `DOCKER_MEMORY_LIMIT` | `4G` | Hard cap. `G` for gigabytes, `M` for megabytes |
+| `DOCKER_CPU_RESERVATION` | `0.5` | Cores guaranteed when the host is under load |
+| `DOCKER_MEMORY_RESERVATION` | `1G` | Memory guaranteed. Must be below the limit |
+
+The 16 GB row matches the commented block in `docker.env.example`, and adds `VIDEO_MAX_CONCURRENT=4`. That pairing matters: `DOCKER_CPU_LIMIT` is what caps [video worker auto-detection](/configuration/video-processing), so raising memory alone buys you no extra workers.
+
+## Related
+
+<CardGroup cols={2}>
+  <Card
+    title="Video Processing"
+    icon="gear"
+    href="/configuration/video-processing"
+  >
+    Worker concurrency, retries and encode limits.
+  </Card>
+  <Card
+    title="Deploy on Coolify"
+    icon="rocket"
+    href="/guides/coolify-deployment"
+  >
+    Full deployment guide with resource configuration.
+  </Card>
+</CardGroup>
