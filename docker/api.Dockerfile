@@ -86,4 +86,6 @@ EXPOSE 3000
 # Change to API directory for runtime
 WORKDIR /app/apps/api
 
-CMD ["/bin/sh", "-c", ". /app/scripts/init-env-wrapper.sh && node /app/scripts/secure-db.js && cd /app && pnpm --filter api start"]
+# exec, and no pnpm wrapper: `pnpm start` leaves a second ~100 MB node process
+# in the container just to spawn this one.
+CMD ["/bin/sh", "-c", ". /app/scripts/init-env-wrapper.sh && node /app/scripts/secure-db.js && cd /app/apps/api && exec node dist/server.js"]
