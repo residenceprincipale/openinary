@@ -95,6 +95,29 @@ jobs:
           echo "patch=$PATCH" >> $GITHUB_OUTPUT
           echo "major_minor=${MAJOR}.${MINOR}" >> $GITHUB_OUTPUT
 
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.login.outputs.publish }}
+    steps:
+      - name: Check Docker Hub credentials
+        id: login
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+        run: |
+          if [ -z "$DOCKER_USERNAME" ] || [ -z "$DOCKER_PASSWORD" ]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "Docker Hub credentials are not configured; skipping image builds."
+            exit 0
+          fi
+          if ! printf '%s' "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin >/dev/null 2>&1; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Docker Hub login failed; skipping image builds."
+            exit 0
+          fi
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+
   build-full:
     strategy:
       fail-fast: false
@@ -105,7 +128,8 @@ jobs:
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    needs: determine-version
+    needs: [determine-version, preflight]
+    if: needs.preflight.outputs.publish == 'true'
     timeout-minutes: 15
     permissions:
       contents: read
@@ -157,7 +181,7 @@ jobs:
 
   merge-full:
     runs-on: ubuntu-latest
-    needs: [determine-version, build-full]
+    needs: [determine-version, preflight, build-full]
     timeout-minutes: 10
     permissions:
       contents: read
@@ -201,7 +225,8 @@ jobs:
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    needs: determine-version
+    needs: [determine-version, preflight]
+    if: needs.preflight.outputs.publish == 'true'
     timeout-minutes: 15
     permissions:
       contents: read
@@ -253,7 +278,7 @@ jobs:
 
   merge-api:
     runs-on: ubuntu-latest
-    needs: [determine-version, build-api]
+    needs: [determine-version, preflight, build-api]
     timeout-minutes: 10
     permissions:
       contents: read
@@ -297,7 +322,8 @@ jobs:
           - platform: linux/arm64
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    needs: determine-version
+    needs: [determine-version, preflight]
+    if: needs.preflight.outputs.publish == 'true'
     timeout-minutes: 15
     permissions:
       contents: read
@@ -349,7 +375,7 @@ jobs:
 
   merge-web:
     runs-on: ubuntu-latest
-    needs: [determine-version, build-web]
+    needs: [determine-version, preflight, build-web]
     timeout-minutes: 10
     permissions:
       contents: read
@@ -384,8 +410,9 @@ jobs:
             $(printf '${{ env.IMAGE_WEB }}@sha256:%s ' *)
 
   summary:
+    if: always()
     runs-on: ubuntu-latest
-    needs: [determine-version, merge-full, merge-api, merge-web]
+    needs: [determine-version, preflight, merge-full, merge-api, merge-web]
     timeout-minutes: 5
     permissions:
       contents: write

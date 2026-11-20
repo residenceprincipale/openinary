@@ -1,0 +1,124 @@
+# Dokploy / Docker Compose deployment for the split Openinary stack.
+#
+# Deploy this file from a checkout of the repository: the nginx service mounts
+# ./docker/nginx.split.conf, and api/web build from their Dockerfiles.
+# Required environment variables in Dokploy:
+#   BETTER_AUTH_URL      e.g. https://media.example.com
+#   BETTER_AUTH_SECRET   openssl rand -hex 32
+#   API_SECRET           openssl rand -hex 32
+# Optional: MAX_FILE_SIZE_MB, MAX_UPLOAD_BODY_MB, MAX_ZIP_MB, STORAGE_LIMIT_MB,
+#           DISABLE_TRANSFORMS, STORAGE_*, VIDEO_*, SHARP_*
+#
+# Point the Dokploy domain at the nginx service on port 3000.
+
+services:
+  db-init:
+    image: alpine:3.20
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - chown -R 1000:1000 /data /public /cache && chmod 700 /data
+    volumes:
+      - openinary-data:/data
+      - openinary-public:/public
+      - openinary-cache:/cache
+
+  api-full:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    image: openinary-api:local
+    restart: unless-stopped
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      MODE: fullstack
+      PORT: "3002"
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?set BETTER_AUTH_URL}
+      BETTER_AUTH_INTERNAL_URL: http://web:3001
+      API_SECRET: ${API_SECRET:?set API_SECRET}
+      DB_PATH: /app/data/auth.db
+      MAX_FILE_SIZE_MB: ${MAX_FILE_SIZE_MB:-50}
+      MAX_UPLOAD_BODY_MB: ${MAX_UPLOAD_BODY_MB:-256}
+      MAX_ZIP_MB: ${MAX_ZIP_MB:-2048}
+      SHARP_CACHE_MB: ${SHARP_CACHE_MB:-10}
+      SHARP_CONCURRENCY: ${SHARP_CONCURRENCY:-1}
+      STORAGE_LIMIT_MB: ${STORAGE_LIMIT_MB:-0}
+      DISABLE_TRANSFORMS: ${DISABLE_TRANSFORMS:-false}
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      OPENINARY_TELEMETRY: ${OPENINARY_TELEMETRY:-true}
+      ALLOW_REMOTE_SOURCE: ${ALLOW_REMOTE_SOURCE:-false}
+      VIDEO_MAX_CONCURRENT: ${VIDEO_MAX_CONCURRENT:-}
+      VIDEO_JOB_RETRY_MAX: ${VIDEO_JOB_RETRY_MAX:-3}
+      VIDEO_JOB_CLEANUP_HOURS: ${VIDEO_JOB_CLEANUP_HOURS:-24}
+      STORAGE_BUCKET_NAME: ${STORAGE_BUCKET_NAME:-}
+      STORAGE_REGION: ${STORAGE_REGION:-}
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-}
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-}
+      STORAGE_PUBLIC_URL: ${STORAGE_PUBLIC_URL:-}
+      STORAGE_PREFIX: ${STORAGE_PREFIX:-}
+      STORAGE_MAX_SOCKETS: ${STORAGE_MAX_SOCKETS:-}
+      STORAGE_CONNECTION_TIMEOUT: ${STORAGE_CONNECTION_TIMEOUT:-}
+      STORAGE_REQUEST_TIMEOUT: ${STORAGE_REQUEST_TIMEOUT:-}
+      STORAGE_SOCKET_TIMEOUT: ${STORAGE_SOCKET_TIMEOUT:-}
+      OPENINARY_ADMIN_NAME: ${OPENINARY_ADMIN_NAME:-}
+      OPENINARY_ADMIN_EMAIL: ${OPENINARY_ADMIN_EMAIL:-}
+      OPENINARY_ADMIN_PASSWORD: ${OPENINARY_ADMIN_PASSWORD:-}
+      OPENINARY_GENERATE_API_KEY: ${OPENINARY_GENERATE_API_KEY:-false}
+    volumes:
+      - openinary-data:/app/data
+      - openinary-public:/app/apps/api/public
+      - openinary-cache:/app/apps/api/cache
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - node -e "fetch('http://127.0.0.1:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: /api
+    image: openinary-web:local
+    restart: unless-stopped
+    depends_on:
+      api-full:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      HOSTNAME: 0.0.0.0
+      DB_PATH: /app/data/auth.db
+      NEXT_PUBLIC_API_BASE_URL: /api
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?set BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL:?set BETTER_AUTH_URL}
+      BETTER_AUTH_INTERNAL_URL: http://web:3001
+      DISABLE_TRANSFORMS: ${DISABLE_TRANSFORMS:-false}
+    volumes:
+      - openinary-data:/app/data
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      - api-full
+      - web
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./docker/nginx.split.conf:/etc/nginx/nginx.conf:ro
+
+volumes:
+  openinary-data:
+  openinary-public:
+  openinary-cache:
