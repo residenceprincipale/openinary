@@ -17,7 +17,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@openinary/dashboard/ui/dropdown-menu";
-import { ArrowUpRight, LogOut, Settings } from "lucide-react";
+import { Archive, ArrowUpRight, ListVideo, LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -30,6 +30,8 @@ const GITHUB_URL = "https://github.com/openinary/openinary";
 const mainItems = [
   { title: "Assets", icon: SolarAssets, url: "/" },
   { title: "Logs", icon: SolarLogs, url: "/settings/logs" },
+  { title: "Queue", icon: ListVideo, url: "/settings/queue" },
+  { title: "Cache", icon: Archive, url: "/settings/cache" },
   { title: "Storage", icon: SolarStorage, url: "/settings/storage" },
   { title: "API keys", icon: SolarKey, url: "/settings/api-keys" },
 ];
@@ -38,6 +40,8 @@ const mainItems = [
 const settingsPages = [
   { title: "Account", url: "/settings/account" },
   { title: "Appearance", url: "/settings/appearance" },
+  { title: "Transforms", url: "/settings/transforms" },
+  { title: "Users", url: "/settings/users" },
 ];
 
 /** The workspace (this instance) and the signed-in account, at the bottom. */

@@ -1,10 +1,18 @@
 import sharp from 'sharp';
+import type { TransformDefaults } from '../../types';
 import { TransformParams, ImageFormat, ImageAnalysis, OptimizationResult } from './types';
 import logger, { serializeError } from '../logger';
 import { SHARP_INPUT_OPTIONS } from './sharp-options';
 import { supportsFormat } from '../../url/negotiate';
 
 export class Compression {
+  constructor(private defaults?: TransformDefaults | (() => TransformDefaults)) {}
+
+  /** Host-app defaults; a getter keeps the config page live. */
+  private configured(): TransformDefaults {
+    return typeof this.defaults === "function" ? this.defaults() : (this.defaults ?? {});
+  }
+
   /** Formats applyFormat() can actually encode. Excludes "auto". */
   private static readonly ENCODABLE_FORMATS = new Set<string>([
     'avif', 'webp', 'jpeg', 'jpg', 'png', 'gif'
@@ -334,18 +342,20 @@ export class Compression {
       return userQuality;
     }
 
-    let baseQuality = 85;
-    
-    // Simplified format-specific adjustments
+    const configuredQuality = this.configured().image?.quality;
+    let baseQuality = configuredQuality ?? 85;
+
+    // Simplified format-specific adjustments, unless the host app set one
+    // quality for every format.
     switch (format) {
       case 'avif':
-        baseQuality = 80; // AVIF can handle slightly lower quality
+        baseQuality = configuredQuality ?? 80;
         break;
       case 'webp':
-        baseQuality = 85;
+        baseQuality = configuredQuality ?? 85;
         break;
       case 'jpeg':
-        baseQuality = 90; // Higher quality for JPEG
+        baseQuality = configuredQuality ?? 90;
         break;
       case 'png':
         return 100; // PNG is lossless, no quality adjustment needed

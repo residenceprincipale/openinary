@@ -2,6 +2,7 @@ import { getDb } from "shared";
 import { VideoJobQueue, enginePathsIn } from "@openinary/core";
 import { getSharedStorage } from "./storage";
 import { SqliteVideoJobStore } from "./video-job-store";
+import { getTransformDefaults } from "../utils/transform-defaults";
 
 const intEnv = (name: string): number | undefined => {
   const value = parseInt(process.env[name] ?? "", 10);
@@ -16,6 +17,7 @@ export const videoJobQueue = new VideoJobQueue(
   getSharedStorage(),
   {
     paths: enginePaths,
+    defaults: getTransformDefaults,
     video: {
       maxConcurrent: intEnv("VIDEO_MAX_CONCURRENT"),
       ffmpegThreads: intEnv("VIDEO_FFMPEG_THREADS"),

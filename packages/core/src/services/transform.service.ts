@@ -24,7 +24,7 @@ import {
   isTransformableImageExt,
   isVideoExt,
 } from "../url/media-types";
-import type { CombindedTransformParams } from "../types";
+import type { CombindedTransformParams, TransformDefaults } from "../types";
 import { NotFoundError, ValidationError } from "../utils/errors";
 import { derivativeEtag, sniffImageContentType } from "../utils/delivery-headers";
 
@@ -68,13 +68,21 @@ const textResult = (status: number, message: string, headers: Record<string, str
 });
 
 export class TransformService {
-  private compression = new Compression();
+  private compression: Compression;
 
   constructor(
     private storage: CloudStorage | null,
     private queue: VideoJobQueue,
     private paths: EnginePaths,
-  ) {}
+    private defaults?: TransformDefaults | (() => TransformDefaults),
+  ) {
+    this.compression = new Compression(defaults);
+  }
+
+  /** Host-app defaults; a getter keeps the config page live. */
+  private configuredDefaults(): TransformDefaults {
+    return typeof this.defaults === "function" ? this.defaults() : (this.defaults ?? {});
+  }
 
   async transform(request: TransformRequest): Promise<TransformResult> {
     const { path: pathname, userAgent, acceptHeader, sourceUrl } = request;
@@ -152,9 +160,18 @@ export class TransformService {
     userAgent?: string,
     acceptHeader?: string,
   ): CombindedTransformParams {
-    if (params.format || !isTransformableImageExt(ext)) return { ...params };
+    if (!isTransformableImageExt(ext)) return { ...params };
+
+    const defaults = this.configuredDefaults().image ?? {};
+    const merged: CombindedTransformParams = {
+      ...params,
+      ...(!params.crop && defaults.crop ? { crop: defaults.crop } : {}),
+      ...(!params.gravity && defaults.gravity ? { gravity: defaults.gravity } : {}),
+    };
+
+    if (merged.format) return merged;
     const format = determineOptimalFormatForCache(userAgent, acceptHeader, ext);
-    return { ...params, format: format as CombindedTransformParams["format"] };
+    return { ...merged, format: format as CombindedTransformParams["format"] };
   }
 
   private cachedResult(
@@ -229,6 +246,7 @@ export class TransformService {
           storage: this.storage,
           paths: this.paths,
           settings: this.queue.videoSettings,
+          defaults: this.configuredDefaults(),
         });
         return {
           buffer: result.buffer,

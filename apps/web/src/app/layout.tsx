@@ -4,6 +4,7 @@ import { NuqsAdapter } from 'nuqs/adapters/next/app'
 import { FieldErrors, OpeninaryProvider, Toaster } from "@openinary/ui";
 import { ThemeProvider } from "next-themes";
 import { QueryProvider } from "@/components/query-provider";
+import { BrandingProvider } from "@/components/branding-provider";
 import "./globals.css";
 
 const monaSans = Mona_Sans({
@@ -45,9 +46,11 @@ export default function RootLayout({
               apiBaseUrl={process.env.NEXT_PUBLIC_API_BASE_URL || ""}
               transformBaseUrl={process.env.NEXT_PUBLIC_TRANSFORM_BASE_URL}
             >
-              <NuqsAdapter>{children}</NuqsAdapter>
-              <Toaster />
-              <FieldErrors />
+              <BrandingProvider>
+                <NuqsAdapter>{children}</NuqsAdapter>
+                <Toaster />
+                <FieldErrors />
+              </BrandingProvider>
             </OpeninaryProvider>
           </ThemeProvider>
         </QueryProvider>

@@ -78,6 +78,12 @@ export { useAssetDetails } from "./details-sidebar/use-asset-details";
 // Storage/upload components
 export { MoveToNavigator } from "./components/move-to-navigator";
 export { BulkActionBarContent } from "./components/bulk-action-bar";
+export {
+  BatchRenameDialog,
+  type BatchRenameItem,
+} from "./components/batch-rename-dialog";
+export { ShareFolderDialog } from "./components/share-dialog";
+export { ReplaceFileDialog } from "./components/replace-file-dialog";
 export { UploadSection } from "./components/upload-section";
 export { CreateFolderSection } from "./components/create-folder-section";
 export { DeleteFolderButton } from "./components/delete-folder-button";

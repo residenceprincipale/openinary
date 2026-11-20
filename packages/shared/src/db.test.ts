@@ -34,7 +34,15 @@ test("an older volume keeps its settings and API keys", () => {
     { id: "k1", referenceId: "u1" },
   ]);
   assert.equal(hasAdmin(db), true);
-  assert.throws(() =>
-    db.exec("INSERT INTO user (id, email, name, createdAt, updatedAt) VALUES ('u2', 'x@y.z', 'X', 1, 1)"),
+  // The first account becomes admin, and the old single-user trigger is gone.
+  assert.deepEqual(db.prepare("SELECT role FROM user WHERE id = 'u1'").get(), {
+    role: "admin",
+  });
+  db.exec(
+    "INSERT INTO user (id, email, name, createdAt, updatedAt) VALUES ('u2', 'x@y.z', 'X', 1, 1)",
+  );
+  assert.deepEqual(
+    db.prepare("SELECT role FROM user WHERE id = 'u2'").get(),
+    { role: "user" },
   );
 });

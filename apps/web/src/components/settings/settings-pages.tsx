@@ -2,11 +2,25 @@
 
 import { SettingsPage, type SettingsPageEntry } from "@openinary/dashboard";
 import { AppearanceTab, StorageTab } from "@openinary/ui";
-import { HardDrive, KeyRound, Palette, ScrollText, User } from "lucide-react";
+import {
+  Archive,
+  HardDrive,
+  KeyRound,
+  ListVideo,
+  Palette,
+  ScrollText,
+  SlidersHorizontal,
+  User,
+  Users,
+} from "lucide-react";
 
 import { ApiKeyManager } from "@/components/api-key-manager";
 import { AccountTab } from "@/components/settings/account-tab";
 import { ActivityTab } from "@/components/settings/activity-tab";
+import { CachePage } from "@/components/settings/cache-page";
+import { QueuePage } from "@/components/settings/queue-page";
+import { TransformsPage } from "@/components/settings/transforms-page";
+import { UsersPage } from "@/components/settings/users-page";
 import { useSession } from "@/lib/auth-client";
 import { Skeleton } from "skullet/react";
 
@@ -65,6 +79,36 @@ export const SETTINGS_PAGES: SettingsPageEntry[] = [
     icon: ScrollText,
     content: ActivityTab,
     wide: true,
+  },
+  {
+    value: "queue",
+    label: "Queue",
+    description: "Background video transcodes, with retry and cancel.",
+    icon: ListVideo,
+    content: QueuePage,
+    wide: true,
+  },
+  {
+    value: "cache",
+    label: "Cache",
+    description: "Local and cloud transformation cache entries.",
+    icon: Archive,
+    content: CachePage,
+    wide: true,
+  },
+  {
+    value: "transforms",
+    label: "Transforms",
+    description: "Default image and video encoding, and dashboard branding.",
+    icon: SlidersHorizontal,
+    content: TransformsPage,
+  },
+  {
+    value: "users",
+    label: "Users",
+    description: "Accounts, admin roles, and folder sharing.",
+    icon: Users,
+    content: UsersPage,
   },
 ];
 

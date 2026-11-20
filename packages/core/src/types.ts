@@ -85,8 +85,24 @@ export interface VideoTransformParams extends OverlayTransformParams {
   crop?: CropMode;
   gravity?: GravityMode;
   quality?: number | "auto";
+  /** Audio volume, 0-100. 0 mutes the audio track. */
+  volume?: number;
   thumbnail?: boolean;
   thumbnailTime?: number;
+}
+
+/** Runtime defaults the host app may override (self-hosted config page). */
+export interface TransformDefaults {
+  image?: {
+    quality?: number;
+    crop?: CropMode;
+    gravity?: GravityMode;
+  };
+  video?: {
+    quality?: number;
+    /** false disables the automatic 720p downscale of large videos. */
+    autoDownscale?: boolean;
+  };
 }
 
 export type CombindedTransformParams = ImageTransformParams &

@@ -1,5 +1,6 @@
 // Transform engine
 export { TransformService } from "./services/transform.service";
+export type { TransformDefaults } from "./types";
 
 // Video job queue
 export { VideoJobQueue, type VideoJob, type JobStatus } from "./utils/video-job-queue";
@@ -24,9 +25,10 @@ export {
 } from "./utils/storage/index";
 export type { StorageClientOptions } from "./types";
 export { invalidateListingCache } from "./utils/storage/listing-cache";
+export { getBucketStats, type BucketStats } from "./utils/storage/stats-tracker";
 
 // Routes (Hono sub-apps, each takes a RouteDeps and returns a mountable app)
-export type { RouteDeps } from "./config/deps";
+export type { RouteDeps, StorageAccess } from "./config/deps";
 export { createTransformRoute } from "./routes/transform";
 export { createAuthenticatedRoute } from "./routes/authenticated";
 export { createStorageRoute } from "./routes/storage";
@@ -56,5 +58,10 @@ export {
   allowedUploadExtensions,
 } from "./url/index";
 export { deleteAssetCompletely, type DeleteAssetResult } from "./utils/asset-deletion";
-export { clearAllCache } from "./utils/cache";
+export {
+  clearAllCache,
+  deleteCachedFiles,
+  getCacheSize,
+  listCachedFiles,
+} from "./utils/cache";
 export { default as logger, serializeError } from "./utils/logger";

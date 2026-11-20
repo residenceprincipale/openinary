@@ -7,6 +7,7 @@ import logger, { serializeError } from "../logger";
 import type { VideoJob, VideoJobStore } from "./queue-store";
 import type { detectVideoSettings } from "./config";
 import type { EnginePaths } from "../../config/paths";
+import type { TransformDefaults } from "../../types";
 import { contentTypeForFormat, determineOutputFormat } from "../../url/media-types";
 import {
   summarizeVideoSamples,
@@ -43,6 +44,7 @@ export class VideoWorker extends EventEmitter {
     private store: VideoJobStore,
     private paths: EnginePaths,
     private video: ReturnType<typeof detectVideoSettings>,
+    private defaults: () => TransformDefaults = () => ({}),
   ) {
     super();
     this.maxConcurrent = video.settings.maxConcurrent;
@@ -207,6 +209,7 @@ export class VideoWorker extends EventEmitter {
         storage: this.storage,
         paths: this.paths,
         settings: this.video.settings,
+        defaults: this.defaults(),
       }, (progress) => {
         outputSeconds = progress.outputSeconds;
         // 100 is the store's "done" and only completion may write it

@@ -1,5 +1,5 @@
 import type { FfmpegCommand, FilterSpecification } from "fluent-ffmpeg";
-import type { VideoTransformParams } from "../../types";
+import type { TransformDefaults, VideoTransformParams } from "../../types";
 
 /**
  * Context object containing all information needed for video transformation
@@ -11,6 +11,10 @@ export interface VideoContext {
   params: VideoTransformParams;
   isImageOutput: boolean;
   isThumbnail: boolean;
+  /** Probed source duration in seconds. Set for thumbnails so seeks clamp. */
+  duration?: number;
+  /** Host-app overrides for video encode defaults. */
+  defaults?: TransformDefaults;
 }
 
 /**

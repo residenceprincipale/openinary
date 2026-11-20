@@ -25,6 +25,9 @@ import {
   Move,
   Pencil,
   Plus,
+  Search,
+  Share2,
+  Replace,
   Trash2,
   Upload,
   FolderPlus,
@@ -56,6 +59,7 @@ import {
   ContextMenuTrigger,
 } from "./ui/context-menu";
 import { Checkbox } from "./ui/checkbox";
+import { Input } from "./ui/input";
 import { cn, encodePath, isMac, toAbsoluteUrl } from "./lib/utils";
 import { useOpeninary } from "./provider/openinary-provider";
 import { VideoThumbnail } from "./components/video-thumbnail";
@@ -72,6 +76,9 @@ import { CreateFolderButtonWithDialog } from "./components/create-folder-button-
 import { UploadSection } from "./components/upload-section";
 import { CreateFolderSection } from "./components/create-folder-section";
 import { BulkActionBarContent } from "./components/bulk-action-bar";
+import { BatchRenameDialog } from "./components/batch-rename-dialog";
+import { ShareFolderDialog } from "./components/share-dialog";
+import { ReplaceFileDialog } from "./components/replace-file-dialog";
 import type { MediaFile } from "./types";
 
 const MIME_TYPES: Record<string, string> = {
@@ -453,6 +460,16 @@ function MediaGridBody({
 
   const mac = isMac();
 
+  // Search, type filter and sort apply to the current level. Local state:
+  // the grid is mounted per route, and ?q= would fight the folder param.
+  const [search, setSearch] = useState("");
+  const [filterType, setFilterType] = useState<"all" | "image" | "video">("all");
+  const [sortBy, setSortBy] = useState<"name" | "type" | "size" | "date">("name");
+  const [batchRenameOpen, setBatchRenameOpen] = useState(false);
+  const [shareFolder, setShareFolder] = useState<string | null>(null);
+  const [replaceTarget, setReplaceTarget] = useState<MediaFile | null>(null);
+  const filtering = search !== "" || filterType !== "all";
+
   // Parse folder path from URL - must be called before any conditional returns
   const pathSegments = useMemo(() => {
     return folderPath && folderPath.length > 0
@@ -464,8 +481,42 @@ function MediaGridBody({
 
   // Current level, loaded lazily per folder (sorted server-side)
   const { data: level, error } = useStorageLevel(currentDir);
-  const folders = useMemo(() => level?.folders ?? [], [level]);
-  const files = useMemo(() => level?.files ?? [], [level]);
+
+  // Derived here, so every consumer below (virtualizers, summaries, menus)
+  // sees the same filtered level the toolbar describes.
+  const folders = useMemo(() => {
+    const list = level?.folders ?? [];
+    if (!search) return list;
+    const query = search.toLowerCase();
+    return list.filter((folder) => folder.name.toLowerCase().includes(query));
+  }, [level, search]);
+
+  const files = useMemo(() => {
+    let list = level?.files ?? [];
+    if (search) {
+      const query = search.toLowerCase();
+      list = list.filter((file) => file.name.toLowerCase().includes(query));
+    }
+    if (filterType !== "all") {
+      list = list.filter((file) => file.type === filterType);
+    }
+
+    return [...list].sort((a, b) => {
+      switch (sortBy) {
+        case "type":
+          return a.type.localeCompare(b.type) || a.name.localeCompare(b.name);
+        case "size":
+          return (a.size ?? 0) - (b.size ?? 0) || a.name.localeCompare(b.name);
+        case "date":
+          return (
+            new Date(a.mtime ?? 0).getTime() - new Date(b.mtime ?? 0).getTime() ||
+            a.name.localeCompare(b.name)
+          );
+        default:
+          return a.name.localeCompare(b.name);
+      }
+    });
+  }, [level, search, filterType, sortBy]);
 
   const effectiveColumns = sidebarOpen ? Math.max(2, columns - 1) : columns;
 
@@ -621,7 +672,12 @@ function MediaGridBody({
 
   // Full-page empty state only at the root; inside a folder the "New folder"
   // tile below keeps the layout
-  if (currentDir === "" && folders.length === 0 && files.length === 0) {
+  if (
+    currentDir === "" &&
+    !filtering &&
+    folders.length === 0 &&
+    files.length === 0
+  ) {
     return (
       <div className="flex min-h-[calc(100vh-8rem)] items-center justify-center">
         <Empty>
@@ -1077,6 +1133,12 @@ function MediaGridBody({
         <Download className="h-4 w-4" />
         Download selection
       </ContextMenuItem>
+      {Array.from(selection.values()).some((entry) => entry.kind === "file") && (
+        <ContextMenuItem onClick={() => setBatchRenameOpen(true)}>
+          <Pencil className="h-4 w-4" />
+          Batch rename
+        </ContextMenuItem>
+      )}
       <ContextMenuSub>
         <ContextMenuSubTrigger>
           <Move className="h-4 w-4" />
@@ -1264,6 +1326,55 @@ function MediaGridBody({
         }}
       />
 
+      <div className="mb-3 flex flex-wrap items-center gap-2 border-b pb-3">
+        <div className="relative w-48">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ds-faint" />
+          <Input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search…"
+            className="pl-8"
+          />
+        </div>
+        <div className="flex items-center gap-0.5">
+          {(["all", "image", "video"] as const).map((type) => (
+            <Button
+              key={type}
+              size="sm"
+              variant={filterType === type ? "secondary" : "ghost"}
+              className="h-7 px-2 text-xs capitalize"
+              onClick={() => setFilterType(type)}
+            >
+              {type}
+            </Button>
+          ))}
+        </div>
+        <span className="text-xs text-ds-faint tabular-nums">
+          {folders.length + files.length} item
+          {folders.length + files.length === 1 ? "" : "s"}
+          {filtering && level && ` of ${level.folders.length + level.files.length}`}
+        </span>
+        <select
+          aria-label="Sort by"
+          value={sortBy}
+          onChange={(event) =>
+            setSortBy(event.target.value as typeof sortBy)
+          }
+          className="ml-auto h-7 rounded-[8px] border border-ds-border-strong bg-ds-field px-2 text-xs text-ds-text outline-none"
+        >
+          <option value="name">Name</option>
+          <option value="type">Type</option>
+          <option value="size">Size</option>
+          <option value="date">Date</option>
+        </select>
+      </div>
+
+      {filtering && folders.length === 0 && files.length === 0 ? (
+        <p className="py-16 text-center text-sm text-muted-foreground">
+          No items match this search.
+        </p>
+      ) : (
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div className="space-y-4">
@@ -1463,6 +1574,16 @@ function MediaGridBody({
                                 >
                                   <Pencil className="h-4 w-4" />
                                   Rename
+                                </ContextMenuItem>
+                                <ContextMenuItem
+                                  onClick={(e: React.MouseEvent) => {
+                                    e.stopPropagation();
+                                    const path = folder.path;
+                                    setTimeout(() => setShareFolder(path), 0);
+                                  }}
+                                >
+                                  <Share2 className="h-4 w-4" />
+                                  Share folder
                                 </ContextMenuItem>
                                 <ContextMenuItem
                                   onClick={(e: React.MouseEvent) => {
@@ -1721,6 +1842,16 @@ function MediaGridBody({
                             <ContextMenuItem
                               onClick={(e: React.MouseEvent) => {
                                 e.stopPropagation();
+                                const path = folder.path;
+                                setTimeout(() => setShareFolder(path), 0);
+                              }}
+                            >
+                              <Share2 className="h-4 w-4" />
+                              Share folder
+                            </ContextMenuItem>
+                            <ContextMenuItem
+                              onClick={(e: React.MouseEvent) => {
+                                e.stopPropagation();
                                 handleDownloadFolder(folder.path, folder.name);
                               }}
                             >
@@ -1884,6 +2015,12 @@ function MediaGridBody({
                                   >
                                     <Copy className="h-4 w-4" />
                                     Make a copy
+                                  </ContextMenuItem>
+                                  <ContextMenuItem
+                                    onClick={() => setReplaceTarget(media)}
+                                  >
+                                    <Replace className="h-4 w-4" />
+                                    Replace file
                                   </ContextMenuItem>
                                   <ContextMenuSub>
                                     <ContextMenuSubTrigger>
@@ -2151,6 +2288,12 @@ function MediaGridBody({
                               <Copy className="h-4 w-4" />
                               Make a copy
                             </ContextMenuItem>
+                            <ContextMenuItem
+                              onClick={() => setReplaceTarget(media)}
+                            >
+                              <Replace className="h-4 w-4" />
+                              Replace file
+                            </ContextMenuItem>
                             <ContextMenuSub>
                               <ContextMenuSubTrigger>
                                 <Move className="h-4 w-4" />
@@ -2222,6 +2365,28 @@ function MediaGridBody({
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
+      )}
+
+      <BatchRenameDialog
+        isOpen={batchRenameOpen}
+        items={Array.from(selection.values())
+          .filter((entry) => entry.kind === "file")
+          .map((entry) => ({ name: entry.name, path: entry.path }))}
+        onClose={() => {
+          setBatchRenameOpen(false);
+          clearSelection();
+        }}
+      />
+      <ShareFolderDialog
+        isOpen={shareFolder !== null}
+        folderPath={shareFolder}
+        onClose={() => setShareFolder(null)}
+      />
+      <ReplaceFileDialog
+        isOpen={replaceTarget !== null}
+        item={replaceTarget}
+        onClose={() => setReplaceTarget(null)}
+      />
     </>
   );
 }

@@ -2,7 +2,7 @@ import { mkdtemp } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { randomUUID } from "crypto";
-import type { VideoTransformParams } from "../../types";
+import type { TransformDefaults, VideoTransformParams } from "../../types";
 import {
   determineOutputFormat,
   IMAGE_FORMATS,
@@ -13,6 +13,7 @@ import { applyTrimming } from "./trim";
 import { applyAutoDownscale } from "./auto-downscale";
 import { applyResize } from "./resize";
 import { applyQuality } from "./quality";
+import { applyVolume } from "./volume";
 import { VideoCommandBuilder, type EncodeProgress } from "./command-builder";
 import type { VideoContext } from "./types";
 import { applyOverlay } from "./overlay";
@@ -82,7 +83,12 @@ async function convertWithSharp(
 export const transformVideo = async (
   inputPath: string,
   params: VideoTransformParams,
-  run: { storage: CloudStorage | null; paths: EnginePaths; settings: VideoSettings },
+  run: {
+    storage: CloudStorage | null;
+    paths: EnginePaths;
+    settings: VideoSettings;
+    defaults?: TransformDefaults;
+  },
   onProgress?: (progress: EncodeProgress) => void,
 ): Promise<Buffer> => {
   // Create temporary directory for output
@@ -109,6 +115,18 @@ export const transformVideo = async (
   // Generate output path using the ffmpeg-friendly format
   const outputPath = join(tmpDir, `${randomUUID()}.${ffmpegFormat}`);
 
+  // Probe duration so thumbnail extraction can clamp a seek past the end
+  // (seeking past the last frame yields zero frames and an empty buffer).
+  let duration: number | undefined;
+  if (isThumbnail) {
+    try {
+      const { getVideoInfo } = await import("./video-info");
+      duration = (await getVideoInfo(inputPath)).duration;
+    } catch {
+      // Non-fatal: fall back to seeking the requested time.
+    }
+  }
+
   // Build context object
   const context: VideoContext = {
     inputPath,
@@ -121,6 +139,8 @@ export const transformVideo = async (
     params: { ...params },
     isImageOutput,
     isThumbnail,
+    duration,
+    defaults: run.defaults,
   };
 
   let overlay: StagedSource | undefined;
@@ -143,6 +163,8 @@ export const transformVideo = async (
         applyResize,
         applyOverlay,
         applyQuality,
+        // After quality: its audioCodec("copy") would drop the filter.
+        applyVolume,
       )
     ).execute(onProgress);
 

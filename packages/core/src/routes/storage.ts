@@ -33,8 +33,53 @@ import {
 type StorageClient = NonNullable<RouteDeps["storage"]>;
 
 export function createStorageRoute(deps: RouteDeps) {
-  const { storage: storageClient, queue, paths } = deps;
+  const { storage: storageClient, queue, paths, access } = deps;
   const storageRoute = new Hono();
+
+  /** Paths the caller may see; null means unrestricted. */
+  const visibleFor = (c: Context): string[] | null =>
+    access ? access.visiblePaths(c) : null;
+
+  /**
+   * A path is visible inside a grant, or as an ancestor of one (so a shared
+   * subfolder stays reachable). Files only qualify inside a grant.
+   */
+  const isInsideGrant = (allowed: string[] | null, path: string): boolean => {
+    if (allowed === null) return true;
+    return allowed.some(
+      (grant) => path === grant || path.startsWith(`${grant}/`),
+    );
+  };
+
+  const isVisible = (allowed: string[] | null, path: string): boolean => {
+    if (isInsideGrant(allowed, path)) return true;
+    return (allowed ?? []).some((grant) => grant.startsWith(`${path}/`));
+  };
+
+  /** Rejects a listing or write below a path the caller cannot reach. */
+  const forbidRead = (c: Context, path: string) => {
+    if (isVisible(visibleFor(c), path)) return null;
+    return c.json(
+      { error: "Forbidden", message: "Insufficient permissions" },
+      403,
+    );
+  };
+
+  /** Writes need a grant on the target folder itself or a parent. */
+  const forbidWriteFolder = (c: Context, folder: string) => {
+    if (!access || access.canWrite(c, folder)) return null;
+    return c.json(
+      { error: "Forbidden", message: "Insufficient permissions" },
+      403,
+    );
+  };
+
+  const forbidWrite = (c: Context, path: string) =>
+    forbidWriteFolder(
+      c,
+      path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "",
+    );
+
   /**
    * Full recursive listing of media objects (keys relative, prefix stripped),
    * shared between /stats and /folders through a short-lived TTL cache
@@ -178,18 +223,34 @@ export function createStorageRoute(deps: RouteDeps) {
       return c.json({ error: "Bad request", message: "Invalid path" }, 400);
     }
 
+    const denied = forbidRead(c, levelPath);
+    if (denied) return denied;
+
     try {
+      const allowed = visibleFor(c);
+      const keepFolders = <T extends { path: string }>(entries: T[]) =>
+        entries.filter((entry) => isVisible(allowed, entry.path));
+      const keepFiles = <T extends { path: string }>(entries: T[]) =>
+        entries.filter((entry) => isInsideGrant(allowed, entry.path));
+
       if (!storageClient) {
-        return c.json({ path: levelPath, ...listLocalLevel(levelPath) });
+        const level = listLocalLevel(levelPath);
+        return c.json({
+          path: levelPath,
+          folders: keepFolders(level.folders),
+          files: keepFiles(level.files),
+        });
       }
 
       const { folderNames, files } = await storageClient.listLevel(levelPath);
-      const folders: LevelFolder[] = folderNames.map((name) => ({
-        name,
-        path: levelPath ? `${levelPath}/${name}` : name,
-      }));
+      const folders: LevelFolder[] = keepFolders(
+        folderNames.map((name) => ({
+          name,
+          path: levelPath ? `${levelPath}/${name}` : name,
+        })),
+      );
 
-      return c.json({ path: levelPath, folders, files });
+      return c.json({ path: levelPath, folders, files: keepFiles(files) });
     } catch (error) {
       logger.error(
         { error: serializeError(error), levelPath },
@@ -235,13 +296,15 @@ export function createStorageRoute(deps: RouteDeps) {
       );
     }
 
+    const allowed = visibleFor(c);
     const folderPaths: string[] = [];
     for (const p of requested) {
       const normalized = normalizeLevelPath(p);
       if (normalized === null) {
         return c.json({ error: "Bad request", message: "Invalid path" }, 400);
       }
-      folderPaths.push(normalized);
+      // Summaries expose file names and previews: only folders inside a grant.
+      if (isInsideGrant(allowed, normalized)) folderPaths.push(normalized);
     }
 
     try {
@@ -367,11 +430,19 @@ export function createStorageRoute(deps: RouteDeps) {
    * Note: This route must be registered before GET "/*"
    */
   storageRoute.get("/folders", async (c) => {
+    const allowed = visibleFor(c);
+    const keep = (folders: string[]) =>
+      allowed === null
+        ? folders.sort((a, b) => a.localeCompare(b))
+        : folders
+            .filter((folder) => isVisible(allowed, folder))
+            .sort((a, b) => a.localeCompare(b));
+
     try {
       if (storageClient) {
         const publicObjects = await getPublicObjects(storageClient);
         return c.json({
-          folders: deriveFolderPaths(publicObjects.map((obj) => obj.key)),
+          folders: keep(deriveFolderPaths(publicObjects.map((obj) => obj.key))),
         });
       }
 
@@ -391,7 +462,7 @@ export function createStorageRoute(deps: RouteDeps) {
       };
       walk(paths.public, "");
 
-      return c.json({ folders: folders.sort((a, b) => a.localeCompare(b)) });
+      return c.json({ folders: keep(folders) });
     } catch (error) {
       logger.error(
         { error: serializeError(error) },
@@ -459,6 +530,9 @@ export function createStorageRoute(deps: RouteDeps) {
         400,
       );
     }
+
+    const denied = forbidRead(c, filePath);
+    if (denied) return denied;
 
     try {
       if (storageClient) {
@@ -540,6 +614,9 @@ export function createStorageRoute(deps: RouteDeps) {
         400,
       );
     }
+
+    const denied = forbidWrite(c, filePath);
+    if (denied) return denied;
 
     try {
       const result = await deleteAssetCompletely(
@@ -639,6 +716,9 @@ export function createStorageRoute(deps: RouteDeps) {
         400,
       );
     }
+
+    const denied = forbidWrite(c, filePath);
+    if (denied) return denied;
 
     let body: { name?: unknown } = {};
     try {
@@ -742,6 +822,9 @@ export function createStorageRoute(deps: RouteDeps) {
       );
     }
 
+    const denied = forbidWrite(c, filePath);
+    if (denied) return denied;
+
     try {
       const isFile = await pathExists(filePath);
       const isFolder = !isFile && isMove && (await isDirectoryPath(filePath));
@@ -777,6 +860,9 @@ export function createStorageRoute(deps: RouteDeps) {
           );
         }
       }
+
+      const targetDenied = forbidWriteFolder(c, targetDir);
+      if (targetDenied) return targetDenied;
 
       if (isFolder) {
         const newPath = targetDir ? `${targetDir}/${baseName}` : baseName;

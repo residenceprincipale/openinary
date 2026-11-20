@@ -390,19 +390,6 @@ export class S3ClientWrapper {
   }
 
   /**
-   * Copies an object within the bucket
-   */
-  async copyObject(sourceKey: string, targetKey: string): Promise<void> {
-    await this.s3Client.send(
-      new CopyObjectCommand({
-        Bucket: this.config.bucketName,
-        CopySource: `/${this.config.bucketName}/${sourceKey}`,
-        Key: targetKey,
-      }),
-    );
-  }
-
-  /**
    * Gets the bucket name
    */
   get bucketName(): string {

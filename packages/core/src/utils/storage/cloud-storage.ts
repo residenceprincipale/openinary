@@ -544,6 +544,27 @@ export class CloudStorage implements StatsBackend {
     return { storage, cache };
   }
 
+  /** Lists the cached derivatives stored under cache/. */
+  async listAllCachedTransformations(): Promise<
+    { key: string; size: number; lastModified: Date }[]
+  > {
+    const objects = await this.s3Client.listObjects("cache/");
+    return objects.map((obj) => ({
+      key: obj.key,
+      size: obj.size ?? 0,
+      lastModified: obj.lastModified ?? new Date(0),
+    }));
+  }
+
+  /** Deletes one cached derivative by its storage key. */
+  async deleteCachedTransformation(key: string): Promise<void> {
+    const cached = await this.s3Client.getObjectMetadata(key);
+    await this.s3Client.deleteObject(key);
+    if (cached) {
+      adjustBucketStats(this, "cache", { size: -cached.size, fileCount: -1 });
+    }
+  }
+
   /**
    * Deletes all cached transformations from cloud storage and clears the in-memory cache
    */

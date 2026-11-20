@@ -83,7 +83,8 @@ export function migrate(db: Db): void {
         createdAt INTEGER NOT NULL,
         updatedAt INTEGER NOT NULL,
         image TEXT,
-        twoFactorEnabled INTEGER DEFAULT 0
+        twoFactorEnabled INTEGER DEFAULT 0,
+        role TEXT NOT NULL DEFAULT 'user'
       );
       CREATE TABLE IF NOT EXISTS session (
         id TEXT PRIMARY KEY,
@@ -122,14 +123,19 @@ export function migrate(db: Db): void {
       );
       CREATE TABLE IF NOT EXISTS apiKey (${API_KEY_COLUMNS});
 
-      -- One account per instance, enforced where two concurrent sign-ups
-      -- cannot both slip past an application-level check.
-      CREATE TRIGGER IF NOT EXISTS prevent_multiple_users
-      BEFORE INSERT ON user
-      WHEN (SELECT COUNT(*) FROM user) >= 1
-      BEGIN
-        SELECT RAISE(ABORT, 'Only one user account is allowed in this deployment');
-      END;
+      -- Multi-user: accounts are managed by admins, so no single-user trigger.
+
+      CREATE TABLE IF NOT EXISTS folder_permissions (
+        id TEXT PRIMARY KEY,
+        folder_path TEXT NOT NULL,
+        user_id TEXT NOT NULL,
+        permission TEXT NOT NULL DEFAULT 'edit' CHECK(permission IN ('view', 'edit', 'admin')),
+        created_by TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        UNIQUE(folder_path, user_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_folder_permissions_user ON folder_permissions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_folder_permissions_path ON folder_permissions(folder_path);
 
       CREATE TABLE IF NOT EXISTS video_jobs (
         id TEXT PRIMARY KEY,
@@ -168,6 +174,19 @@ export function migrate(db: Db): void {
         PRIMARY KEY (hour, kind)
       );
     `);
+
+    // Older releases allowed one account, enforced by a trigger. Multi-user
+    // instances need it gone; existing rows gain a role, first user is admin.
+    db.exec("DROP TRIGGER IF EXISTS prevent_multiple_users");
+    const hasRole = db
+      .prepare("SELECT 1 FROM pragma_table_info('user') WHERE name = 'role'")
+      .get();
+    if (!hasRole) {
+      db.exec("ALTER TABLE user ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
+      db.exec(
+        "UPDATE user SET role = 'admin' WHERE id = (SELECT id FROM user ORDER BY createdAt ASC LIMIT 1)",
+      );
+    }
 
     // @better-auth/api-key 1.5 renamed userId to referenceId.
     const hasReferenceId = db
@@ -214,7 +233,7 @@ export function migrate(db: Db): void {
   }).immediate();
 }
 
-/** True once the instance's one account exists. */
+/** True once at least one account exists (first-run setup is then closed). */
 export function hasAdmin(db: Db = getDb()): boolean {
   return !!db.prepare("SELECT 1 FROM user LIMIT 1").get();
 }

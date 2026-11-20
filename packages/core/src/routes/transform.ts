@@ -5,7 +5,12 @@ import { pathBelowMount, remoteSourceUrl, respond } from "./delivery";
 import logger, { serializeError } from "../utils/logger";
 
 export function createTransformRoute(deps: RouteDeps) {
-  const transformService = new TransformService(deps.storage, deps.queue, deps.paths);
+  const transformService = new TransformService(
+    deps.storage,
+    deps.queue,
+    deps.paths,
+    deps.defaults,
+  );
   const t = new Hono();
 
   t.get("/*", async (c) => {

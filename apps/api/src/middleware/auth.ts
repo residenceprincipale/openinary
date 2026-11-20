@@ -10,6 +10,7 @@ export type AuthVariables = {
       id: string;
       email: string;
       name: string;
+      role: string;
     } | null;
     apiKey: {
       id: string;
@@ -46,8 +47,11 @@ export async function authenticateRequest(
 
       if (result.valid && result.key) {
         const userId = result.key.referenceId;
+        const row = getDb()
+          .prepare("SELECT role FROM user WHERE id = ?")
+          .get(userId) as { role: string } | undefined;
         c.set("apiKey", { id: result.key.id, name: result.key.name, userId });
-        c.set("user", { id: userId, email: "", name: "" });
+        c.set("user", { id: userId, email: "", name: "", role: row?.role ?? "user" });
         auditLog(c, "auth.api_key.success", {
           userId,
           apiKeyId: result.key.id,
@@ -75,14 +79,15 @@ export async function authenticateRequest(
       if (sessionResult?.session && sessionResult.user) {
         // Belt and braces against a session outliving its user.
         const userExists = getDb()
-          .prepare("SELECT 1 FROM user WHERE id = ?")
-          .get(sessionResult.user.id);
+          .prepare("SELECT role FROM user WHERE id = ?")
+          .get(sessionResult.user.id) as { role: string } | undefined;
 
         if (userExists) {
           c.set("user", {
             id: sessionResult.user.id,
             email: sessionResult.user.email,
             name: sessionResult.user.name,
+            role: userExists.role,
           });
           c.set("apiKey", null);
           auditLog(c, "auth.session.success", {

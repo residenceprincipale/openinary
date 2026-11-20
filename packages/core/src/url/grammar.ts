@@ -98,6 +98,8 @@ const TRANSFORM_VALUE_PATTERNS: Readonly<
   bg: { test: (value: string) => parseBackgroundValue(value) !== undefined },
   so: /^\d+(?:\.\d+)?$/,
   eo: /^\d+(?:\.\d+)?$/,
+  // Audio volume percentage; 0 mutes the track.
+  v: /^(100|[1-9]?\d)$/,
   t: /^(true|1|\d+)$/,
   tt: /^\d+(?:\.\d+)?$/,
   r: /^max$|^\d+(?::\d+){0,3}$/,
@@ -155,6 +157,7 @@ type TransformKey =
   | "bg"
   | "so"
   | "eo"
+  | "v" // audio volume
   | "t" // thumbnail
   | "tt" // thumbnail time
   | "r" // round corners
@@ -242,6 +245,9 @@ const parseTransform = (segment: string): CombindedTransformParams => {
         break;
       case "eo":
         params.endOffset = parseInt(value);
+        break;
+      case "v":
+        params.volume = parseInt(value);
         break;
       case "t":
         params.thumbnail = !!value;

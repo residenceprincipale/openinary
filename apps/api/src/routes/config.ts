@@ -1,58 +1,22 @@
 import { Hono } from "hono";
-import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from "fs";
+import { existsSync, readdirSync, statSync } from "fs";
 import { join } from "path";
-import { apiKeyAuth } from "../middleware/auth";
-import { createStorageClient } from "../utils/storage/factory";
-import logger, { serializeError } from "../utils/logger";
+import { getBucketStats, logger, serializeError } from "@openinary/core";
+import { apiKeyAuth, type AuthVariables } from "../middleware/auth";
+import { getSharedStorage } from "../config/storage";
+import { enginePaths } from "../config/queue";
+import { readConfig, writeConfig } from "../utils/transform-defaults";
 
-const CONFIG_PATH = join(process.cwd(), "data", "transforms.json");
-
-const defaults = {
-  image: {
-    quality: 80, format: "auto", crop: "fill", gravity: "center",
-    background: null, radius: null, aspect: null, rotate: null, width: null, height: null,
-  },
-  video: {
-    quality: 60, format: "mp4", autoDownscale: true, autoDownscaleResolution: 720,
-    volume: null, crop: null, gravity: null, resize: null,
-    width: null, height: null, startOffset: null, endOffset: null,
-  },
-  audio: { quality: 192, format: "mp3", sampleRate: "44100", channels: "stereo" },
-  branding: { title: "Openinary", logoUrl: "" },
-};
-
-function readConfig(): typeof defaults {
-  try {
-    if (existsSync(CONFIG_PATH)) {
-      const saved = JSON.parse(readFileSync(CONFIG_PATH, "utf-8"));
-      return {
-        image: { ...defaults.image, ...(saved.image || {}) },
-        video: { ...defaults.video, ...(saved.video || {}) },
-        audio: { ...defaults.audio, ...(saved.audio || {}) },
-        branding: { ...defaults.branding, ...(saved.branding || {}) },
-      };
-    }
-  } catch {
-    logger.warn("Failed to read config, using defaults");
-  }
-  return defaults;
-}
-
-const config = new Hono();
-
+const config = new Hono<AuthVariables>();
 config.use("/*", apiKeyAuth);
 
-config.get("/transforms", (c) => {
-  return c.json({ success: true, data: readConfig() });
-});
-
-function getLocalStorageUsed(): number {
-  const dir = "./public";
+/** Bytes held by the originals when no bucket is configured. */
+function localStorageUsed(dir: string): number {
   if (!existsSync(dir)) return 0;
   let total = 0;
-  const walk = (p: string) => {
-    for (const entry of readdirSync(p, { withFileTypes: true })) {
-      const full = join(p, entry.name);
+  const walk = (path: string) => {
+    for (const entry of readdirSync(path, { withFileTypes: true })) {
+      const full = join(path, entry.name);
       if (entry.isDirectory()) walk(full);
       else if (entry.isFile()) total += statSync(full).size;
     }
@@ -61,20 +25,7 @@ function getLocalStorageUsed(): number {
   return total;
 }
 
-config.get("/server", async (c) => {
-  const storageLimitMB = parseInt(process.env.STORAGE_LIMIT_MB ?? "0", 10) || 0;
-  const storage = createStorageClient();
-  const usedBytes = storage ? await storage.getTotalSize() : getLocalStorageUsed();
-
-  return c.json({
-    success: true,
-    data: {
-      maxFileSizeMB: parseInt(process.env.MAX_FILE_SIZE_MB ?? "50", 10) || 50,
-      storageLimitMB,
-      storageUsedMB: Math.round(usedBytes / (1024 * 1024) * 100) / 100,
-    },
-  });
-});
+config.get("/transforms", (c) => c.json({ success: true, data: readConfig() }));
 
 config.put("/transforms", async (c) => {
   try {
@@ -86,15 +37,29 @@ config.put("/transforms", async (c) => {
       audio: { ...current.audio, ...body.audio },
       branding: { ...current.branding, ...body.branding },
     };
-    const dir = join(process.cwd(), "data");
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(CONFIG_PATH, JSON.stringify(merged, null, 2));
+    writeConfig(merged);
     logger.info({ config: merged }, "Transform defaults updated");
     return c.json({ success: true, data: merged });
   } catch (error) {
     logger.error({ error: serializeError(error) }, "Failed to update config");
     return c.json({ success: false, error: "Failed to save config" }, 500);
   }
+});
+
+config.get("/server", async (c) => {
+  const storage = getSharedStorage();
+  const usedBytes = storage
+    ? (await getBucketStats(storage)).storage.size
+    : localStorageUsed(enginePaths.public);
+
+  return c.json({
+    success: true,
+    data: {
+      maxFileSizeMB: parseInt(process.env.MAX_FILE_SIZE_MB ?? "50", 10) || 50,
+      storageLimitMB: parseInt(process.env.STORAGE_LIMIT_MB ?? "0", 10) || 0,
+      storageUsedMB: Math.round((usedBytes / (1024 * 1024)) * 100) / 100,
+    },
+  });
 });
 
 export default config;

@@ -1,126 +1,109 @@
-import { Hono } from "hono"
-import { promises as fs } from "fs"
-import { join } from "path"
-import { existsSync } from "fs"
-import { apiKeyAuth, AuthVariables } from "../middleware/auth"
-import { SmartCache } from "../utils/cache"
-import { createStorageClient } from "../utils/storage"
-import { safePath } from "../utils/path-security"
-import logger from "../utils/logger"
+import { Hono } from "hono";
+import { promises as fs } from "fs";
+import { basename, join } from "path";
+import {
+  clearAllCache,
+  getCacheSize,
+  listCachedFiles,
+  logger,
+  serializeError,
+} from "@openinary/core";
+import { apiKeyAuth, type AuthVariables } from "../middleware/auth";
+import { getSharedStorage } from "../config/storage";
+import { enginePaths } from "../config/queue";
 
-const CACHE_DIR = "./cache"
-
-const cacheRoute = new Hono<AuthVariables>()
-cacheRoute.use("/*", apiKeyAuth)
+const cacheRoute = new Hono<AuthVariables>();
+cacheRoute.use("/*", apiKeyAuth);
 
 cacheRoute.get("/stats", async (c) => {
-  let totalFiles = 0, totalSize = 0
-  const files: { name: string; size: number; lastModified: number }[] = []
+  const localFiles = await listCachedFiles(enginePaths.cache);
+  const local = await getCacheSize(enginePaths.cache);
 
-  if (existsSync(CACHE_DIR)) {
-    const names = await fs.readdir(CACHE_DIR)
-    for (const name of names) {
-      const s = await fs.stat(join(CACHE_DIR, name))
-      files.push({ name, size: s.size, lastModified: s.mtimeMs })
-    }
-    files.sort((a, b) => b.lastModified - a.lastModified)
-    totalFiles = files.length
-    totalSize = files.reduce((sum, f) => sum + f.size, 0)
-  }
-
-  const storage = createStorageClient()
-  let cloudFiles: { key: string; size: number; lastModified: Date }[] = []
-
-  if (storage) {
-    // ponytail: lists all cache/ objects each time; add pagination if >1000 objects
-    cloudFiles = await storage.listAllCachedTransformations()
-  }
+  const storage = getSharedStorage();
+  const cloudFiles = storage ? await storage.listAllCachedTransformations() : null;
 
   return c.json({
     success: true,
     data: {
-      local: { totalFiles, totalSize, maxSize: SmartCache["stats"].maxCacheSize, files },
-      cloud: storage ? { enabled: true, totalFiles: cloudFiles.length, totalSize: cloudFiles.reduce((s, f) => s + f.size, 0), files: cloudFiles } : { enabled: false },
+      local: {
+        totalFiles: local.fileCount,
+        totalSize: local.size,
+        files: localFiles,
+      },
+      cloud: cloudFiles
+        ? {
+            enabled: true,
+            totalFiles: cloudFiles.length,
+            totalSize: cloudFiles.reduce((sum, f) => sum + f.size, 0),
+            files: cloudFiles,
+          }
+        : { enabled: false, totalFiles: 0, totalSize: 0, files: [] },
     },
-  })
-})
+  });
+});
 
 cacheRoute.delete("/", async (c) => {
-  let localDeleted = 0
-
-  if (existsSync(CACHE_DIR)) {
-    const names = await fs.readdir(CACHE_DIR)
-    for (const name of names) {
-      try {
-        await fs.unlink(join(CACHE_DIR, name))
-        localDeleted++
-      } catch (err) {
-        logger.warn({ error: (err as Error).message, file: name }, "Failed to delete cache file")
-      }
-    }
-  }
-
-  SmartCache["stats"].requests.clear()
-  SmartCache["stats"].totalCacheSize = 0
-
-  const storage = createStorageClient()
-  let cloudDeleted = 0
-  if (storage) {
-    cloudDeleted = await storage.clearAllCachedTransformations()
-  }
-
-  return c.json({ success: true, data: { localDeleted, cloudDeleted } })
-})
+  const storage = getSharedStorage();
+  const [localDeleted, cloudDeleted] = await Promise.all([
+    clearAllCache(enginePaths.cache),
+    storage ? storage.clearAllCache() : Promise.resolve(0),
+  ]);
+  return c.json({ success: true, data: { localDeleted, cloudDeleted } });
+});
 
 cacheRoute.delete("/cloud/*", async (c) => {
-  const key = c.req.param("*")
-  if (!key) return c.json({ success: false, error: "Key required" }, 400)
-  const storage = createStorageClient()
-  if (!storage) return c.json({ success: false, error: "Cloud storage not configured" }, 400)
-  try {
-    await storage.deleteCachedTransformation(key)
-    return c.json({ success: true, data: { deleted: key } })
-  } catch (err) {
-    return c.json({ success: false, error: (err as Error).message }, 500)
-  }
-})
+  const key = c.req.param("*");
+  if (!key) return c.json({ success: false, error: "Key required" }, 400);
 
-cacheRoute.delete("/:name", async (c) => {
-  const name = c.req.param("name")
-  if (!name) return c.json({ success: false, error: "File name required" }, 400)
-  const filePath = safePath(CACHE_DIR, name)
-  if (!existsSync(filePath)) return c.json({ success: false, error: "File not found" }, 404)
-  try {
-    await fs.unlink(filePath)
-    return c.json({ success: true, data: { deleted: name } })
-  } catch (err) {
-    return c.json({ success: false, error: (err as Error).message }, 500)
+  const storage = getSharedStorage();
+  if (!storage) {
+    return c.json({ success: false, error: "Cloud storage not configured" }, 400);
   }
-})
+  try {
+    await storage.deleteCachedTransformation(key);
+    return c.json({ success: true, data: { deleted: key } });
+  } catch (error) {
+    logger.error({ error: serializeError(error), key }, "Failed to delete cloud cache entry");
+    return c.json(
+      { success: false, error: error instanceof Error ? error.message : "Unknown error" },
+      500,
+    );
+  }
+});
 
 cacheRoute.delete("/old", async (c) => {
-  const age = parseInt(c.req.query("age") || String(7 * 24 * 60 * 60 * 1000))
-  const cutoff = Date.now() - age
+  const age = parseInt(c.req.query("age") || String(7 * 24 * 60 * 60 * 1000), 10);
+  const cutoff = Date.now() - age;
 
-  if (!existsSync(CACHE_DIR)) {
-    return c.json({ success: true, data: { deletedCount: 0 } })
-  }
-
-  const names = await fs.readdir(CACHE_DIR)
-  let deletedCount = 0
-  for (const name of names) {
+  const files = await listCachedFiles(enginePaths.cache);
+  let deletedCount = 0;
+  for (const file of files) {
+    if (file.lastModified.getTime() >= cutoff) continue;
     try {
-      const s = await fs.stat(join(CACHE_DIR, name))
-      if (s.mtimeMs < cutoff) {
-        await fs.unlink(join(CACHE_DIR, name))
-        deletedCount++
-      }
-    } catch (err) {
-      logger.warn({ error: (err as Error).message, file: name }, "Failed to delete old cache file")
+      await fs.unlink(join(enginePaths.cache, file.name));
+      deletedCount++;
+    } catch (error) {
+      logger.warn({ error: serializeError(error), file: file.name }, "Failed to delete old cache file");
     }
   }
 
-  return c.json({ success: true, data: { deletedCount, cutoffAge: age } })
-})
+  return c.json({ success: true, data: { deletedCount, cutoffAge: age } });
+});
 
-export default cacheRoute
+cacheRoute.delete("/:name", async (c) => {
+  const name = basename(c.req.param("name"));
+  if (!name) return c.json({ success: false, error: "File name required" }, 400);
+
+  try {
+    await fs.unlink(join(enginePaths.cache, name));
+    return c.json({ success: true, data: { deleted: name } });
+  } catch (error) {
+    const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
+    return c.json(
+      { success: false, error: missing ? "File not found" : "Failed to delete file" },
+      missing ? 404 : 500,
+    );
+  }
+});
+
+export default cacheRoute;

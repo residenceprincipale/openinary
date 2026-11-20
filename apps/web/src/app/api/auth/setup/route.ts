@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { hasAdmin } from "shared";
+import { getDb, hasAdmin } from "shared";
 import { getAuth } from "shared/auth";
 import logger from "@/lib/logger";
 
@@ -63,6 +63,17 @@ export async function POST(request: Request) {
     const authResponse = await getAuth().api.signUpEmail({
       body: { email, password, name },
     });
+
+    // The first account runs the instance; later ones are created by an
+    // admin from the Users page and default to 'user'.
+    const count = getDb().prepare("SELECT COUNT(*) AS count FROM user").get() as {
+      count: number;
+    };
+    if (count.count === 1) {
+      getDb()
+        .prepare("UPDATE user SET role = 'admin' WHERE id = ?")
+        .run(authResponse.user.id);
+    }
 
     logger.info("[Setup] Admin account created successfully", { email });
     return NextResponse.json(authResponse, { status: 201 });

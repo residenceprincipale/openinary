@@ -7,7 +7,12 @@ import { transformVideo } from "../utils/video/index";
 import type { Compression } from "../utils/image/compression";
 import logger, { serializeError } from "../utils/logger";
 import { existsInCache, saveToCache, readFromCache, SmartCache } from "../utils/cache";
-import type { CombindedTransformParams, ImageTransformParams, VideoTransformParams } from "../types";
+import type {
+  CombindedTransformParams,
+  ImageTransformParams,
+  TransformDefaults,
+  VideoTransformParams,
+} from "../types";
 import { contentTypeForFormat, determineOutputFormat } from "../url/media-types";
 import type { EnginePaths } from "../config/paths";
 import type { VideoSettings } from "../utils/video/config";
@@ -141,7 +146,12 @@ const MAX_VIDEO_SIZE = 200 * 1024 * 1024;
 export async function processVideo(
   originalPath: string,
   params: VideoTransformParams,
-  run: { storage: CloudStorage | null; paths: EnginePaths; settings: VideoSettings },
+  run: {
+    storage: CloudStorage | null;
+    paths: EnginePaths;
+    settings: VideoSettings;
+    defaults?: TransformDefaults;
+  },
 ): Promise<{ buffer: Buffer; contentType: string }> {
   const { size } = statSync(originalPath);
   if (size > MAX_VIDEO_SIZE) {

@@ -68,6 +68,16 @@ export function createAuth(db: Db, secret: string) {
 
   return betterAuth({
     database: db,
+    user: {
+      additionalFields: {
+        role: {
+          type: "string",
+          required: false,
+          defaultValue: "user",
+          input: false,
+        },
+      },
+    },
     emailAndPassword: { enabled: true },
     secret,
     baseURL,

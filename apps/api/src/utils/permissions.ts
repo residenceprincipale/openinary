@@ -1,36 +1,37 @@
-import { db } from "shared";
 import crypto from "crypto";
+import { getDb } from "shared";
 
-function ensureTable(): void {
-  db.exec(`CREATE TABLE IF NOT EXISTS folder_permissions (
-    id TEXT PRIMARY KEY,
-    folder_path TEXT NOT NULL,
-    user_id TEXT NOT NULL,
-    permission TEXT NOT NULL DEFAULT 'edit',
-    created_by TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    UNIQUE(folder_path, user_id)
-  )`);
+export interface FolderPermission {
+  id: string;
+  folder_path: string;
+  user_id: string;
+  permission: string;
+  created_by: string;
+  created_at: number;
+  email?: string;
+  name?: string;
 }
 
+/** True when `userId` has a grant on `path` or on one of its parents. */
 export function hasPermission(path: string, userId: string): boolean {
-  ensureTable();
   const segments = path.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
   const prefixes: string[] = [""];
-  for (const seg of segments) {
-    const prev = prefixes[prefixes.length - 1];
-    prefixes.push(prev ? `${prev}/${seg}` : seg);
+  for (const segment of segments) {
+    const previous = prefixes[prefixes.length - 1];
+    prefixes.push(previous ? `${previous}/${segment}` : segment);
   }
-  const stmt = db.prepare("SELECT 1 FROM folder_permissions WHERE folder_path = ? AND user_id = ? LIMIT 1");
-  return prefixes.some(p => stmt.get(p, userId));
+  const stmt = getDb().prepare(
+    "SELECT 1 FROM folder_permissions WHERE folder_path = ? AND user_id = ? LIMIT 1",
+  );
+  return prefixes.some((prefix) => stmt.get(prefix, userId));
 }
 
 export function getUserAccessiblePaths(userId: string): string[] {
   return (
-    db
+    getDb()
       .prepare("SELECT DISTINCT folder_path FROM folder_permissions WHERE user_id = ?")
       .all(userId) as { folder_path: string }[]
-  ).map((r) => r.folder_path);
+  ).map((row) => row.folder_path);
 }
 
 export function isPathAccessible(
@@ -39,7 +40,7 @@ export function isPathAccessible(
 ): boolean {
   if (accessiblePaths.length === 0) return false;
   return accessiblePaths.some(
-    (p) => filePath === p || filePath.startsWith(p + "/"),
+    (path) => filePath === path || filePath.startsWith(`${path}/`),
   );
 }
 
@@ -47,43 +48,32 @@ export function grantPermission(
   folderPath: string,
   userId: string,
   grantedBy: string,
+  permission: "view" | "edit" | "admin" = "edit",
 ): void {
-  ensureTable();
-  db.prepare(
-    `INSERT INTO folder_permissions (id, folder_path, user_id, permission, created_by, created_at)
-     VALUES (?, ?, ?, 'edit', ?, ?)
-     ON CONFLICT(folder_path, user_id) DO NOTHING`,
-  ).run(
-    crypto.randomUUID(),
-    folderPath,
-    userId,
-    grantedBy,
-    Date.now(),
-  );
+  getDb()
+    .prepare(
+      `INSERT INTO folder_permissions (id, folder_path, user_id, permission, created_by, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(folder_path, user_id) DO UPDATE SET permission = excluded.permission`,
+    )
+    .run(crypto.randomUUID(), folderPath, userId, permission, grantedBy, Date.now());
 }
 
 export function revokePermission(folderPath: string, userId: string): void {
-  db.prepare(
-    "DELETE FROM folder_permissions WHERE folder_path = ? AND user_id = ?",
-  ).run(folderPath, userId);
+  getDb()
+    .prepare("DELETE FROM folder_permissions WHERE folder_path = ? AND user_id = ?")
+    .run(folderPath, userId);
 }
 
-export function listPermissions(
-  folderPath: string,
-): { user_id: string; user_email: string | null; user_name: string | null; created_by: string; created_at: number }[] {
-  return db
+/** Grants on one folder, with the users' names for the share dialog. */
+export function listPermissions(folderPath: string): FolderPermission[] {
+  return getDb()
     .prepare(
-      `SELECT fp.user_id, u.email as user_email, u.name as user_name, fp.created_by, fp.created_at
-       FROM folder_permissions fp
-       LEFT JOIN user u ON u.id = fp.user_id
-       WHERE fp.folder_path = ?
-       ORDER BY fp.created_at`,
+      `SELECT p.*, u.email, u.name
+       FROM folder_permissions p
+       LEFT JOIN user u ON u.id = p.user_id
+       WHERE p.folder_path = ?
+       ORDER BY u.email ASC`,
     )
-    .all(folderPath) as {
-      user_id: string;
-      user_email: string | null;
-      user_name: string | null;
-      created_by: string;
-      created_at: number;
-    }[];
+    .all(folderPath) as FolderPermission[];
 }

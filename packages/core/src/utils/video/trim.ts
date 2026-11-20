@@ -1,20 +1,22 @@
 import type { TransformFunction } from "./types";
 
+/**
+ * Apply temporal trimming transformation
+ * Cuts the video based on startOffset and endOffset parameters
+ */
 export const applyTrimming: TransformFunction = (
   command,
   outputVideoStream,
   context,
 ) => {
+  // Skip trimming for thumbnail extraction
   if (context.isThumbnail) {
     return;
   }
 
-  let { startOffset, endOffset } = context.params;
+  const { startOffset, endOffset } = context.params;
 
-  if (startOffset !== undefined && context.duration !== undefined) {
-    startOffset = Math.max(0, Math.min(startOffset, context.duration - 0.5));
-  }
-
+  // Apply start offset if specified
   if (startOffset !== undefined && startOffset >= 0) {
     command = command.seekInput(startOffset);
   }

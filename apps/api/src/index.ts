@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { compress } from "hono/compress";
 import { cors } from "hono/cors";
 import { allowedOrigins } from "shared";
@@ -17,17 +17,24 @@ import {
   logger,
   serializeError,
   type RouteDeps,
+  type StorageAccess,
 } from "@openinary/core";
 import { createUploadRoute } from "./routes/upload";
 import apiKeys from "./routes/api-keys";
 import activity from "./routes/activity";
 import onboarding from "./routes/onboarding";
 import health from "./routes/health";
+import cache from "./routes/cache";
+import config from "./routes/config";
+import users from "./routes/users";
+import { createStorageExtras } from "./routes/storage-extras";
 import { logDelivery, noteApiUpload } from "./middleware/activity";
-import { apiKeyAuth } from "./middleware/auth";
+import { apiKeyAuth, type AuthVariables } from "./middleware/auth";
 import { publicRateLimit } from "./middleware/rate-limit";
 import { getSharedStorage } from "./config/storage";
 import { enginePaths, videoJobQueue } from "./config/queue";
+import { getTransformDefaults } from "./utils/transform-defaults";
+import { getUserAccessiblePaths, hasPermission } from "./utils/permissions";
 
 // Logged, not fatal: only /authenticated and presigned uploads need the
 // secret, and they answer 500 without it.
@@ -40,12 +47,29 @@ try {
   );
 }
 
+const access: StorageAccess = {
+  visiblePaths(c) {
+    const user = (c as Context<AuthVariables>).get("user");
+    if (!user) return [];
+    return user.role === "admin" ? null : getUserAccessiblePaths(user.id);
+  },
+  canWrite(c, folder) {
+    const user = (c as Context<AuthVariables>).get("user");
+    // No user is a presigned upload: /upload/sign checked the folder.
+    if (!user) return true;
+    return user.role === "admin" || hasPermission(folder, user.id);
+  },
+};
+
 const deps: RouteDeps = {
   storage: getSharedStorage(),
   queue: videoJobQueue,
   paths: enginePaths,
   apiSecret: process.env.API_SECRET,
   allowRemoteSource: process.env.ALLOW_REMOTE_SOURCE === "true",
+  // A getter, so saving the config page applies without a restart.
+  defaults: getTransformDefaults,
+  access,
 };
 
 const transform = createTransformRoute(deps);
@@ -135,6 +159,9 @@ app.route("/upload", upload);
 // /queue/events streams SSE and /t/* serves already-compressed media
 app.use("/storage/*", compress());
 app.use("/storage/*", apiKeyAuth);
+// Sharing and replace-file routes read the users table, so they stay here
+// and are mounted before the core storage route.
+app.route("/storage", createStorageExtras());
 app.route("/storage", storageRoute);
 
 app.use("/download-zip", apiKeyAuth);
@@ -154,6 +181,17 @@ app.route("/activity", activity);
 app.use("/onboarding", apiKeyAuth);
 app.use("/onboarding/*", apiKeyAuth);
 app.route("/onboarding", onboarding);
+
+app.use("/cache", apiKeyAuth);
+app.use("/cache/*", apiKeyAuth);
+app.route("/cache", cache);
+
+app.use("/config", apiKeyAuth);
+app.use("/config/*", apiKeyAuth);
+app.route("/config", config);
+
+// Applies apiKeyAuth itself.
+app.route("/users", users);
 
 // Applies apiKeyAuth itself.
 app.route("/api-keys", apiKeys);

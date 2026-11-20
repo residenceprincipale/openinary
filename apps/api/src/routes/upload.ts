@@ -12,6 +12,7 @@ import {
   validateUploadFileType,
   validateUploadContent,
   allowedUploadExtensions,
+  getBucketStats,
   logger,
   serializeError,
   type RouteDeps,
@@ -23,6 +24,9 @@ import heicConvert from "heic-convert";
 
 const MAX_FILE_SIZE =
   (parseInt(process.env.MAX_FILE_SIZE_MB ?? "50", 10) || 50) * 1024 * 1024;
+// 0 = unlimited
+const STORAGE_LIMIT =
+  (parseInt(process.env.STORAGE_LIMIT_MB ?? "0", 10) || 0) * 1024 * 1024;
 const MAX_PREWARM_TRANSFORMATIONS = 20;
 
 const DEFAULT_PRESIGN_EXPIRES_IN = 5 * 60; // 5 minutes
@@ -137,10 +141,41 @@ function parsePrewarmTransformations(formData: FormData): string[] {
 }
 
 export function createUploadRoute(deps: RouteDeps) {
-  const { storage, apiSecret, paths } = deps;
+  const { storage, apiSecret, paths, access } = deps;
   const videoJobQueue = deps.queue;
-  const transformService = new TransformService(storage, videoJobQueue, paths);
+  const transformService = new TransformService(
+    storage,
+    videoJobQueue,
+    paths,
+    deps.defaults,
+  );
   const upload = new Hono();
+
+  const writeDenied = (c: Context, folder: string) => {
+    if (!access || access.canWrite(c, folder)) return null;
+    return c.json(
+      { success: false, error: "Insufficient permissions for that folder" },
+      403,
+    );
+  };
+
+  function localStorageUsed(): number {
+    if (!fs.existsSync(paths.public)) return 0;
+    let total = 0;
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.isFile()) total += fs.statSync(full).size;
+      }
+    };
+    walk(paths.public);
+    return total;
+  }
+
+  async function storageUsed(): Promise<number> {
+    return storage ? (await getBucketStats(storage)).storage.size : localStorageUsed();
+  }
 
   async function prewarmImageTransformations(
     c: Context,
@@ -313,6 +348,10 @@ export function createUploadRoute(deps: RouteDeps) {
     }
 
     const folder = typeof body.folder === "string" ? body.folder : "";
+
+    const denied = writeDenied(c, folder);
+    if (denied) return denied;
+
     const requestedExpiresIn =
       typeof body.expiresIn === "number" && Number.isFinite(body.expiresIn)
         ? body.expiresIn
@@ -360,6 +399,28 @@ export function createUploadRoute(deps: RouteDeps) {
 
       if (files.length === 0) {
         return c.json({ success: false, error: "No files provided" }, 400);
+      }
+
+      // Presigned uploads carry no user: the signature was minted by a
+      // caller /upload/sign already checked.
+      const denied = writeDenied(c, (uploadFolder || "").replace(/^\/+|\/+$/g, ""));
+      if (denied) return denied;
+
+      if (STORAGE_LIMIT > 0) {
+        const incoming = files.reduce(
+          (sum, file) => sum + (file instanceof File ? file.size : 0),
+          0,
+        );
+        const used = await storageUsed();
+        if (used + incoming > STORAGE_LIMIT) {
+          return c.json(
+            {
+              success: false,
+              error: `Storage limit of ${STORAGE_LIMIT / 1024 / 1024}MB exceeded (${(used / 1024 / 1024).toFixed(2)}MB used, ${(incoming / 1024 / 1024).toFixed(2)}MB requested)`,
+            },
+            413,
+          );
+        }
       }
 
       const successfulUploads: UploadResult[] = [];
@@ -658,6 +719,9 @@ export function createUploadRoute(deps: RouteDeps) {
           400,
         );
       }
+
+      const denied = writeDenied(c, rawSanitizedPath);
+      if (denied) return denied;
 
       if (storage) {
         const alreadyExists = await storage.folderExists(rawSanitizedPath);

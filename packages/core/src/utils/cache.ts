@@ -71,23 +71,35 @@ export async function readFromCache(cachePath: string): Promise<Buffer> {
   return fs.readFile(cachePath);
 }
 
-async function cacheFiles(cacheDir: string): Promise<{ name: string; size: number }[]> {
+async function cacheFiles(
+  cacheDir: string,
+): Promise<{ name: string; size: number; lastModified: Date }[]> {
   let names: string[];
   try {
     names = await fs.readdir(cacheDir);
   } catch {
     return [];
   }
-  const files: { name: string; size: number }[] = [];
+  const files: { name: string; size: number; lastModified: Date }[] = [];
   for (const name of names) {
     try {
       const stats = await fs.stat(join(cacheDir, name));
-      if (stats.isFile()) files.push({ name, size: stats.size });
+      if (stats.isFile()) {
+        files.push({ name, size: stats.size, lastModified: stats.mtime });
+      }
     } catch (error) {
       logger.warn({ error: serializeError(error), file: name }, "Failed to stat cache file");
     }
   }
   return files;
+}
+
+/** Local derivatives, newest first, for the dashboard's cache page. */
+export async function listCachedFiles(
+  cacheDir: string,
+): Promise<{ name: string; size: number; lastModified: Date }[]> {
+  const files = await cacheFiles(cacheDir);
+  return files.sort((a, b) => b.lastModified.getTime() - a.lastModified.getTime());
 }
 
 async function deleteFiles(cacheDir: string, names: string[]): Promise<number> {

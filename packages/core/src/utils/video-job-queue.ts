@@ -13,6 +13,7 @@ import {
   TRANSFORMATION_PRIORITY,
   type VideoSettings,
 } from "./video/config";
+import type { TransformDefaults } from "../types";
 import type { EnginePaths } from "../config/paths";
 import { derivativeCachePath } from "./cache";
 import type { CombindedTransformParams, VideoTransformParams } from "../types";
@@ -82,13 +83,20 @@ export class VideoJobQueue extends EventEmitter {
   constructor(
     readonly store: VideoJobStore,
     private storage: CloudStorage | null,
-    config: { paths: EnginePaths; video?: Partial<VideoSettings> },
+    config: {
+      paths: EnginePaths;
+      video?: Partial<VideoSettings>;
+      defaults?: TransformDefaults | (() => TransformDefaults);
+    },
   ) {
     super();
     this.paths = config.paths;
     const video = detectVideoSettings(config.video);
     this.videoSettings = video.settings;
-    this.worker = new VideoWorker(storage, store, this.paths, video);
+    const defaults = config.defaults;
+    this.worker = new VideoWorker(storage, store, this.paths, video, () =>
+      typeof defaults === "function" ? defaults() : (defaults ?? {}),
+    );
     for (const event of FORWARDED_EVENTS) {
       this.worker.on(event, (job: DBVideoJob, ...rest: unknown[]) =>
         this.emit(event, convertDBJob(job), ...rest),

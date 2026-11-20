@@ -21,10 +21,9 @@ export const applyQuality: TransformFunction = (
 
   const { quality } = context.params;
 
-  // Default quality if not specified: 60 (CRF 31 - faster encoding for 8K)
-  // This prevents ffmpeg from re-encoding without compression
-  // Lower quality = faster encoding, especially important for 8K videos
-  const defaultQuality = 60;
+  // Default quality if not specified: 60 (CRF 31 - faster encoding for 8K),
+  // unless the host app configured another default.
+  const defaultQuality = context.defaults?.video?.quality ?? 60;
   const qualityValue =
     quality !== undefined
       ? typeof quality === "string"

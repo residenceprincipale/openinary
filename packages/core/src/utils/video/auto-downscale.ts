@@ -21,8 +21,13 @@ export const applyAutoDownscale: TransformFunction = (
 
   const { width, height } = context.params;
 
-  // Skip if user has explicitly specified dimensions
-  if (width !== undefined || height !== undefined) {
+  // Skip if user has explicitly specified dimensions, or if the host app
+  // turned the safety downscale off.
+  if (
+    width !== undefined ||
+    height !== undefined ||
+    context.defaults?.video?.autoDownscale === false
+  ) {
     return;
   }
 
