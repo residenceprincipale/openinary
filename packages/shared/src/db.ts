@@ -183,6 +183,14 @@ export function migrate(db: Db): void {
       .get();
     if (!hasRole) {
       db.exec("ALTER TABLE user ADD COLUMN role TEXT NOT NULL DEFAULT 'user'");
+    }
+    // Every instance must keep one admin (auto-created accounts, or a volume
+    // whose role column predates this release). The last-admin guard in the
+    // users route makes this a no-op on healthy multi-user instances.
+    const admins = db
+      .prepare("SELECT COUNT(*) AS count FROM user WHERE role = 'admin'")
+      .get() as { count: number };
+    if (admins.count === 0) {
       db.exec(
         "UPDATE user SET role = 'admin' WHERE id = (SELECT id FROM user ORDER BY createdAt ASC LIMIT 1)",
       );

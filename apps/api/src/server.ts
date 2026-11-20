@@ -62,6 +62,11 @@ async function initializeAuth() {
 
     if (!signUpResult) throw new Error("Creating initial user failed.");
 
+    // The first account runs the instance.
+    getDb()
+      .prepare("UPDATE user SET role = 'admin' WHERE id = ?")
+      .run(signUpResult.user.id);
+
     logger.info("Initial user created successfully!");
 
     if (!generateApiKey && mode === "fullstack")
