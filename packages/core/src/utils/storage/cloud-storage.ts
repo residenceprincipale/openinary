@@ -338,6 +338,32 @@ export class CloudStorage implements StatsBackend {
     return this.s3Client.getPublicUrl(key);
   }
 
+  /** Uploads an encoded derivative from disk without buffering it. */
+  async uploadFromFile(
+    originalPath: string,
+    params: object,
+    filePath: string,
+    contentType: string,
+  ): Promise<string> {
+    const key = this.keyFor(originalPath, params);
+    const metadata = {
+      "x-original-path": encodeURIComponent(originalPath),
+    };
+
+    const size = await this.s3Client.uploadObjectFromFile(
+      key,
+      filePath,
+      contentType,
+      metadata,
+    );
+    adjustBucketStats(this, "cache", { size, fileCount: 1 });
+    this.cache.set(this.derivativeEntry(originalPath, key), {
+      exists: true,
+      timestamp: Date.now(),
+    });
+    return this.s3Client.getPublicUrl(key);
+  }
+
   async download(originalPath: string, params: object): Promise<Buffer> {
     const key = this.keyFor(originalPath, params);
     return await this.s3Client.downloadObject(key);

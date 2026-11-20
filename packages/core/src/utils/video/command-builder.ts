@@ -81,15 +81,17 @@ export class VideoCommandBuilder {
   }
 
   /**
-   * Execute the ffmpeg command and return the output buffer
-   * Handles cleanup of temporary files
-   * Includes a 5-minute timeout to handle large videos (4K, 8K)
+   * Execute the ffmpeg command and return the path of the encoded file.
+   * The caller owns that file and the temp directory: cleanup() only releases
+   * staged overlays. Includes a 5-minute timeout to handle large videos.
    *
    * onProgress is measured against the output's own duration rather than
    * fluent-ffmpeg's `percent`, which divides by the *input* duration and so
    * never gets past a fraction of the way on a trimmed video.
    */
-  async execute(onProgress?: (progress: EncodeProgress) => void): Promise<Buffer> {
+  async executeToFile(
+    onProgress?: (progress: EncodeProgress) => void,
+  ): Promise<string> {
     const TIMEOUT_MS = 300000; // 5 minutes (increased for 8K videos)
 
     if (this.complexFilter.length > 0) {
@@ -112,17 +114,17 @@ export class VideoCommandBuilder {
       this.command.on("start", (cmd) => {
         console.log(cmd);
       });
-      
+
       if (onProgress) {
         let outputSeconds: number | null = null;
         this.command
-          .on('codecData', (data: { duration?: string }) => {
+          .on("codecData", (data: { duration?: string }) => {
             outputSeconds = expectedOutputSeconds(
               parseTimemark(data.duration),
               this.context.params,
             );
           })
-          .on('progress', (progress: { timemark?: string }) => {
+          .on("progress", (progress: { timemark?: string }) => {
             const done = parseTimemark(progress.timemark);
             if (!outputSeconds || done === null) return;
             onProgress({
@@ -136,35 +138,36 @@ export class VideoCommandBuilder {
         .on("end", async () => {
           clearTimeout(timeoutId);
           try {
-            // Read the output file
-            const buffer = await readFile(this.context.outputPath);
-
-            // Cleanup: remove output file and temp directory
-            await unlink(this.context.outputPath);
-            try {
-              await rmdir(this.context.tmpDir);
-            } catch {
-              // Ignore if directory is not empty or already removed
-            }
-
-            resolve(buffer);
+            await this.cleanup();
+            resolve(this.context.outputPath);
           } catch (error) {
             reject(error);
-          } finally {
-            try {
-              this.cleanup();
-            } catch (error) {
-              reject(error);
-            }
           }
         })
         .on("error", (error) => {
           clearTimeout(timeoutId);
-          this.cleanup();
+          void this.cleanup();
+          // A failed or timed-out encode leaves a partial file behind.
+          void unlink(this.context.outputPath).catch(() => {});
           reject(new Error(`Video processing failed: ${error.message}`));
         })
         .run();
     });
+  }
+
+  /** Buffer convenience for thumbnails and tests. */
+  async execute(onProgress?: (progress: EncodeProgress) => void): Promise<Buffer> {
+    const outputPath = await this.executeToFile(onProgress);
+    try {
+      return await readFile(outputPath);
+    } finally {
+      await unlink(outputPath).catch(() => {});
+      try {
+        await rmdir(this.context.tmpDir);
+      } catch {
+        // Ignore if directory is not empty or already removed
+      }
+    }
   }
 
   async cleanup(): Promise<void> {

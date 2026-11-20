@@ -1,9 +1,27 @@
 services:
+  # Named volumes are created root-owned; API and web run as uid 1000.
+  db-init:
+    profiles: ["api", "full"]
+    image: alpine:3.20
+    command:
+      - sh
+      - -c
+      - chown -R 1000:1000 /app/data /app/apps/api/public /app/apps/api/cache && chmod 700 /app/data
+    volumes:
+      - db-data:/app/data
+      - public-files:/app/apps/api/public
+      - cache-data:/app/apps/api/cache
+    networks:
+      - openinary-network
+
   # API Only - Profile: api
   api:
     profiles: ["api"]
     # Use pre-built image by default, or build locally with: docker compose --profile api build
     image: openinary/openinary-api:${IMAGE_TAG:-latest}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
     build:
       context: .
       dockerfile: docker/api.Dockerfile
@@ -79,47 +97,31 @@ services:
           cpus: '${DOCKER_CPU_RESERVATION:-0.5}'
           memory: ${DOCKER_MEMORY_RESERVATION:-1G}
 
-  # Full Stack (API + Web + Nginx) - Profile: full
-  openinary:
+  # Full stack split in three containers: API, web, nginx. No supervisord.
+  api-full:
     profiles: ["full"]
-    # Use pre-built image by default, or build locally with: docker compose --profile full build
-    image: openinary/openinary:${IMAGE_TAG:-latest}
+    image: openinary/openinary-api:${IMAGE_TAG:-latest}
     build:
       context: .
-      dockerfile: docker/full.Dockerfile
-      args:
-        # NEXT_PUBLIC_API_BASE_URL is needed at build time
-        # CORS is handled at runtime in Next.js middleware
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api}
-        # IMAGE_TAG is baked into the image at build time (written to /app/version.txt)
-        IMAGE_TAG: ${IMAGE_TAG:-latest}
-    ports:
-      - "3000:3000"
+      dockerfile: docker/api.Dockerfile
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+    expose:
+      - "3002"
     volumes:
-      # Mount cache folder for persistence
       - cache-data:/app/apps/api/cache
-      # Mount public folder for static files
       - public-files:/app/apps/api/public
-      # Mount shared data folder for auth database persistence
       - db-data:/app/data
-      # Where images built before DB_PATH was set may look for the database.
-      - db-data:/app/web-standalone/data
-    # Only the variables listed under environment reach the container: add a
-    # line here for any other one you set in .env. (No env_file: older Compose
-    # can't parse its optional form and the short form fails without a .env.)
     environment:
       - NODE_ENV=production
       - MODE=fullstack
-      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-/api}
+      - PORT=3002
       - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-}
       - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3000}
-      - BETTER_AUTH_INTERNAL_URL=${BETTER_AUTH_INTERNAL_URL:-http://127.0.0.1:3001}
+      - BETTER_AUTH_INTERNAL_URL=http://web:3001
       - API_SECRET=${API_SECRET:-}
-      # IMAGE_TAG automatically mapped from IMAGE_TAG (single source of truth)
       - IMAGE_TAG=${IMAGE_TAG:-latest}
-      # Video queue configuration
-      # VIDEO_MAX_CONCURRENT is auto-detected based on RAM (1 worker per 2GB)
-      # Override only if you need custom concurrency settings
       - VIDEO_MAX_CONCURRENT=${VIDEO_MAX_CONCURRENT:-}
       - VIDEO_JOB_RETRY_MAX=${VIDEO_JOB_RETRY_MAX:-3}
       - VIDEO_JOB_CLEANUP_HOURS=${VIDEO_JOB_CLEANUP_HOURS:-24}
@@ -136,30 +138,29 @@ services:
       - ALLOW_REMOTE_SOURCE=${ALLOW_REMOTE_SOURCE:-}
       - PUBLIC_RATE_LIMIT_MAX=${PUBLIC_RATE_LIMIT_MAX:-}
       - PUBLIC_RATE_LIMIT_WINDOW_MS=${PUBLIC_RATE_LIMIT_WINDOW_MS:-}
-      # S3-compatible storage (local disk when STORAGE_BUCKET_NAME is empty)
       - STORAGE_BUCKET_NAME=${STORAGE_BUCKET_NAME:-}
       - STORAGE_REGION=${STORAGE_REGION:-}
       - STORAGE_ACCESS_KEY_ID=${STORAGE_ACCESS_KEY_ID:-}
       - STORAGE_SECRET_ACCESS_KEY=${STORAGE_SECRET_ACCESS_KEY:-}
       - STORAGE_ENDPOINT=${STORAGE_ENDPOINT:-}
       - STORAGE_PUBLIC_URL=${STORAGE_PUBLIC_URL:-}
-      # No value on purpose: unset keeps the public/ default, while an empty
-      # STORAGE_PREFIX= in .env means the bucket root.
       - STORAGE_PREFIX
       - STORAGE_MAX_SOCKETS=${STORAGE_MAX_SOCKETS:-}
       - STORAGE_CONNECTION_TIMEOUT=${STORAGE_CONNECTION_TIMEOUT:-}
       - STORAGE_REQUEST_TIMEOUT=${STORAGE_REQUEST_TIMEOUT:-}
       - STORAGE_SOCKET_TIMEOUT=${STORAGE_SOCKET_TIMEOUT:-}
-      # Initial Authentication configuration
       - OPENINARY_ADMIN_NAME=${OPENINARY_ADMIN_NAME}
       - OPENINARY_ADMIN_EMAIL=${OPENINARY_ADMIN_EMAIL}
       - OPENINARY_ADMIN_PASSWORD=${OPENINARY_ADMIN_PASSWORD}
       - OPENINARY_GENERATE_API_KEY=${OPENINARY_GENERATE_API_KEY:-false}
-    networks:
-      - openinary-network
-    # Resource limits to prevent video processing from crashing the server
-    # Dynamic allocation: configure via env vars or use defaults for 4GB+ systems
-    # For 16GB+ systems: DOCKER_MEMORY_LIMIT=12G DOCKER_CPU_LIMIT=4.0
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - node -e "fetch('http://127.0.0.1:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -168,6 +169,55 @@ services:
         reservations:
           cpus: '${DOCKER_CPU_RESERVATION:-0.5}'
           memory: ${DOCKER_MEMORY_RESERVATION:-1G}
+    networks:
+      - openinary-network
+
+  web:
+    profiles: ["full"]
+    image: openinary/openinary-web:${IMAGE_TAG:-latest}
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-/api}
+        IMAGE_TAG: ${IMAGE_TAG:-latest}
+    expose:
+      - "3001"
+    volumes:
+      - db-data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - HOSTNAME=0.0.0.0
+      - DB_PATH=/app/data/auth.db
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-/api}
+      - BETTER_AUTH_SECRET=${BETTER_AUTH_SECRET:-}
+      - BETTER_AUTH_URL=${BETTER_AUTH_URL:-http://localhost:3000}
+      - BETTER_AUTH_INTERNAL_URL=http://web:3001
+      - DISABLE_TRANSFORMS=${DISABLE_TRANSFORMS:-false}
+    depends_on:
+      api-full:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '${WEB_CPU_LIMIT:-1.0}'
+          memory: ${WEB_MEMORY_LIMIT:-1G}
+    networks:
+      - openinary-network
+
+  nginx:
+    profiles: ["full"]
+    image: nginx:1.27-alpine
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./docker/nginx.split.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api-full
+      - web
+    networks:
+      - openinary-network
 
 networks:
   openinary-network:

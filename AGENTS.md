@@ -29,7 +29,7 @@ packages/dashboard/ Shared dashboard shell and pages
 packages/ui/        Shared media browser, details sidebar, settings widgets
 packages/shared/    Auth config, DB, telemetry schema
 packages/cli/       create-openinary CLI
-docker/             Dockerfiles, nginx, supervisord
+docker/             Dockerfiles (api, web, legacy full), nginx configs, supervisord
 scripts/            init-env, secure-db, release helpers
 ```
 
@@ -55,7 +55,9 @@ Type-check and tests both depend on `^build`; run them before pushing.
 - Image pipeline: `packages/core/src/utils/image/*`; video pipeline:
   `packages/core/src/utils/video/*` (thumbnail → trim → downscale → resize →
   overlay → quality → volume).
-- Video transcodes run in the SQLite-backed job queue. A request returns 202
+- Video transcodes run in the SQLite-backed job queue. The worker encodes to a
+  temp file and streams it to the local/cloud cache; it never buffers the
+  output. A request returns 202
   with an ETA; `/video-status/<transform>/<path>` reports progress. When a
   browser is previewing (Accept `text/html`/`video/*`, Range, or
   Sec-Fetch-Dest `video`), the untouched original is served with
@@ -112,3 +114,9 @@ S3, `CORS_ORIGIN`.
 app so the dashboard hides transform/queue/cache and uses the raw originals.
 Runtime transform defaults are saved by the Transforms page to
 `data/transforms.json` (next to `DB_PATH`).
+
+Docker: `--profile full` now runs three containers — `api-full` (API image),
+`web` (Next standalone) and `nginx` — with no supervisord. `db-init` chowns
+the named volumes once before API startup. `--profile api` runs the API alone.
+`docker/full.Dockerfile` + `docker/supervisord.conf` are the legacy
+monolithic image kept for existing releases/CLI template.

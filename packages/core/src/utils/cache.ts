@@ -67,6 +67,23 @@ export async function saveToCache(cachePath: string, buffer: Buffer): Promise<vo
   }
 }
 
+/** Copies an encoded file into the local cache without reading it into RAM. */
+export async function saveFileToCache(
+  cachePath: string,
+  sourcePath: string,
+): Promise<void> {
+  try {
+    await fs.mkdir(dirname(cachePath), { recursive: true });
+    const tmpPath = `${cachePath}.tmp-${process.pid}-${Date.now()}`;
+    await fs.copyFile(sourcePath, tmpPath);
+    await fs.rename(tmpPath, cachePath);
+    const { size } = await fs.stat(cachePath);
+    logger.debug({ cachePath, size }, "Copied encoded file to cache");
+  } catch (error) {
+    logger.warn({ error: serializeError(error), cachePath }, "Failed to save file to cache");
+  }
+}
+
 export async function readFromCache(cachePath: string): Promise<Buffer> {
   return fs.readFile(cachePath);
 }

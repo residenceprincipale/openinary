@@ -1,4 +1,4 @@
-import { mkdtemp } from "fs/promises";
+import { mkdtemp, rmdir, unlink } from "fs/promises";
 import { join } from "path";
 import { tmpdir } from "os";
 import { randomUUID } from "crypto";
@@ -80,43 +80,42 @@ async function convertWithSharp(
  *      buffer is post-processed by sharp, this avoids relying on optional
  *      ffmpeg build flags such as libwebp.
  */
-export const transformVideo = async (
+type VideoRun = {
+  storage: CloudStorage | null;
+  paths: EnginePaths;
+  settings: VideoSettings;
+  defaults?: TransformDefaults;
+};
+
+type PipelineResult =
+  | { buffer: Buffer; outputPath?: undefined; cleanup?: undefined }
+  | { buffer?: undefined; outputPath: string; cleanup: () => Promise<void> };
+
+/** Shared pipeline: ffmpeg writes one file, and the caller decides whether to
+ *  read it into memory (thumbnails) or stream it to storage (video worker). */
+async function runVideoPipeline(
   inputPath: string,
   params: VideoTransformParams,
-  run: {
-    storage: CloudStorage | null;
-    paths: EnginePaths;
-    settings: VideoSettings;
-    defaults?: TransformDefaults;
-  },
-  onProgress?: (progress: EncodeProgress) => void,
-): Promise<Buffer> => {
-  // Create temporary directory for output
+  run: VideoRun,
+  onProgress: ((progress: EncodeProgress) => void) | undefined,
+  keepOutput: boolean,
+): Promise<PipelineResult> {
   const tmpDir = await mkdtemp(join(tmpdir(), "video-"));
-
-  // Get source file extension
   const sourceExt = inputPath.split(".").pop()?.toLowerCase();
 
-  // Determine output format and flags
   const { format, isImageOutput, isThumbnail } = determineOutputFormat(
     sourceExt,
     params.format,
   );
 
-  // For thumbnails, always let ffmpeg output JPEG, it is universally supported
-  // regardless of ffmpeg build flags (no libwebp required).
-  // We post-process with sharp afterwards if the requested format differs.
   const ffmpegFormat = isThumbnail ? "jpg" : format;
   const needsSharpConversion =
     isThumbnail &&
     IMAGE_FORMATS.has(normalizeFormat(format)) &&
     SHARP_CONVERTED_FORMATS.has(normalizeFormat(format));
 
-  // Generate output path using the ffmpeg-friendly format
   const outputPath = join(tmpDir, `${randomUUID()}.${ffmpegFormat}`);
 
-  // Probe duration so thumbnail extraction can clamp a seek past the end
-  // (seeking past the last frame yields zero frames and an empty buffer).
   let duration: number | undefined;
   if (isThumbnail) {
     try {
@@ -127,15 +126,10 @@ export const transformVideo = async (
     }
   }
 
-  // Build context object
   const context: VideoContext = {
     inputPath,
     outputPath,
     tmpDir,
-    // A copy: staging the overlay below rewrites overlayPath to a temp file,
-    // and the caller (the video worker) keys the cloud cache upload on its
-    // own params. Mutating them uploaded every overlaid video under a random
-    // key, so no other instance, and no restart, ever found it again.
     params: { ...params },
     isImageOutput,
     isThumbnail,
@@ -144,6 +138,7 @@ export const transformVideo = async (
   };
 
   let overlay: StagedSource | undefined;
+  let completed = false;
 
   try {
     if (context.params.overlayPath) {
@@ -151,24 +146,36 @@ export const transformVideo = async (
       context.params.overlayPath = overlay.path;
     }
 
-    // Apply transformations pipeline and execute
-    // Order matters: thumbnail extraction or trimming first, auto-downscale, resize, then quality
     const builder = new VideoCommandBuilder(context, run.settings);
+    await builder.apply(
+      applyThumbnailExtraction,
+      applyTrimming,
+      applyAutoDownscale,
+      applyResize,
+      applyOverlay,
+      applyQuality,
+      // After quality: its audioCodec("copy") would drop the filter.
+      applyVolume,
+    );
 
-    let buffer = await (
-      await builder.apply(
-        applyThumbnailExtraction,
-        applyTrimming,
-        applyAutoDownscale,
-        applyResize,
-        applyOverlay,
-        applyQuality,
-        // After quality: its audioCodec("copy") would drop the filter.
-        applyVolume,
-      )
-    ).execute(onProgress);
+    if (keepOutput) {
+      const filePath = await builder.executeToFile(onProgress);
+      completed = true;
+      return {
+        outputPath: filePath,
+        cleanup: async () => {
+          await unlink(filePath).catch(() => {});
+          try {
+            await rmdir(tmpDir);
+          } catch {
+            // Already gone or a staged overlay still lives there.
+          }
+        },
+      };
+    }
 
-    // Post-process with sharp if needed (e.g. JPEG → WebP/AVIF/PNG)
+    let buffer = await builder.execute(onProgress);
+
     if (needsSharpConversion) {
       const qualityValue =
         params.quality !== undefined
@@ -183,8 +190,42 @@ export const transformVideo = async (
       );
     }
 
-    return buffer;
+    completed = true;
+    return { buffer };
   } finally {
     await overlay?.cleanup();
+    if (!completed) {
+      await unlink(outputPath).catch(() => {});
+      try {
+        await rmdir(tmpDir);
+      } catch {
+        // Already gone.
+      }
+    }
   }
+}
+
+export const transformVideo = async (
+  inputPath: string,
+  params: VideoTransformParams,
+  run: VideoRun,
+  onProgress?: (progress: EncodeProgress) => void,
+): Promise<Buffer> => {
+  const result = await runVideoPipeline(inputPath, params, run, onProgress, false);
+  return result.buffer!;
+};
+
+/**
+ * Encodes a video to a temporary file and lets the caller stream it to its
+ * destination. The 300 MB buffer of a large transcode never enters the heap.
+ * `cleanup()` removes the file and its temp directory; call it after upload.
+ */
+export const transformVideoToFile = async (
+  inputPath: string,
+  params: VideoTransformParams,
+  run: VideoRun,
+  onProgress?: (progress: EncodeProgress) => void,
+): Promise<{ filePath: string; cleanup: () => Promise<void> }> => {
+  const result = await runVideoPipeline(inputPath, params, run, onProgress, true);
+  return { filePath: result.outputPath!, cleanup: result.cleanup! };
 };

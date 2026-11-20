@@ -1,6 +1,6 @@
 import { EventEmitter } from "events";
-import { transformVideo } from "./index";
-import { saveToCache } from "../cache";
+import { transformVideoToFile } from "./index";
+import { saveFileToCache } from "../cache";
 import { stageSource, type StagedSource } from "../stage-source";
 import type { CloudStorage } from "../storage/index";
 import logger, { serializeError } from "../logger";
@@ -196,6 +196,7 @@ export class VideoWorker extends EventEmitter {
     this.emit("job:started", job);
 
     let source: StagedSource | undefined;
+    let encoded: Awaited<ReturnType<typeof transformVideoToFile>> | undefined;
     try {
       const params = JSON.parse(job.params_json);
       source = await stageSource(this.storage, this.paths, job.file_path);
@@ -205,7 +206,7 @@ export class VideoWorker extends EventEmitter {
       let outputSeconds: number | null = null;
       let lastPercent = 0;
       let lastWriteAt = 0;
-      const buffer = await transformVideo(source.path, params, {
+      encoded = await transformVideoToFile(source.path, params, {
         storage: this.storage,
         paths: this.paths,
         settings: this.video.settings,
@@ -235,13 +236,18 @@ export class VideoWorker extends EventEmitter {
         }
       });
 
-      await saveToCache(job.cache_path, buffer);
+      await saveFileToCache(job.cache_path, encoded.filePath);
 
       if (this.storage) {
         const sourceExt = job.file_path.split(".").pop()?.toLowerCase();
         const { format } = determineOutputFormat(sourceExt, params.format);
         const contentType = contentTypeForFormat(format);
-        await this.storage.upload(job.file_path, params, buffer, contentType);
+        await this.storage.uploadFromFile(
+          job.file_path,
+          params,
+          encoded.filePath,
+          contentType,
+        );
       }
 
       this.store.updateJobStatus(job.id, "completed", 100);
@@ -299,6 +305,7 @@ export class VideoWorker extends EventEmitter {
         );
       }
     } finally {
+      await encoded?.cleanup();
       await source?.cleanup();
     }
   }

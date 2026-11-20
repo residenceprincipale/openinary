@@ -9,6 +9,8 @@ import {
   CopyObjectCommand,
 } from "@aws-sdk/client-s3";
 import https from "https";
+import { createReadStream } from "fs";
+import { stat } from "fs/promises";
 import { StorageConfig, StorageClientOptions } from "./types";
 
 export class S3ClientWrapper {
@@ -273,6 +275,31 @@ export class S3ClientWrapper {
         Metadata: metadata,
       }),
     );
+  }
+
+  /**
+   * Uploads a file from disk. The body is a stream, so an encoded video never
+   * has to be read into a Buffer first.
+   */
+  async uploadObjectFromFile(
+    key: string,
+    filePath: string,
+    contentType: string,
+    metadata?: Record<string, string>,
+  ): Promise<number> {
+    const { size } = await stat(filePath);
+    await this.s3Client.send(
+      new PutObjectCommand({
+        Bucket: this.config.bucketName,
+        Key: key,
+        Body: createReadStream(filePath),
+        ContentLength: size,
+        ContentType: contentType,
+        CacheControl: "public, max-age=31536000",
+        Metadata: metadata,
+      }),
+    );
+    return size;
   }
 
   /**
