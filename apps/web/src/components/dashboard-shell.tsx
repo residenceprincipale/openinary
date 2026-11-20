@@ -1,7 +1,7 @@
 "use client";
 
 import { ShellInset } from "@openinary/dashboard";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Suspense, useEffect } from "react";
 
 import { AppSidebar } from "@/components/sidebar/app-sidebar";
@@ -14,11 +14,6 @@ import { useSession } from "@/lib/auth-client";
  * skeleton while its data loads.
  */
 export function DashboardShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-
-  // The queue monitor is a bare debugging page, outside the shell.
-  if (pathname.startsWith("/debug")) return children;
-
   return (
     <Suspense>
       <Shell>{children}</Shell>
