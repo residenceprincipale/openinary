@@ -21,6 +21,7 @@ import { Archive, ArrowUpRight, ListVideo, LogOut, Settings } from "lucide-react
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { useBranding } from "@/components/branding-provider";
 import { useOnboardingState } from "@/components/onboarding-gate";
 import { useVersion } from "@/components/sidebar/version-display";
 import { signOut, useSession } from "@/lib/auth-client";
@@ -128,10 +129,17 @@ function Account() {
 
 export function AppSidebar() {
   const router = useRouter();
+  const branding = useBranding();
 
   return (
     <DashboardSidebar
-      brand={<img src="/icon.svg" alt="" className="size-[18px] dark:invert" />}
+      brand={
+        <img
+          src={branding.logoUrl || "/icon.svg"}
+          alt=""
+          className="size-[18px] dark:invert"
+        />
+      }
       mainItems={mainItems}
       settingsPages={settingsPages}
       settingsActions={settingsPages.map((page) => ({
