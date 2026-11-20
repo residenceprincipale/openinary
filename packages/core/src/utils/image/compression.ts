@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import './sharp-runtime';
 import type { TransformDefaults } from '../../types';
 import { TransformParams, ImageFormat, ImageAnalysis, OptimizationResult } from './types';
 import logger, { serializeError } from '../logger';

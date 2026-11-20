@@ -1,7 +1,12 @@
 import { Hono } from "hono";
 import { TransformService } from "../services/transform.service";
 import type { RouteDeps } from "../config/deps";
-import { pathBelowMount, remoteSourceUrl, respond } from "./delivery";
+import {
+  pathBelowMount,
+  prefersPlayableOriginal,
+  remoteSourceUrl,
+  respond,
+} from "./delivery";
 import logger, { serializeError } from "../utils/logger";
 
 export function createTransformRoute(deps: RouteDeps) {
@@ -21,6 +26,7 @@ export function createTransformRoute(deps: RouteDeps) {
         userAgent: c.req.header("User-Agent") ?? "",
         acceptHeader: c.req.header("Accept"),
         sourceUrl: remoteSourceUrl(c, deps.allowRemoteSource ?? false),
+        preferOriginal: prefersPlayableOriginal(c),
       });
       return respond(c, result, path);
     } catch (error) {

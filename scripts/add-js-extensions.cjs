@@ -11,6 +11,8 @@ function addJsExtensionsInFile(filePath) {
   const exportRegex = /(export\s+.*?\s+from\s+['"])(\.[^'"]*?)(?<!\.js)(['"])/g;
   // Dynamic import() — no `from` keyword
   const dynamicImportRegex = /(import\(\s*['"])(\.[^'"]*?)(?<!\.js)(['"]\s*\))/g;
+  // Side-effect import "x" (no `from`), used by runtime configuration modules
+  const sideEffectImportRegex = /(import\s*['"])(\.[^'"]*?)(?<!\.js)(['"])/g;
   
   let hasChanges = false;
   let newContent = content.replace(importRegex, (match, prefix, importPath, suffix) => {
@@ -60,6 +62,21 @@ function addJsExtensionsInFile(filePath) {
       return prefix + importPath + '/index.js' + suffix;
     }
     
+    const fullPath = path.resolve(path.dirname(filePath), importPath + '.js');
+    if (fs.existsSync(fullPath)) {
+      hasChanges = true;
+      return prefix + importPath + '.js' + suffix;
+    }
+    return match;
+  });
+
+  newContent = newContent.replace(sideEffectImportRegex, (match, prefix, importPath, suffix) => {
+    const dirPath = path.resolve(path.dirname(filePath), importPath);
+    const indexPath = path.join(dirPath, 'index.js');
+    if (fs.existsSync(indexPath) && fs.statSync(dirPath).isDirectory()) {
+      hasChanges = true;
+      return prefix + importPath + '/index.js' + suffix;
+    }
     const fullPath = path.resolve(path.dirname(filePath), importPath + '.js');
     if (fs.existsSync(fullPath)) {
       hasChanges = true;

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { RouteDeps } from "../config/deps";
 import { zipSync } from "fflate";
+import { HTTPException } from "hono/http-exception";
 import fs from "fs";
 import path from "path";
 import logger, { serializeError } from "../utils/logger";
@@ -8,6 +9,8 @@ import { decodeRequestPath } from "../url/grammar";
 import { cleanStorageKey } from "../url/storage-layout";
 
 const MAX_PATHS = 200;
+const MAX_ZIP_BYTES =
+  (parseInt(process.env.MAX_ZIP_MB ?? "2048", 10) || 2048) * 1024 * 1024;
 
 type ZipItem = { path: string; kind?: "file" | "folder" };
 
@@ -96,56 +99,59 @@ export function createDownloadZipRoute(deps: RouteDeps) {
 
     try {
       const zipFiles: Record<string, Uint8Array> = {};
+      let totalBytes = 0;
 
-      const addFolder = async (cleanPath: string) => {
-        const prefix = storage!.mediaKey(`${cleanPath}/`);
-        const objects = await storage!.list(prefix);
-        await Promise.all(
-          objects.map(async (obj) => {
-            const relPath = obj.key.replace(prefix, "");
-            if (!relPath || relPath.endsWith("/")) return;
-            const buffer = await storage!.downloadOriginal(
-              `${cleanPath}/${relPath}`,
-            );
-            zipFiles[`${cleanPath}/${relPath}`] = new Uint8Array(buffer);
-          }),
-        );
+      const add = (name: string, buffer: Buffer) => {
+        totalBytes += buffer.length;
+        if (totalBytes > MAX_ZIP_BYTES) {
+          throw new HTTPException(413, {
+            message: `Archive exceeds ${MAX_ZIP_BYTES / 1024 / 1024} MB. Download fewer items at once.`,
+          });
+        }
+        zipFiles[name] = new Uint8Array(buffer);
       };
 
-      await Promise.all(
-        items.map(async ({ path: raw, kind }) => {
-          const cleanPath = cleanStorageKey(decodeRequestPath(raw));
-          if (!cleanPath) return;
+      // Sequential on purpose: parallel downloads would hold every object in
+      // memory at once, on top of the archive being built.
+      for (const { path: raw, kind } of items) {
+        const cleanPath = cleanStorageKey(decodeRequestPath(raw));
+        if (!cleanPath) continue;
 
-          if (storage) {
-            const isFolder = kind
-              ? kind === "folder"
-              : await storage.folderExists(cleanPath);
-            if (isFolder) {
-              await addFolder(cleanPath);
-            } else {
-              try {
-                const buffer = await storage.downloadOriginal(cleanPath);
-                zipFiles[cleanPath] = new Uint8Array(buffer);
-              } catch {
-                // Skip missing files rather than failing the whole archive
-              }
+        if (storage) {
+          const isFolder = kind
+            ? kind === "folder"
+            : await storage.folderExists(cleanPath);
+          if (isFolder) {
+            const prefix = storage.mediaKey(`${cleanPath}/`);
+            const objects = await storage.list(prefix);
+            for (const obj of objects) {
+              const relPath = obj.key.replace(prefix, "");
+              if (!relPath || relPath.endsWith("/")) continue;
+              const buffer = await storage.downloadOriginal(
+                `${cleanPath}/${relPath}`,
+              );
+              add(`${cleanPath}/${relPath}`, buffer);
             }
           } else {
-            const localPath = path.join(paths.public, cleanPath);
-            if (!fs.existsSync(localPath)) return;
-            if (fs.statSync(localPath).isDirectory()) {
-              for (const entry of collectLocalFiles(localPath, cleanPath)) {
-                zipFiles[entry.arcPath] = new Uint8Array(
-                  fs.readFileSync(entry.fullPath),
-                );
-              }
-            } else {
-              zipFiles[cleanPath] = new Uint8Array(fs.readFileSync(localPath));
+            try {
+              const buffer = await storage.downloadOriginal(cleanPath);
+              add(cleanPath, buffer);
+            } catch {
+              // Skip missing files rather than failing the whole archive
             }
           }
-        }),
-      );
+        } else {
+          const localPath = path.join(paths.public, cleanPath);
+          if (!fs.existsSync(localPath)) continue;
+          if (fs.statSync(localPath).isDirectory()) {
+            for (const entry of collectLocalFiles(localPath, cleanPath)) {
+              add(entry.arcPath, fs.readFileSync(entry.fullPath));
+            }
+          } else {
+            add(cleanPath, fs.readFileSync(localPath));
+          }
+        }
+      }
 
       if (Object.keys(zipFiles).length === 0) {
         return c.json(
@@ -162,6 +168,12 @@ export function createDownloadZipRoute(deps: RouteDeps) {
       c.header("Cache-Control", "private, no-store");
       return c.body(zipBuffer);
     } catch (error) {
+      if (error instanceof HTTPException) {
+        return c.json(
+          { error: "Payload too large", message: error.message },
+          413,
+        );
+      }
       logger.error(
         { error: serializeError(error) },
         "Bulk zip download failed",

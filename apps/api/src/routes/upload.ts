@@ -145,13 +145,19 @@ export function createUploadRoute(
   options: {
     /** Undefined when DISABLE_TRANSFORMS is on. */
     transformService?: TransformService;
+    /** Loads the transform runtime on first prewarm (keeps sharp out of idle). */
+    getTransformService?: () => Promise<TransformService>;
     transformsEnabled?: boolean;
   } = {},
 ) {
   const { storage, apiSecret, paths, access } = deps;
-  const videoJobQueue = deps.queue;
-  const transformService = options.transformService;
   const transformsEnabled = options.transformsEnabled ?? true;
+
+  async function ensureTransforms(): Promise<TransformService | null> {
+    if (!transformsEnabled) return null;
+    if (options.transformService) return options.transformService;
+    return (await options.getTransformService?.()) ?? null;
+  }
   // Bare /t/<path> streams originals, so it exists even without transforms
   // only when the raw root route is mounted. There the URL is /<path>.
   const deliveryUrl = (filePath: string) =>
@@ -189,6 +195,7 @@ export function createUploadRoute(
     filePath: string,
     transformations: string[],
   ): Promise<{ prewarmedUrls: string[]; prewarmErrors: string[] }> {
+    const transformService = await ensureTransforms();
     if (!transformService) return { prewarmedUrls: [], prewarmErrors: [] };
 
     const prewarmedUrls: string[] = [];
@@ -251,12 +258,17 @@ export function createUploadRoute(
     return fs.existsSync(fullPath);
   }
 
-  function queueVideoTransformations(
+  async function queueVideoTransformations(
     filePath: string,
     transformations: string[],
-  ): { queuedTransformationUrls: string[]; queueErrors: string[] } {
+  ): Promise<{ queuedTransformationUrls: string[]; queueErrors: string[] }> {
     const queuedTransformationUrls: string[] = [];
     const queueErrors: string[] = [];
+
+    // Loading the runtime also swaps deps.queue from its stub to the real one.
+    if (!(await ensureTransforms())) {
+      return { queuedTransformationUrls, queueErrors };
+    }
 
     for (const transformSegment of transformations) {
       const transformPath = `/t/${transformSegment}/${filePath}`;
@@ -274,7 +286,7 @@ export function createUploadRoute(
         : TRANSFORMATION_PRIORITY;
 
       try {
-        const jobId = videoJobQueue.enqueueTransform(filePath, params, priority);
+        const jobId = deps.queue.enqueueTransform(filePath, params, priority);
 
         queuedTransformationUrls.push(transformPath);
         logger.info(
@@ -571,7 +583,7 @@ export function createUploadRoute(
               normalizedContentType.startsWith("video/") &&
               prewarmTransformations.length > 0
             ) {
-              const queueResult = queueVideoTransformations(
+              const queueResult = await queueVideoTransformations(
                 finalPath,
                 prewarmTransformations,
               );
@@ -632,7 +644,7 @@ export function createUploadRoute(
               normalizedContentType.startsWith("video/") &&
               prewarmTransformations.length > 0
             ) {
-              const queueResult = queueVideoTransformations(
+              const queueResult = await queueVideoTransformations(
                 finalPath,
                 prewarmTransformations,
               );

@@ -50,6 +50,11 @@ export interface TransformRequest {
    * both sides, stays this instance's own.
    */
   sourceUrl?: string;
+  /**
+   * The caller renders the result (browser video/link). While a transcode is
+   * queued, serve the original with X-Video-Status instead of 202 JSON.
+   */
+  preferOriginal?: boolean;
 }
 
 export interface TransformResult {
@@ -209,7 +214,7 @@ export class TransformService {
     ext: string | undefined,
     effectiveParams: CombindedTransformParams,
     cachePath: string,
-    { userAgent, acceptHeader, sourceUrl }: TransformRequest,
+    { userAgent, acceptHeader, sourceUrl, preferOriginal }: TransformRequest,
   ): Promise<TransformResult> {
     const isImage = isTransformableImageExt(ext);
     const isAudio = isAudioExt(ext);
@@ -265,7 +270,10 @@ export class TransformService {
     // expired. A remote source therefore covers images and video thumbnails,
     // not transcodes.
     if (isVideoExt(ext) && !effectiveParams.thumbnail) {
-      return await this.queueVideo(requestPath, filePath, effectiveParams);
+      return await this.queueVideo(requestPath, filePath, effectiveParams, {
+        preferOriginal: preferOriginal ?? false,
+        sourceUrl,
+      });
     }
 
     // Reached only when effectiveParams is non-empty - the bare-URL case
@@ -356,6 +364,7 @@ export class TransformService {
     requestPath: string,
     filePath: string,
     params: CombindedTransformParams,
+    options: { preferOriginal: boolean; sourceUrl?: string },
   ): Promise<TransformResult> {
     let job = this.queue.getJobByPath(filePath, params);
 
@@ -392,11 +401,28 @@ export class TransformService {
       this.queue.enqueueTransform(filePath, params, TRANSFORMATION_PRIORITY);
     }
 
-    // Never fall back to the original while the transform is pending: it would
-    // ship content whose transformations (watermark, crop, trim) have not been
-    // applied yet. Answer 202 and let the client poll /video-status, or simply
-    // retry this URL once Retry-After has passed.
     const estimate = await this.queue.estimate(filePath, params);
+
+    // A browser asked for something to play: show the untouched original
+    // rather than a JSON body. no-store keeps it out of every cache, and
+    // X-Video-Status tells the dashboard a transcode is still running.
+    if (options.preferOriginal) {
+      const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+      const original = await this.streamOriginal(filePath, ext, options.sourceUrl);
+      return {
+        ...original,
+        headers: {
+          ...original.headers,
+          "Cache-Control": "no-store",
+          "X-Video-Status": "processing",
+          ...processingHeaders(estimate),
+        },
+      };
+    }
+
+    // API clients get 202 and can poll /video-status or retry once Retry-After
+    // has passed. Never do this for a browser: unprocessed bytes would be
+    // cached under a transform URL whose crop/trim/watermark is not applied.
     return {
       buffer: Buffer.from(
         JSON.stringify(

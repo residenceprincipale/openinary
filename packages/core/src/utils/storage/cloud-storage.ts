@@ -281,13 +281,17 @@ export class CloudStorage implements StatsBackend {
    * it in memory. Used to serve large originals (e.g. videos still being
    * optimized) directly to clients.
    */
-  async downloadOriginalStream(originalPath: string): Promise<{
+  async downloadOriginalStream(
+    originalPath: string,
+    range?: string,
+  ): Promise<{
     stream: ReadableStream<Uint8Array>;
     contentLength?: number;
+    contentRange?: string;
     contentType?: string;
   }> {
     const storageKey = this.mediaKey(originalPath);
-    return await this.s3Client.downloadObjectStream(storageKey);
+    return await this.s3Client.downloadObjectStream(storageKey, range);
   }
 
   async uploadOriginal(

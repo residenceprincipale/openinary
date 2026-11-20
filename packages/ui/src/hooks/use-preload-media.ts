@@ -2,8 +2,19 @@
 
 import { useEffect, useRef } from "react";
 
-// Global cache to prevent duplicate preloads across components
+// Global cache to prevent duplicate preloads across components. Bounded: a
+// long browsing session over thousands of thumbnails must not keep every URL
+// (and the browser image it maps to) alive.
+const MAX_PRELOADED = 200;
 const globalPreloadedCache = new Set<string>();
+
+function rememberPreload(url: string): void {
+  if (globalPreloadedCache.size >= MAX_PRELOADED) {
+    const oldest = globalPreloadedCache.values().next().value;
+    if (oldest) globalPreloadedCache.delete(oldest);
+  }
+  globalPreloadedCache.add(url);
+}
 
 /**
  * Check if connection is slow (using Network Information API if available)
@@ -43,13 +54,13 @@ export function usePreloadMedia(url: string | null, type: "image" | "video") {
     if (type === "image") {
       const img = new Image();
       img.src = url;
-      globalPreloadedCache.add(url);
+      rememberPreload(url);
       preloadedRef.current.add(url);
     } else {
       const video = document.createElement("video");
       video.src = url;
       video.preload = "auto";
-      globalPreloadedCache.add(url);
+      rememberPreload(url);
       preloadedRef.current.add(url);
     }
   }, [url, type]);
@@ -69,11 +80,11 @@ export function preloadMedia(url: string, type: "image" | "video") {
   if (type === "image") {
     const img = new Image();
     img.src = url;
-    globalPreloadedCache.add(url);
+    rememberPreload(url);
   } else {
     const video = document.createElement("video");
     video.src = url;
     video.preload = "auto";
-    globalPreloadedCache.add(url);
+    rememberPreload(url);
   }
 }

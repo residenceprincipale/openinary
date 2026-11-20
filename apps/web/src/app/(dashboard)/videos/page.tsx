@@ -1,4 +1,10 @@
-import { GetStartedPage, VideosPlayground } from "@openinary/dashboard";
+import dynamic from "next/dynamic";
+import { GetStartedPage } from "@openinary/dashboard";
+
+// Same split as Images: the player and demo clips load with the page body.
+const VideosPlayground = dynamic(() =>
+  import("@openinary/dashboard").then((mod) => mod.VideosPlayground),
+);
 
 export default function Page() {
   return (

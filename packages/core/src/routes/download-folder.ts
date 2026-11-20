@@ -25,6 +25,9 @@ function collectLocalFiles(
   return results;
 }
 
+const MAX_ZIP_BYTES =
+  (parseInt(process.env.MAX_ZIP_MB ?? "2048", 10) || 2048) * 1024 * 1024;
+
 export function createDownloadFolderRoute(deps: RouteDeps) {
   const { storage, paths } = deps;
   const downloadFolder = new Hono();
@@ -59,6 +62,16 @@ export function createDownloadFolderRoute(deps: RouteDeps) {
           return c.text("Folder not found or empty", 404);
         }
 
+        const totalBytes = objects.reduce((sum, obj) => sum + (obj.size ?? 0), 0);
+        if (totalBytes > MAX_ZIP_BYTES) {
+          return c.text(
+            `Folder is too large to zip (${Math.round(totalBytes / 1024 / 1024)} MB, max ${MAX_ZIP_BYTES / 1024 / 1024} MB). Download its files individually.`,
+            413,
+          );
+        }
+
+        // One file at a time: the zip still lives in memory, but the peak is
+        // the folder size instead of twice it in parallel buffers.
         for (const obj of objects) {
           // obj.key looks like "<mediaPrefix>videos/clip.mp4"
           const relPath = obj.key.replace(prefix, "");
@@ -79,6 +92,20 @@ export function createDownloadFolderRoute(deps: RouteDeps) {
         const entries = collectLocalFiles(localDir, "");
         if (entries.length === 0) {
           return c.text("Folder is empty", 404);
+        }
+
+        const totalBytes = entries.reduce((sum, entry) => {
+          try {
+            return sum + fs.statSync(entry.fullPath).size;
+          } catch {
+            return sum;
+          }
+        }, 0);
+        if (totalBytes > MAX_ZIP_BYTES) {
+          return c.text(
+            `Folder is too large to zip (${Math.round(totalBytes / 1024 / 1024)} MB, max ${MAX_ZIP_BYTES / 1024 / 1024} MB). Download its files individually.`,
+            413,
+          );
         }
 
         for (const entry of entries) {

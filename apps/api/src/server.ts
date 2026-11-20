@@ -13,7 +13,7 @@ import { deploymentMode } from "./config/mode";
 // In cloud mode the bucket is the cache: local files from a previous run go.
 if (getSharedStorage()) await clearAllCache(enginePaths.cache);
 
-startBackgroundJobs();
+void startBackgroundJobs();
 
 /**
  * First boot only: creates the admin from OPENINARY_ADMIN_* and, in API mode
@@ -129,12 +129,12 @@ initializeAuth();
 // Graceful shutdown
 process.on("SIGTERM", () => {
   logger.info("SIGTERM received, shutting down gracefully...");
-  stopBackgroundJobs();
+  void stopBackgroundJobs();
   process.exit(0);
 });
 
 process.on("SIGINT", () => {
   logger.info("SIGINT received, shutting down gracefully...");
-  stopBackgroundJobs();
+  void stopBackgroundJobs();
   process.exit(0);
 });

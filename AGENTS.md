@@ -100,7 +100,9 @@ created becomes `admin`; later accounts default to `user`.
 ## Environment
 `BETTER_AUTH_SECRET` (required in production), `BETTER_AUTH_URL`, `API_SECRET`
 (signed URLs), `DB_PATH`, `MODE` (`fullstack` or `api`), `MAX_FILE_SIZE_MB`,
-`STORAGE_LIMIT_MB` (0 = unlimited), `STORAGE_*` for S3, `CORS_ORIGIN`.
+`MAX_UPLOAD_BODY_MB` (whole request), `MAX_ZIP_MB`, `SHARP_CACHE_MB` (10),
+`SHARP_CONCURRENCY` (1), `STORAGE_LIMIT_MB` (0 = unlimited), `STORAGE_*` for
+S3, `CORS_ORIGIN`.
 `DISABLE_TRANSFORMS=true` runs delivery-only: no `/t`, no video queue, and
 `@openinary/core/light` (no sharp) is used. Set the same variable for the web
 app so the dashboard hides transform/queue/cache and uses the raw originals.

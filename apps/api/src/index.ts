@@ -1,7 +1,8 @@
 import { Hono, type Context } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { compress } from "hono/compress";
 import { cors } from "hono/cors";
-import { allowedOrigins } from "shared";
+import { allowedOrigins, getDb } from "shared";
 import {
   createStorageRoute,
   createDownloadRoute,
@@ -25,7 +26,7 @@ import cache from "./routes/cache";
 import config from "./routes/config";
 import users from "./routes/users";
 import { createStorageExtras } from "./routes/storage-extras";
-import { noteApiUpload } from "./middleware/activity";
+import { logDelivery, noteApiUpload } from "./middleware/activity";
 import { apiKeyAuth, type AuthVariables } from "./middleware/auth";
 import { publicRateLimit } from "./middleware/rate-limit";
 import { getSharedStorage } from "./config/storage";
@@ -39,6 +40,11 @@ import { getUserAccessiblePaths, hasPermission } from "./utils/permissions";
  * memory flat. Uploads still work; prewarm requests are ignored.
  */
 export const transformsDisabled = process.env.DISABLE_TRANSFORMS === "true";
+
+// Guards before Hono parses a multipart body into memory. MAX_FILE_SIZE_MB is
+// per file; a request may carry several, so this is the whole-request cap.
+const MAX_UPLOAD_BODY =
+  (parseInt(process.env.MAX_UPLOAD_BODY_MB ?? "256", 10) || 256) * 1024 * 1024;
 
 // Logged, not fatal: only /authenticated and presigned uploads need the
 // secret, and they answer 500 without it.
@@ -54,11 +60,7 @@ if (!transformsDisabled) {
 }
 
 type TransformRuntime = typeof import("./transform-runtime");
-
-let transformRuntime: TransformRuntime | null = null;
-if (!transformsDisabled) {
-  transformRuntime = await import("./transform-runtime");
-}
+type RuntimeApps = ReturnType<TransformRuntime["createTransformApps"]>;
 
 // The storage route only needs the job store to delete related jobs. With
 // transforms off there are none, and importing VideoJobQueue would pull sharp.
@@ -66,7 +68,59 @@ const disabledQueue = {
   store: { deleteJobsByFilePath: () => 0 },
 } as unknown as VideoJobQueue;
 
-const queue = transformRuntime?.videoJobQueue ?? disabledQueue;
+let runtimePromise:
+  | Promise<{
+      runtime: TransformRuntime;
+      apps: RuntimeApps;
+      transformService: ReturnType<
+        TransformRuntime["createUploadTransformService"]
+      >;
+    }>
+  | null = null;
+
+/**
+ * sharp/ffmpeg load on the first transform or upload prewarm, not at boot.
+ * A pending job from a previous run triggers the same load from server.ts.
+ */
+function loadTransformRuntime() {
+  runtimePromise ??= (async () => {
+    const runtime = await import("./transform-runtime");
+    // Storage deletes and upload prewarms read this at call time.
+    deps.queue = runtime.videoJobQueue;
+    runtime.startVideoQueue();
+    return {
+      runtime,
+      apps: runtime.createTransformApps(deps),
+      transformService: runtime.createUploadTransformService(deps),
+    };
+  })();
+  return runtimePromise;
+}
+
+/** A sub-app that is only imported when its first request arrives. */
+function lazyProxy(
+  prefix: string,
+  pick: (apps: RuntimeApps) => Hono,
+): Hono {
+  const proxy = new Hono();
+  proxy.all("/*", async (c) => {
+    const { apps } = await loadTransformRuntime();
+    const url = new URL(c.req.url);
+    url.pathname = url.pathname.slice(prefix.length) || "/";
+
+    const init: RequestInit & { duplex?: "half" } = {
+      method: c.req.method,
+      headers: c.req.raw.headers,
+    };
+    if (c.req.method !== "GET" && c.req.method !== "HEAD") {
+      init.body = c.req.raw.body;
+      init.duplex = "half";
+    }
+
+    return pick(apps).fetch(new Request(url, init));
+  });
+  return proxy;
+}
 
 const access: StorageAccess = {
   visiblePaths(c) {
@@ -84,7 +138,7 @@ const access: StorageAccess = {
 
 const deps: RouteDeps = {
   storage: getSharedStorage(),
-  queue,
+  queue: disabledQueue,
   paths: enginePaths,
   apiSecret: process.env.API_SECRET,
   allowRemoteSource: process.env.ALLOW_REMOTE_SOURCE === "true",
@@ -95,7 +149,9 @@ const deps: RouteDeps = {
 
 const upload = createUploadRoute(deps, {
   transformsEnabled: !transformsDisabled,
-  transformService: transformRuntime?.createUploadTransformService(deps),
+  getTransformService: transformsDisabled
+    ? undefined
+    : async () => (await loadTransformRuntime()).transformService,
 });
 const storageRoute = createStorageRoute(deps);
 const download = createDownloadRoute(deps);
@@ -139,7 +195,32 @@ app.route("/health", health);
 
 // /t, /authenticated, /video-status and /queue are only mounted when
 // transforms are on.
-transformRuntime?.registerTransformRoutes(app, deps);
+if (!transformsDisabled) {
+  app.use("/video-status", publicRateLimit);
+  app.use("/video-status/*", publicRateLimit);
+  app.route("/video-status", lazyProxy("/video-status", (a) => a.videoStatus));
+
+  app.use("/t", publicRateLimit);
+  app.use("/t/*", publicRateLimit);
+  app.use("/t/*", logDelivery("/t"));
+  app.route("/t", lazyProxy("/t", (a) => a.transform));
+
+  app.use("/authenticated", publicRateLimit);
+  app.use("/authenticated/*", publicRateLimit);
+  app.use("/authenticated/*", logDelivery("/authenticated"));
+  app.route(
+    "/authenticated",
+    lazyProxy("/authenticated", (a) => a.authenticated),
+  );
+
+  // Public, and registered before the protected /queue/*.
+  app.use("/queue/events", publicRateLimit);
+  app.use("/queue/events/*", publicRateLimit);
+  app.route("/queue/events", lazyProxy("/queue/events", (a) => a.queueEvents));
+
+  app.use("/queue/*", apiKeyAuth);
+  app.route("/queue", lazyProxy("/queue", (a) => a.queue));
+}
 
 app.use("/download", publicRateLimit);
 app.use("/download/*", publicRateLimit);
@@ -148,6 +229,21 @@ app.route("/download", download);
 app.use("/download-folder", publicRateLimit);
 app.use("/download-folder/*", publicRateLimit);
 app.route("/download-folder", downloadFolder);
+
+app.use(
+  "/upload",
+  bodyLimit({
+    maxSize: MAX_UPLOAD_BODY,
+    onError: (c) =>
+      c.json(
+        {
+          success: false,
+          error: `Upload exceeds ${MAX_UPLOAD_BODY / 1024 / 1024}MB for one request. Raise MAX_UPLOAD_BODY_MB or split the batch.`,
+        },
+        413,
+      ),
+  }),
+);
 
 // POST /upload accepts either a real API key/session, or a short-lived
 // presigned signature minted by POST /upload/sign, so it gets its own
@@ -201,13 +297,23 @@ app.route("/api-keys", apiKeys);
 // Last: every API route above wins.
 app.route("/", raw);
 
-/** Starts the video worker; a no-op when transforms are off. */
-export function startBackgroundJobs(): void {
-  transformRuntime?.startVideoQueue();
+/**
+ * Starts the video worker only when a previous run left work behind. Otherwise
+ * the runtime loads on the first transform request, keeping sharp/ffmpeg out
+ * of an idle process.
+ */
+export async function startBackgroundJobs(): Promise<void> {
+  if (transformsDisabled) return;
+  const pending = getDb()
+    .prepare("SELECT 1 FROM video_jobs WHERE status IN ('pending', 'processing') LIMIT 1")
+    .get();
+  if (pending) await loadTransformRuntime();
 }
 
-export function stopBackgroundJobs(): void {
-  transformRuntime?.stopVideoQueue();
+export async function stopBackgroundJobs(): Promise<void> {
+  if (!runtimePromise) return;
+  const { runtime } = await runtimePromise;
+  runtime.stopVideoQueue();
 }
 
 export default app;

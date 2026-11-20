@@ -49,13 +49,25 @@ export function createUploadTransformService(deps: RouteDeps) {
   return new TransformService(deps.storage, deps.queue, deps.paths, deps.defaults);
 }
 
+/** The transform sub-apps, mounted lazily by index.ts on first use. */
+export function createTransformApps(deps: RouteDeps) {
+  return {
+    transform: createTransformRoute(deps),
+    authenticated: createAuthenticatedRoute(deps),
+    videoStatus: createVideoStatusRoute(deps),
+    queueEvents: createQueueEventsRoute(deps),
+    queue: createQueueRoute(deps),
+  };
+}
+
 /** Mounts /t, /authenticated, /video-status, /queue/events and /queue. */
 export function registerTransformRoutes(app: Hono, deps: RouteDeps) {
-  const transform = createTransformRoute(deps);
-  const authenticated = createAuthenticatedRoute(deps);
-  const videoStatus = createVideoStatusRoute(deps);
-  const queueEvents = createQueueEventsRoute(deps);
-  const queue = createQueueRoute(deps);
+  const apps = createTransformApps(deps);
+  const transform = apps.transform;
+  const authenticated = apps.authenticated;
+  const videoStatus = apps.videoStatus;
+  const queueEvents = apps.queueEvents;
+  const queue = apps.queue;
 
   app.use("/video-status", publicRateLimit);
   app.use("/video-status/*", publicRateLimit);

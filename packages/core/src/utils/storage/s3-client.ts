@@ -106,15 +106,20 @@ export class S3ClientWrapper {
    * Downloads an object as a stream, without buffering it in memory.
    * Used to serve large files (e.g. original videos) directly to clients.
    */
-  async downloadObjectStream(key: string): Promise<{
+  async downloadObjectStream(
+    key: string,
+    range?: string,
+  ): Promise<{
     stream: ReadableStream<Uint8Array>;
     contentLength?: number;
+    contentRange?: string;
     contentType?: string;
   }> {
     const response = await this.s3Client.send(
       new GetObjectCommand({
         Bucket: this.config.bucketName,
         Key: key,
+        Range: range,
       }),
     );
 
@@ -125,6 +130,7 @@ export class S3ClientWrapper {
     return {
       stream: response.Body.transformToWebStream() as ReadableStream<Uint8Array>,
       contentLength: response.ContentLength,
+      contentRange: response.ContentRange,
       contentType: response.ContentType,
     };
   }

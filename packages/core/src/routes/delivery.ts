@@ -6,6 +6,22 @@ import { decodeRequestPath } from "../url/grammar";
 import { cleanStorageKey } from "../url/storage-layout";
 
 /**
+ * A browser is asking for something it wants to render (a <video> element or
+ * a link opened in a tab), not an API client polling for a 202. Used to serve
+ * the original while a video transcode is still queued instead of JSON.
+ */
+export function prefersPlayableOriginal(c: Context): boolean {
+  const accept = (c.req.header("accept") ?? "").toLowerCase();
+  return (
+    c.req.query("original") === "1" ||
+    c.req.header("range") !== undefined ||
+    c.req.header("sec-fetch-dest") === "video" ||
+    accept.includes("video/") ||
+    accept.includes("text/html")
+  );
+}
+
+/**
  * The decoded request path below the route's wildcard, whatever the app
  * mounted it under: "w_100/a.jpg" for "/t/w_100/a.jpg" on "/t/*", and for
  * "/b/x/t/w_100/a.jpg" on "/b/:id/t/*".

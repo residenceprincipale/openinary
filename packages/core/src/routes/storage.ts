@@ -33,7 +33,7 @@ import {
 type StorageClient = NonNullable<RouteDeps["storage"]>;
 
 export function createStorageRoute(deps: RouteDeps) {
-  const { storage: storageClient, queue, paths, access } = deps;
+  const { storage: storageClient, paths, access } = deps;
   const storageRoute = new Hono();
 
   /** Paths the caller may see; null means unrestricted. */
@@ -624,7 +624,7 @@ export function createStorageRoute(deps: RouteDeps) {
       const result = await deleteAssetCompletely(
         filePath,
         storageClient,
-        queue.store,
+        deps.queue.store,
         paths,
       );
 

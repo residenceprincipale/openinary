@@ -1,4 +1,11 @@
-import { GetStartedPage, ImagesPlayground } from "@openinary/dashboard";
+import dynamic from "next/dynamic";
+import { GetStartedPage } from "@openinary/dashboard";
+
+// The comparison playground pulls in canvas, demo assets and copy helpers;
+// keep it out of the initial dashboard bundle.
+const ImagesPlayground = dynamic(() =>
+  import("@openinary/dashboard").then((mod) => mod.ImagesPlayground),
+);
 
 export default function Page() {
   return (

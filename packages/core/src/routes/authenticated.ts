@@ -5,7 +5,7 @@ import logger, { serializeError } from "../utils/logger";
 import { verifySignature, sanitizeFilePath } from "../utils/signature";
 import { SIGNATURE_LENGTH } from "../url/hmac";
 import { splitTransformPath } from "../url/grammar";
-import { pathBelowMount, respond } from "./delivery";
+import { pathBelowMount, prefersPlayableOriginal, respond } from "./delivery";
 
 export function createAuthenticatedRoute(deps: RouteDeps) {
   const transformService = new TransformService(deps.storage, deps.queue, deps.paths);
@@ -65,6 +65,7 @@ export function createAuthenticatedRoute(deps: RouteDeps) {
         path: `/t/${transform ? `${transform}/` : ""}${sanitizedFilePath}`,
         userAgent: c.req.header("User-Agent") ?? "",
         acceptHeader: c.req.header("Accept"),
+        preferOriginal: prefersPlayableOriginal(c),
       });
       // The signature gates who can request a URL, not what the stored bytes
       // are: respond() applies the same nosniff and content-type rules as /t.

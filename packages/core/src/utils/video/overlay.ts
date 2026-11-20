@@ -1,6 +1,7 @@
 import { ValidationError } from "../errors";
 import { FullGravityMode } from "../../types";
 import sharp from "sharp";
+import "../image/sharp-runtime";
 import Ffmpeg from "fluent-ffmpeg";
 import { promisify } from "util";
 import fs from "fs/promises";

@@ -1,4 +1,5 @@
 import sharp from "sharp";
+import "./sharp-runtime";
 import { readFile } from "fs/promises";
 import Psd from "@webtoon/psd";
 import { applyAspectRatio } from "./aspect-ratio";
